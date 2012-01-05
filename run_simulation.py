@@ -7,6 +7,7 @@
 # Standard Library
 import sys, os
 import cPickle as pickle
+import multiprocessing
 
 # External Packages
 import numpy as np
@@ -46,8 +47,8 @@ def run_one_simulation(timesteps):
     #plot_clusters(id, data, clusterIndices)
     
     if not clusterIndices.all():
-        print "Cluster not found!"
-        return False
+        #print "Cluster not found!"
+        return False, None
     
     initial_u0 = np.exp(-10.*np.random.uniform())
     initial_t0 = np.median(data.t[clusterIndices])
@@ -63,13 +64,13 @@ def run_one_simulation(timesteps):
         popt = step2.fit_lightcurve(data, p0)
     except RuntimeError:
         print "maxfev reached!"
-        return False
+        return False, None
     #plot_fit(id, data, popt, true_params)
     
     if not SAVEFIGS and SHOW:
         plt.show()
     
-    return True
+    return True, sum((data.mag - SE.FluxToRMag(SE.FLUXMODEL(data.t, *popt)))/data.sigma**2)
 
 # Plotting
 def plot_model(id, data, true_params):
@@ -133,14 +134,48 @@ if __name__ == "__main__":
                 for name in os.listdir("sample_lightcurves") \
                 if os.path.splitext(name.lower())[1] == ".pickle"]
     
+    chisquares = []
     counter = 0.
     for pickleIndex in np.random.randint(len(pickles), size=NUM_SIMULATIONS):
         f = open(pickles[pickleIndex])
         timesteps = pickle.load(f)
         f.close()
         
-        success = run_one_simulation(timesteps)
+        success, chisq = run_one_simulation(timesteps)
         if success:
             counter += 1.
+            chisquares.append(chisq)
     
-    print "Fraction:", counter/NUM_SIMULATIONS
+    print "Fraction:", counter / float(NUM_SIMULATIONS)
+    plt.hist(chisquares)
+    plt.show()
+            
+    """
+    # Multiprocessing Method!
+    
+    counter = None
+    chisq = None
+
+    def init(cnt):
+        ''' store the counter for later use '''
+        global counter
+        counter = cnt
+    
+    def work(idx):
+        f = open(pickles[idx])
+        timesteps = pickle.load(f)
+        f.close()
+
+        success, csq = run_one_simulation(timesteps)
+        if success:
+            global counter
+            counter.value += 1
+    
+    counter = multiprocessing.Value('i', 0)
+    pool = multiprocessing.Pool(initializer = init, initargs = (counter, ))
+    #for idx in np.random.randint(len(pickles), size=NUM_SIMULATIONS):
+    p = pool.map_async(work, np.random.randint(len(pickles), size=NUM_SIMULATIONS))
+    
+    p.wait()
+    print "Fraction:", counter.value/float(NUM_SIMULATIONS)
+    """

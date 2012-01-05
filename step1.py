@@ -62,14 +62,14 @@ def find_clusters(data, contMag, contStd):
             group.append(idx)
         else:
             if in_group and len(group) >= 3: 
-                print "cluster found!"
+                #print "cluster found!"
                 return np.array(group)
                 
             in_group = False
             group = []
     
     if in_group and len(group) >= 3: 
-        print "cluster found!"
+        #print "cluster found!"
         return np.array(group)
     else:
         return np.array([False]*len(data.t))
