@@ -19,7 +19,7 @@ import step1
 import step2
 
 np.random.seed(115)
-NUM_SIMULATIONS = 10000
+NUM_SIMULATIONS = 100
 SAVEFIGS = False
 SHOW = False
 
@@ -70,7 +70,7 @@ def run_one_simulation(timesteps):
     if not SAVEFIGS and SHOW:
         plt.show()
     
-    return True, sum((data.mag - SE.FluxToRMag(SE.FLUXMODEL(data.t, *popt)))/data.sigma**2)
+    return True, (np.array(popt)-np.array(true_params))/np.array(true_params)
 
 # Plotting
 def plot_model(id, data, true_params):
@@ -134,22 +134,37 @@ if __name__ == "__main__":
                 for name in os.listdir("sample_lightcurves") \
                 if os.path.splitext(name.lower())[1] == ".pickle"]
     
-    chisquares = []
+    offsets = []
     counter = 0.
     for pickleIndex in np.random.randint(len(pickles), size=NUM_SIMULATIONS):
         f = open(pickles[pickleIndex])
         timesteps = pickle.load(f)
         f.close()
         
-        success, chisq = run_one_simulation(timesteps)
+        success, offset = run_one_simulation(timesteps)
         if success:
             counter += 1.
-            chisquares.append(chisq)
+            offsets.append(offset)
+    
+    # Fractional offsets in parameters
+    offsets = np.array(offsets)
     
     print "Fraction:", counter / float(NUM_SIMULATIONS)
-    plt.hist(chisquares, bins=NUM_SIMULATIONS/100)
-    plt.savefig("hist.png")
-            
+    fig = plt.figure()
+    ax1 = fig.add_subplot(221)
+    ax1.hist(offsets[:,0], bins=np.arange(-10., 10., 0.1))
+    
+    ax2 = fig.add_subplot(222)
+    ax2.hist(offsets[:,1], bins=np.arange(-10., 10., 0.1))
+    
+    ax3 = fig.add_subplot(223)
+    ax3.hist(offsets[:,2], bins=np.arange(-10., 10., 0.1))
+    
+    ax4 = fig.add_subplot(224)
+    ax4.hist(offsets[:,3], bins=np.arange(-10., 10., 0.1))
+    
+    plt.show()
+    
     """
     # Multiprocessing Method!
     
