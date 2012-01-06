@@ -147,8 +147,8 @@ if __name__ == "__main__":
             chisquares.append(chisq)
     
     print "Fraction:", counter / float(NUM_SIMULATIONS)
-    plt.hist(chisquares)
-    plt.show()
+    plt.hist(chisquares, bins=NUM_SIMULATIONS/100)
+    plt.savefig("hist.png")
             
     """
     # Multiprocessing Method!
