@@ -25,14 +25,6 @@ import logging
 
 import numpy as np
 from scipy.optimize import curve_fit, anneal
-import sqlalchemy
-from sqlalchemy import create_engine, MetaData
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, scoped_session, deferred
-from sqlalchemy.schema import Column
-from sqlalchemy.types import Float
-from sqlalchemy.dialects.postgresql import ARRAY
-from sqlalchemy.sql.expression import func
 import esutil as eu
 import matplotlib.pyplot as plt
 
