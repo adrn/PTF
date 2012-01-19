@@ -21,10 +21,6 @@ theta_E_mas = theta_E*60*60*1000.
 t0 = 0.
 t_E = 5. #theta_E / mu_rel
 
-# Parameters for the model:
-#              u_0   t_0    t_E   B
-true_params = (0.05, 55420., t_E, 11.1)
-
 def RMagToFlux(R):
     # Returns a flux in Janskys
     return 2875.*10**(R/-2.5)
@@ -70,19 +66,27 @@ def simulate_flux():
     
     plt.show()
 
-def simulate_event(t, true_params):
-    t = np.sort(t)
+def simulate_event(t, mag, magErr, true_params):
     u0, t0, tE, F0 = true_params
     
-    #Ft = F0*A_u(u_t(t, u0, t0, tE)) + np.random.normal(0., 0.03*F0, size=len(t))
-    Ft = FLUXMODEL(t, u0, t0, tE, F0) + np.random.normal(0., 0.03*F0, size=len(t))
-    mag = FluxToRMag(Ft)
-    
-    results = []
-    for ii in range(len(Ft)):
-        results.append((t[ii], mag[ii], np.random.normal(0.005, 0.01)))
-    
-    return np.array(results, dtype=[('t', float), ('mag', float), ('sigma', float)]).view(np.recarray)
+    if mag == None:
+        t = np.sort(t)
+        
+        #Ft = F0*A_u(u_t(t, u0, t0, tE)) + np.random.normal(0., 0.03*F0, size=len(t))
+        Ft = FLUXMODEL(t, u0, t0, tE, F0) + np.random.normal(0., 0.03*F0, size=len(t))
+        mag = FluxToRMag(Ft)
+        
+        results = []
+        for ii in range(len(Ft)):
+            results.append((t[ii], mag[ii], np.random.normal(0.005, 0.01)))
+        
+        return np.array(results, dtype=[('t', float), ('mag', float), ('sigma', float)]).view(np.recarray)
+    else:
+        newMag = FluxToRMag(FLUXMODEL(t, u0, t0, tE, RMagToFlux(mag)))
+        results = []
+        for ii in range(len(newMag)):
+            results.append((t[ii], newMag[ii], magErr[ii]))
+        return np.array(results, dtype=[('t', float), ('mag', float), ('sigma', float)]).view(np.recarray)
     
 def plot_simulated_event():
     

@@ -42,12 +42,12 @@ def get_continuum(data):
             sigmas = new_sigmas
             sig = np.std(mag)
     
-    contMag = fit_line(t, mag, sigmas)
-    contStd = np.std(mag)
+    continuumMag = fit_line(t, mag, sigmas)
+    continuumSigma = np.std(mag)
     
-    return contMag, contStd
+    return continuumMag, continuumSigma
 
-def find_clusters(data, contMag, contStd):
+def find_clusters(data, contMag, contStd, num_points_per_cluster=4):
     # Next, determine which points are outside of contMag +/- 2 or 3 contStd, and see if they are clustered
     w = (data.mag > (contMag - 3*contStd)) & (data.mag < (contMag + 3*contStd))
     
@@ -61,14 +61,14 @@ def find_clusters(data, contMag, contStd):
         if pt:
             group.append(idx)
         else:
-            if in_group and len(group) >= 3: 
+            if in_group and len(group) >= num_points_per_cluster: 
                 #print "cluster found!"
                 return np.array(group)
                 
             in_group = False
             group = []
     
-    if in_group and len(group) >= 3: 
+    if in_group and len(group) >= num_points_per_cluster: 
         #print "cluster found!"
         return np.array(group)
     else:

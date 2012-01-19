@@ -16,6 +16,7 @@ import simulated_event as SE
 
 def fit_lightcurve(data, p0):
     popt, pcov = curve_fit(SE.FLUXMODEL, data.t, SE.RMagToFlux(data.mag), p0=p0, sigma=data.sigma, maxfev=10000)
-    return popt
+    goodness = np.sum((SE.RMagToFlux(data.mag) - SE.FLUXMODEL(data.t, *popt)) / data.sigma)**2
+    return popt, goodness
 
     
