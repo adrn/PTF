@@ -4,7 +4,7 @@ from DatabaseConnection import *
 import matplotlib.pyplot as plt
 import numpy as np
 
-fields = np.unique(Session.query(LightCurve.field).all())
+fields = np.unique(Session.query(LightCurve.field).limit(1).all())
 
 derp = dict()
 derp["25-50"] = []
