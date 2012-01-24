@@ -22,12 +22,132 @@
 import sys
 from optparse import OptionParser
 import logging
+import copy
 
 import numpy as np
-from scipy.optimize import curve_fit, anneal
-import esutil as eu
+from scipy.optimize import curve_fit
+import scipy.optimize as so
 import matplotlib.pyplot as plt
+from sqlalchemy.sql.expression import func
+import pyest
 
+from DatabaseConnection import *
+session = Session
+
+class PTFLightCurve:
+
+    def __init__(self, dbLightCurve):
+        """ Accepts a sqlalchemy LightCurve object, and
+            creates a new object with bonus features and
+            no ties to the psycopg2 engine (e.g. you can
+            use multiprocessing with these objects!)
+        """
+        self.mjd = np.array(dbLightCurve.mjd)
+        self.original_mag = np.array(dbLightCurve.mag)
+        self.mag_error = np.array(dbLightCurve.mag_error)
+        self.objid = str(dbLightCurve.objid)
+
+        # Get rid of messy data points
+        MAXERR = 0.2
+        self.mjd = self.mjd[self.mag_error < MAXERR]
+        self.original_mag = self.original_mag[self.mag_error < MAXERR]
+        self.mag = self.original_mag
+        self.mag_error = self.mag_error[self.mag_error < MAXERR]
+        
+        if ((len(dbLightCurve.mjd) - len(self.mjd)) / len(dbLightCurve.mjd)) > 0.05:
+            raise ValueError("Too many bad data points!")
+    
+    def addMicrolensingEvent(self, params):
+        self.params = params
+        newFlux = RMagToFlux(self.mag) * A_u(u_t(self.mjd, *params))
+        self.mag = FluxToRMag(newFlux)
+        
+    def measureContinuum(self, clipSigma=2.):
+        """ This is a stupid sigma-clipping way to find 
+            the continuum magnitude. This often fails when
+            the microlensing event occurs over a significant 
+            number of data points, but I'm not sure what a
+            better method would be?
+        """
+        
+        sigma = np.std(self.mag)
+        b = np.median(self.mag)
+        
+        mags = self.mag
+        mjds = self.mjd
+        sigmas = self.mag_error
+        
+        while True:
+            w = np.fabs(mags - np.median(mags)) < clipSigma*sigma
+            new_mags = mags[w]
+            new_mjds = mjds[w]
+            new_sigmas = sigmas[w]
+    
+            if (len(mags) - len(new_mags)) <= (0.02*len(mags)):
+                break
+            else:
+                mags = new_mags
+                mjds = new_mjds
+                sigmas = new_sigmas
+                sigma = np.std(mags)
+        
+        self.continuumMag = fit_line(mjds, mags, sigmas)
+        self.continuumSigma = np.std(mags)
+        
+        return self.continuumMag, self.continuumSigma
+    
+    def findClusters(self, num_points_per_cluster=4):
+        # Determine which points are outside of continuumMag +/- 2 or 3 continuumSigma, and see if they are clustered
+        w = (self.mag > (self.continuumMag - 3*self.continuumSigma))
+        
+        allGroups = []
+        
+        group = []
+        in_group = False
+        group_finished = False
+        for idx, pt in enumerate(np.logical_not(w)):
+            if len(group) > 0:
+                in_group = True
+            
+            if pt:
+                group.append(idx)
+            else:
+                if in_group and len(group) >= num_points_per_cluster: 
+                    #print "cluster found!"
+                    # return np.array(group)
+                    allGroups.append(np.array(group))
+                    
+                in_group = False
+                group = []
+        
+        if in_group and len(group) >= num_points_per_cluster: 
+            #print "cluster found!"
+            # return np.array(group)
+            allGroups.append(np.array(group))
+        
+        self.clusterIndices = allGroups
+        
+        return allGroups
+    
+    def plot(self):
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        ax.axhline(self.continuumMag, c='c', lw=3.)
+        ax.axhline(self.continuumMag+3*self.continuumSigma, ls="--", c='c')
+        ax.axhline(self.continuumMag-3*self.continuumSigma, ls="--", c='c')
+        ax.errorbar(self.mjd, self.mag, self.mag_error, c='k', ls='None', marker='.')
+        for clusterIdx in self.clusterIndices:
+            ax.plot(self.mjd[clusterIdx], self.mag[clusterIdx], 'r+', ms=15, lw=3)
+        ax.axvline(self.params[1], c='b', ls='--')
+        
+        #modelT = np.arange(min(self.mjd), max(self.mjd), 0.1)
+        #ax.plot(modelT, FluxToRMag(fluxModel(modelT, *fitParameters)), 'g-', label='Fit')
+        
+        ax.set_ylim(ax.get_ylim()[::-1])
+        ax.set_xlim(min(self.mjd)-10., max(self.mjd)+10.)
+        
+        return ax
+        
 # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
 #  Utility Functions
 #
@@ -64,16 +184,16 @@ def plot_event(lightCurveData, clusterIndices, continuumMag, continuumSigma, eve
     ax.axhline(continuumMag, c='c', lw=3.)
     ax.axhline(continuumMag+3*continuumSigma, ls="--", c='c')
     ax.axhline(continuumMag-3*continuumSigma, ls="--", c='c')
-    ax.errorbar(lightCurveData.np_mjd, lightCurveData.np_mag, lightCurveData.np_mag_error, c='k', ls='None', marker='.')
+    ax.errorbar(lightCurveData.amjd, lightCurveData.amag, lightCurveData.amag_error, c='k', ls='None', marker='.')
     for clusterIdx in clusterIndices:
-        ax.plot(lightCurveData.np_mjd[clusterIdx], lightCurveData.np_mag[clusterIdx], 'r+', ms=15, lw=3)
+        ax.plot(lightCurveData.amjd[clusterIdx], lightCurveData.amag[clusterIdx], 'r+', ms=15, lw=3)
     ax.axvline(eventParameters[1], c='b', ls='--')
     
-    modelT = np.arange(min(lightCurveData.np_mjd), max(lightCurveData.np_mjd), 0.1)
+    modelT = np.arange(min(lightCurveData.amjd), max(lightCurveData.amjd), 0.1)
     ax.plot(modelT, FluxToRMag(fluxModel(modelT, *fitParameters)), 'g-', label='Fit')
     
     ax.set_ylim(ax.get_ylim()[::-1])
-    ax.set_xlim(min(lightCurveData.np_mjd)-10., max(lightCurveData.np_mjd)+10.)
+    ax.set_xlim(min(lightCurveData.amjd)-10., max(lightCurveData.amjd)+10.)
     
 
 # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
@@ -95,174 +215,126 @@ def sample_microlensing_parameters(mjdMin, mjdMax):
     
     return (u0, t0, tE)
 
-def add_microlensing_event(lcData, params):
-    flux = RMagToFlux(lcData.np_mag) * A_u(u_t(lcData.np_mjd, *params))
-    lcData.mag = FluxToRMag(flux)
-    
-def get_continuum(lcData):
-    sigma = np.std(lcData.np_mag)
-    b = np.median(lcData.np_mag)
-    
-    # This is a stupid sigma-clipping way to find the continuum magnitude 
-    CLIPSIG = 2
-    
-    mags = lcData.np_mag
-    mjds = lcData.np_mjd
-    sigmas = lcData.np_mag_error
-    
-    while True:
-        w = np.fabs(mags - np.median(mags)) < CLIPSIG*sigma
-        new_mags = mags[w]
-        new_mjds = mjds[w]
-        new_sigmas = sigmas[w]
+def lightcurve_chisq(p, lc):
+    if (p[0] < 0) or (p[0] > 1):
+        return 9999999.0
+    ch = np.sum((RMagToFlux(lc.mag) - fluxModel(lc.mjd, *p))**2. / (2.*lc.mag_error**2.))
+    #print ch
+    return ch
 
-        if (len(mags) - len(new_mags)) <= (0.02*len(mags)):
-            break
-        else:
-            mags = new_mags
-            mjds = new_mjds
-            sigmas = new_sigmas
-            sigma = np.std(mags)
+def fit_lightcurve_cluster(lc, clusterIdx):
+    initial_u0 = np.exp(-10.*np.random.uniform())
+    initial_t0 = np.median(lc.mjd[clusterIdx])
+    initial_tE = (max(lc.mjd[clusterIdx]) - min(lc.mjd[clusterIdx])) / 2.
+    initial_F0 = RMagToFlux(lc.continuumMag)
     
-    continuumMag = fit_line(mjds, mags, sigmas)
-    continuumSigma = np.std(mags)
+    p0 = (initial_u0, initial_t0, initial_tE, initial_F0)
     
-    return continuumMag, continuumSigma
-
-def find_clusters(lcData, continuumMag, continuumSigma, num_points_per_cluster=4):
-    # Determine which points are outside of continuumMag +/- 2 or 3 continuumSigma, and see if they are clustered
-    w = (lcData.np_mag > (continuumMag - 3*continuumSigma)) #& (lcData.np_mag < (continuumMag + 3*continuumSigma))
+    full_out = so.fmin_powell(lightcurve_chisq, p0, args=(lc,), full_output=True)
     
-    allGroups = []
+    return full_out[0], full_out[1]
     
-    group = []
-    in_group = False
-    group_finished = False
-    for idx, pt in enumerate(np.logical_not(w)):
-        if len(group) > 0:
-            in_group = True
+    """
+    popt, pcov = curve_fit(fluxModel, lc.mjd, RMagToFlux(lc.mag), p0=p0, sigma=lc.mag_error, maxfev=10000)
+    goodness = np.sum((RMagToFlux(lc.mag) - fluxModel(lc.mjd, *popt)) / lc.mag_error)**2
+    """
+    Nwalkers = 10
+    Ndim = 4
+    Nsteps = 100
+    
+    print "initial", np.exp(-10.*np.random.uniform()), initial_t0, initial_tE, FluxToRMag(initial_F0)
+    initial_params = [[np.exp(-10.*np.random.uniform()), initial_t0, initial_tE, initial_F0] for ii in xrange(Nwalkers)] #?? DAMNIT, step sizes suck..
+    sampler = pyest.EnsembleSampler(Nwalkers, Ndim, lightcurve_chisq, postargs=[lc], threads=2, a=4.)
+    
+    pos,prob,state = sampler.run_mcmc(initial_params, None, Nsteps/10)
+    sampler.clear_chain()
+    sampler.run_mcmc(pos, state, Nsteps)
+    
+    for jj in xrange(Nwalkers):
+        ii = np.argmax(sampler.lnprobability[jj])
+        u0 = sampler.chain[jj][0] #[chain][param][link]
+        t0 = sampler.chain[jj][1]
+        tE = sampler.chain[jj][2]
+        F0 = sampler.chain[jj][3]
         
-        if pt:
-            group.append(idx)
-        else:
-            if in_group and len(group) >= num_points_per_cluster: 
-                #print "cluster found!"
-                # return np.array(group)
-                allGroups.append(np.array(group))
-                
-            in_group = False
-            group = []
-    
-    if in_group and len(group) >= num_points_per_cluster: 
-        #print "cluster found!"
-        # return np.array(group)
-        allGroups.append(np.array(group))
-    
-    return allGroups
-
-def fit_lightcurve(lcData, p0):
-    popt, pcov = curve_fit(fluxModel, lcData.np_mjd, RMagToFlux(lcData.np_mag), p0=p0, sigma=lcData.np_mag_error, maxfev=10000)
-    goodness = np.sum((RMagToFlux(lcData.np_mag) - fluxModel(lcData.np_mjd, *popt)) / lcData.np_mag_error)**2
-    
-    return popt, goodness
+        #print "Derped:", u0[ii], t0[ii], tE[ii], FluxToRMag(F0[ii])
+        
+    plt.clf()
+    plt.subplot(221)
+    plt.plot(u0)
+    plt.subplot(222)
+    plt.plot(t0)
+    plt.subplot(223)
+    plt.plot(tE)
+    plt.subplot(224)
+    plt.plot(F0)
+    plt.show()
+    return (u0[ii], t0[ii], tE[ii], F0[ii]), 1.0
     
 # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
 #  Main routine
-# 
-#def run(number_of_simulations=1000):
-def run(lightCurves, number_of_simulations=1000):
+#
+def work(lightCurve):
+    logging.info("objid: {0}".format(lightCurve.objid))
+    
+    # Sample microlensing event parameters
+    eventParameters = sample_microlensing_parameters(min(lightCurve.mjd), max(lightCurve.mjd))
+    logging.debug("Real Parameters:\n\t- u0 = {0}\n\t- t0 = {1}\n\t- tE = {2}".format(*eventParameters))
+    
+    # Add a microlensing event to the light curve
+    lightCurve.addMicrolensingEvent(eventParameters)
+    
+    # Fit for continuum level, F0, by sigma clipping away outliers
+    continuumMag, continuumSigma = lightCurve.measureContinuum(clipSigma=2.)
+    
+    # Find clusters of points **brighter** than the continuumMag
+    clusterIndices = lightCurve.findClusters(num_points_per_cluster=4)
+    
+    #ax = lightCurve.plot()
+    #plt.show()
+    
+    if len(clusterIndices) == 0:
+        logging.debug("Found no clusters!")
+        return
+    
+    # Try to fit the light curve with a point-lens, point-source event shape
+    for clusterIdx in clusterIndices:
+        fitParameters, goodness = fit_lightcurve_cluster(lightCurve, clusterIdx)
+        logging.info("Fit Parameters:\n\t- u0 = {0}\n\t- t0 = {1}\n\t- tE = {2}".format(*fitParameters))
+        
+        ax = lightCurve.plot()
+        modelT = np.arange(min(lightCurve.mjd), max(lightCurve.mjd), 0.1)
+        ax.plot(modelT, FluxToRMag(fluxModel(modelT, *fitParameters)), 'r-')
+        plt.show()
+        
+    logging.info("-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~")    
+    #successes += 1
+
+def run(number_of_simulations=1000):
     logging.debug("Number of simulations to run: {0}".format(number_of_simulations))
     
-    fit_ps = []
-    ps = []
-    successes = 0
-    for idx in np.random.randint(len(lightCurves), size=number_of_simulations):    
-        # Read in light curve data from PTF
-        lightCurveData = lightCurves[idx]
-
-        # Sample microlensing event parameters
-        eventParameters = sample_microlensing_parameters(min(lightCurveData.mjd), max(lightCurveData.mjd))
-        logging.info("Real Parameters:\n\t- u0 = {0}\n\t- t0 = {1}\n\t- tE = {2}".format(*eventParameters))
-        
-        # Add a microlensing event to the light curve
-        add_microlensing_event(lightCurveData, eventParameters)
-        
-        # Fit for continuum level, F0, by sigma clipping away outliers
-        continuumMag, continuumSigma = get_continuum(lightCurveData)
-        
-        # Find clusters of points **brighter** than the continuumMag
-        clusterIndices = find_clusters(lightCurveData, continuumMag, continuumSigma)
-        if len(clusterIndices) == 0:
-            logging.debug("Found no clusters!")
-            continue
-        
-        # Try to fit the light curve with a point-lens, point-source event shape
-        for clusterIdx in clusterIndices:
-            old_goodness = 1E10
-            old_popt = None
-            #for jj in range(10):
-            for jj in range(1):
-                initial_u0 = np.exp(-10.*np.random.uniform())
-                initial_t0 = np.median(lightCurveData.np_mjd[clusterIdx])
-                initial_tE = (max(lightCurveData.np_mjd[clusterIdx]) - min(lightCurveData.np_mjd[clusterIdx])) / 2.
-                initial_F0 = RMagToFlux(continuumMag)
-                
-                p0 = (initial_u0,\
-                      initial_t0, \
-                      initial_tE, \
-                      initial_F0)
-                      
-                logging.debug("-> Trying: u0 = {0}, t0 = {1}, tE = {2}, F0 = {2} (M0 = {3})".format(p0[0], p0[1], p0[2], p0[3], FluxToRMag(p0[3])))
-                
-                try:
-                    popt, goodness = fit_lightcurve(lightCurveData, p0)
-                    if goodness < old_goodness:
-                        old_goodness = goodness
-                        old_popt = popt
-                    else:
-                        continue
-                        
-                except RuntimeError:
-                    logging.debug("maxfev reached!")
-                    continue
+    lightCurves = []
+    for lc in session.query(LightCurve).filter(func.array_upper(LightCurve.mjd, 1) >= 150).all():
+        try:
+            lightCurves.append(PTFLightCurve(lc))
+        except ValueError:
+            logging.debug("Light curve rejected due to bad points")
+            logging.debug(lc.mag_error)
             
-            if old_popt == None:
-                logging.debug("Fit failed!")
-                continue
-        
-        if old_popt == None: continue
-        
-        fitParameters = old_popt
-        
-        logging.info("Fit Parameters:\n\t- u0 = {0}\n\t- t0 = {1}\n\t- tE = {2}".format(*fitParameters))
-        logging.info("-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~")
-        
-        fit_ps.append(list(fitParameters)[:3])
-        ps.append(list(eventParameters))
-        successes += 1
-        #plot_event(lightCurveData, clusterIndices, continuumMag, continuumSigma, eventParameters, fitParameters)
-        #plt.show()
+    logging.debug("Light curves loaded...")
     
-    if False:
-        fit_ps = np.array(fit_ps)
-        ps = np.array(ps)
-        diff = np.fabs(fit_ps - ps)
-        
-        fig = plt.figure()
-        ax = fig.add_subplot(221)
-        ax.hist(diff[:, 0]/ps[:,0]*100, bins=np.arange(0., 20., 0.1))
-        ax = fig.add_subplot(222)
-        ax.hist(diff[:, 1]/ps[:,1]*100, bins=np.arange(0., 20., 0.1))
-        ax.set_xlim(0,20)
-        ax = fig.add_subplot(223)
-        ax.hist(diff[:, 2]/ps[:,2]*100, bins=np.arange(0., 20., 0.1))
-        ax.set_xlim(0,20)
-        plt.show()
+    lightCurveQueue = []
+    for idx in np.random.randint(len(lightCurves), size=number_of_simulations):
+        lightCurveQueue.append(lightCurves[idx])
     
-    return successes
+    # Non-multiprocessing way to do it
+    for ptfLightCurve in lightCurveQueue:
+        work(ptfLightCurve)
+    
+    return 
     
 if __name__ == "__main__":
-    np.random.seed(10)
+    np.random.seed(101)
     
     parser = OptionParser(description="")
     parser.add_option("-v", "--verbose", action="store_true", dest="verbose", default=False,
@@ -274,55 +346,5 @@ if __name__ == "__main__":
     if options.verbose: logging.basicConfig(level=logging.DEBUG, format='%(message)s')
     elif options.quiet: logging.basicConfig(level=logging.WARN, format='%(message)s')
     else: logging.basicConfig(level=logging.INFO, format='%(message)s')
-    
-    # Postgresql Database Connection
-    database_connection_string = 'postgresql://%s:%s@%s:%s/%s' \
-        % ('adrian','','localhost','5432','ptf_microlensing')
-    
-    engine = create_engine(database_connection_string, echo=False)
-    metadata = MetaData()
-    metadata.bind = engine
-    Base = declarative_base(bind=engine)
-    Session = scoped_session(sessionmaker(bind=engine, autocommit=True, autoflush=False))
-    global session, LightCurve
-    session = Session()
-    
-    # Model Class for light curves
-    class LightCurve(Base):
-        __tablename__ = 'light_curve'
-        __table_args__ = {'autoload' : True}
         
-        mjd = deferred(Column(ARRAY(Float)))
-        mag = deferred(Column(ARRAY(Float)))
-        mag_error = deferred(Column(ARRAY(Float)))
-        
-        def __repr__(self):
-            return self.__class__.__name__
-        
-        @property
-        def np_mjd(self):
-            return np.array(self.mjd)
-        
-        @property
-        def np_mag(self):
-            return np.array(self.mag)
-        
-        @property
-        def np_mag_error(self):
-            return np.array(self.mag_error)
-    
-    lightCurves = session.query(LightCurve).filter(func.array_upper(LightCurve.mjd, 1) >= 25).filter(func.array_upper(LightCurve.mjd, 1) < 50).all()
-    s = run(lightCurves, 10000)
-    print "25-50", float(s) / 10000.
-    
-    lightCurves = session.query(LightCurve).filter(func.array_upper(LightCurve.mjd, 1) >= 50).filter(func.array_upper(LightCurve.mjd, 1) < 100).all()
-    s = run(lightCurves, 10000)
-    print "50-100",  float(s) / 10000.
-    
-    lightCurves = session.query(LightCurve).filter(func.array_upper(LightCurve.mjd, 1) >= 100).filter(func.array_upper(LightCurve.mjd, 1) < 150).all()
-    s = run(lightCurves, 10000)
-    print "100-150",  float(s) / 10000.
-    
-    lightCurves = session.query(LightCurve).filter(func.array_upper(LightCurve.mjd, 1) >= 150).all()
-    s = run(lightCurves, 10000)
-    print "150+",  float(s) / 10000.
+    s = run(10)
