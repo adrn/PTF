@@ -19,6 +19,9 @@
             use MCMC, or maybe we could use simulated
             annealing?
 """
+
+__author__ = "adrn <adrn@astro.columbia.edu>"
+
 import sys
 from optparse import OptionParser
 import logging
