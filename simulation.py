@@ -25,7 +25,7 @@ __author__ = "adrn <adrn@astro.columbia.edu>"
 import sys
 from optparse import OptionParser
 import logging
-import copy
+import multiprocessing
 
 import numpy as np
 from scipy.optimize import curve_fit
@@ -329,9 +329,29 @@ def run(number_of_simulations=1000):
     for idx in np.random.randint(len(lightCurves), size=number_of_simulations):
         lightCurveQueue.append(lightCurves[idx])
     
+    """
     # Non-multiprocessing way to do it
     for ptfLightCurve in lightCurveQueue:
         work(ptfLightCurve)
+    """
+        
+    # Multiprocessing way to do it!
+    # Multiprocessing Method!
+    counter = None
+    chisq = None
+
+    def init(cnt):
+        ''' store the counter for later use '''
+        global counter
+        counter = cnt
+    
+    counter = multiprocessing.Value('i', 0)
+    pool = multiprocessing.Pool(initializer = init, initargs = (counter, ))
+    p = pool.map_async(work, lightCurveQueue)
+    p.wait()
+    
+    print "Value:", counter.value
+    print "Fraction:", counter.value/float(number_of_simulations)
     
     return 
     
