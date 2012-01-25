@@ -358,8 +358,8 @@ def run(number_of_simulations=1000):
         falsePositives = fPos
     
     counter = multiprocessing.Value('i', 0)
-    numEvents = multiprocessing.Value('j', 0)
-    falsePositives = multiprocessing.Value('k', 0)
+    numEvents = multiprocessing.Value('i', 0)
+    falsePositives = multiprocessing.Value('i', 0)
     pool = multiprocessing.Pool(initializer = init, initargs = (counter, numEvents, falsePositives))
     p = pool.map_async(work, lightCurveQueue)
     p.wait()
