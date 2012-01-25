@@ -277,14 +277,19 @@ def fit_lightcurve_cluster(lc, clusterIdx):
 #  Main routine
 #
 def work(lightCurve):
+    global counter, numEvents, falsePositives
+    
     logging.info("objid: {0}".format(lightCurve.objid))
     
     # Sample microlensing event parameters
     eventParameters = sample_microlensing_parameters(min(lightCurve.mjd), max(lightCurve.mjd))
     logging.debug("Real Parameters:\n\t- u0 = {0}\n\t- t0 = {1}\n\t- tE = {2}".format(*eventParameters))
     
-    # Add a microlensing event to the light curve
-    lightCurve.addMicrolensingEvent(eventParameters)
+    # Add a microlensing event to the light curve 60% of the time
+    addEvent = np.random.random() >= 0.4
+    if addEvent:
+        lightCurve.addMicrolensingEvent(eventParameters)
+        numEvents.value += 1
     
     # Fit for continuum level, F0, by sigma clipping away outliers
     continuumMag, continuumSigma = lightCurve.measureContinuum(clipSigma=2.)
@@ -311,8 +316,11 @@ def work(lightCurve):
         
     logging.info("-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~")    
     #successes += 1
-    global counter
-    counter.value += 1
+    
+    if not addEvent:
+        falsePositives.value += 1
+    else:
+        counter.value += 1
 
 def run(number_of_simulations=1000):
     logging.debug("Number of simulations to run: {0}".format(number_of_simulations))
@@ -342,18 +350,22 @@ def run(number_of_simulations=1000):
     counter = None
     chisq = None
 
-    def init(cnt):
+    def init(cnt, numEv, fPos):
         ''' store the counter for later use '''
-        global counter
+        global counter, numEvents, falsePositives
         counter = cnt
+        numEvents = numEv
+        falsePositives = fPos
     
     counter = multiprocessing.Value('i', 0)
-    pool = multiprocessing.Pool(initializer = init, initargs = (counter, ))
+    numEvents = multiprocessing.Value('j', 0)
+    falsePositives = multiprocessing.Value('k', 0)
+    pool = multiprocessing.Pool(initializer = init, initargs = (counter, numEvents, falsePositives))
     p = pool.map_async(work, lightCurveQueue)
     p.wait()
     
-    print "Value:", counter.value
-    print "Fraction:", counter.value/float(number_of_simulations)
+    print "Fraction:", counter.value/float(numEvents)
+    print "False positives:", falsePositives.value
     
     return 
     
