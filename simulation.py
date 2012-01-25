@@ -364,6 +364,10 @@ def run(number_of_simulations=1000):
     p = pool.map_async(work, lightCurveQueue)
     p.wait()
     
+    print counter.value
+    print numEvents.value
+    print falsePositives.value
+    
     print "Fraction:", counter.value/float(numEvents.value)
     print "False positives:", falsePositives.value
     
