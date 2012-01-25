@@ -311,6 +311,8 @@ def work(lightCurve):
         
     logging.info("-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~")    
     #successes += 1
+    global counter
+    counter.value += 1
 
 def run(number_of_simulations=1000):
     logging.debug("Number of simulations to run: {0}".format(number_of_simulations))
