@@ -1,6 +1,9 @@
 """ 
     Take PTF light curve data from ./lightcurves/*.pickle and load it
     into a postgres database.
+    
+    ** SQL TO CREATE TABLE IS AT BOTTOM **
+    
 """
 import glob, os
 import cPickle as pickle
@@ -15,7 +18,7 @@ from sqlalchemy.schema import Table
 
 # Postgresql Database Connection
 database_connection_string = 'postgresql://%s:%s@%s:%s/%s' \
-	% ('adrian','','localhost','5432','ptf_microlensing')
+	% ('adrian','lateralus0','localhost','5432','ptf_microlensing')
 
 engine = create_engine(database_connection_string, echo=False)
 metadata = MetaData()
@@ -73,8 +76,8 @@ for file in files:
     lightCurve.mag_error = list(data.mag_err)
     
     try:
-        lightCurve.ra = data.ra
-        lightCurve.dec = data.dec
+        lightCurve.ra = float(data.ra[0])
+        lightCurve.dec = float(data.dec[0])
     except AttributeError:
         pass
         
@@ -88,3 +91,10 @@ for file in files:
 session.commit()
 session.rollback()
 engine.dispose()
+
+
+""" SQL TO CREATE TABLE:
+
+
+
+"""

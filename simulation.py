@@ -32,7 +32,6 @@ from scipy.optimize import curve_fit
 import scipy.optimize as so
 import matplotlib.pyplot as plt
 from sqlalchemy.sql.expression import func
-import pyest
 
 from DatabaseConnection import *
 session = Session
