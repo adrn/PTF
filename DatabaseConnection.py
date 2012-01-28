@@ -9,7 +9,7 @@ from sqlalchemy.sql.expression import func
 
 import numpy as np
 
-__all__ = ["Session", "Base", "engine", "LightCurve"]
+__all__ = ["Session", "Base", "engine", "LightCurve", "SimLightCurve"]
 
 class Singleton(type):
 	def __init__(cls, name, bases, dict):
@@ -49,7 +49,31 @@ metadata = db.metadata
 Session = db.Session
 Base = db.Base
 
-# Model Class for light curves
+# Model Class for simulation light curves
+class SimLightCurve(Base):
+    __tablename__ = 'simulation_light_curve'
+    __table_args__ = {'autoload' : True}
+    
+    mjd = deferred(Column(ARRAY(Float)))
+    mag = deferred(Column(ARRAY(Float)))
+    mag_error = deferred(Column(ARRAY(Float)))
+    
+    def __repr__(self):
+        return "<{0} -- objid: {1}>".format(self.__class__.__name__, self.objid)
+    
+    @property
+    def amjd(self):
+        return np.array(self.mjd)
+    
+    @property
+    def amag(self):
+        return np.array(self.mag)
+    
+    @property
+    def amag_error(self):
+        return np.array(self.mag_error)
+
+# Model Class for true PTF light curves
 class LightCurve(Base):
     __tablename__ = 'light_curve'
     __table_args__ = {'autoload' : True}

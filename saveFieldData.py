@@ -53,8 +53,8 @@ def saveLightCurves(field, id):
         .fetch(bounds=[(bounds_xy, bounds_t)])
         
         logging.info("CCD {0} had {1} detected sources".format(thisCCD, len(results)))
-        resultsArray = np.array(results, dtype=[('ra', '<f8'), ('dec', '<f8'), ('mjd', '<f8'), ('mag', '<f8'), ('mag_err', '<f8'), \
-            ('sys_err', '<f8'), ('filterid', int), ('obj_id', '<u8')])
+        resultsArray = np.array(results, dtype=[('ra', float), ('dec', float), ('mjd', float), ('mag', float), ('mag_err', float), \
+            ('sys_err', np.float32), ('filterid', np.uint8), ('obj_id', np.uint64)])
         resultsArray = resultsArray.view(np.recarray)
         
         f = open("{0}_{1}.pickle".format(id, thisCCD), "w")

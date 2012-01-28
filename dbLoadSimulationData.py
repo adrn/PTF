@@ -95,6 +95,26 @@ engine.dispose()
 
 """ SQL TO CREATE TABLE:
 
+CREATE TABLE simulation_light_curve
+(
+  mjd double precision[] NOT NULL,
+  mag double precision[] NOT NULL,
+  mag_error double precision[] NOT NULL,
+  ra double precision,
+  "dec" double precision,
+  field integer NOT NULL,
+  objid numeric NOT NULL,
+  CONSTRAINT light_curve_pk PRIMARY KEY (objid)
+)
+WITH (
+  OIDS=FALSE
+);
+ALTER TABLE light_curve OWNER TO adrian;
 
+
+CREATE INDEX light_curve_objid_idx
+  ON light_curve
+  USING btree
+  (objid);
 
 """

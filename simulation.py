@@ -383,8 +383,8 @@ if __name__ == "__main__":
     else: logging.basicConfig(level=logging.INFO, format='%(message)s')
     
     lightCurves = []
-    #for lc in session.query(LightCurve).filter(func.array_upper(LightCurve.mjd, 1) >= 150).all():
-    for lc in session.query(LightCurve).filter(func.array_upper(LightCurve.mjd, 1) >= 50).filter(func.array_upper(LightCurve.mjd, 1) < 100).all():
+    #for lc in session.query(SimLightCurve).filter(func.array_upper(SimLightCurve.mjd, 1) >= 150).all():
+    for lc in session.query(SimLightCurve).filter(func.array_upper(SimLightCurve.mjd, 1) >= 50).filter(func.array_upper(SimLightCurve.mjd, 1) < 100).all():
         try:
             lightCurves.append(PTFLightCurve(lc))
         except ValueError:
