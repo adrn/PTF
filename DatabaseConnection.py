@@ -35,7 +35,7 @@ class DatabaseConnection(object):
 
 db_config = {
 	'user'     : 'adrian',
-	'password' : '',
+	'password' : 'lateralus0',
 	'database' : 'ptf_microlensing',
 	'host'     : 'localhost',
 	'port'     : 5432

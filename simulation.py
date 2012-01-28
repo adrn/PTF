@@ -176,7 +176,7 @@ def straight(t, b):
 def fit_line(x, y, sigma_y):
     popt, pcov = curve_fit(straight, x, y, sigma=sigma_y)
     return popt[0]
-    
+
 # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
 #  Plotting Functions
 #
@@ -232,7 +232,7 @@ def fit_lightcurve_cluster(lc, clusterIdx):
     
     p0 = (initial_u0, initial_t0, initial_tE, initial_F0)
     
-    full_out = so.fmin_powell(lightcurve_chisq, p0, args=(lc,), full_output=True)
+    full_out = so.fmin_powell(lightcurve_chisq, p0, args=(lc,), full_output=True, disp=0)
     
     return full_out[0], full_out[1]
     
@@ -277,7 +277,6 @@ def fit_lightcurve_cluster(lc, clusterIdx):
 #  Main routine
 #
 def work(lightCurve):
-    global counter, numEvents, falsePositives
     
     logging.info("objid: {0}".format(lightCurve.objid))
     
@@ -286,10 +285,11 @@ def work(lightCurve):
     logging.debug("Real Parameters:\n\t- u0 = {0}\n\t- t0 = {1}\n\t- tE = {2}".format(*eventParameters))
     
     # Add a microlensing event to the light curve 60% of the time
-    addEvent = np.random.random() >= 0.4
+    addEvent = np.random.uniform() <= 0.6
+    eventAdded = 0
     if addEvent:
         lightCurve.addMicrolensingEvent(eventParameters)
-        numEvents.value += 1
+        eventAdded = 1
     
     # Fit for continuum level, F0, by sigma clipping away outliers
     continuumMag, continuumSigma = lightCurve.measureContinuum(clipSigma=2.)
@@ -302,38 +302,46 @@ def work(lightCurve):
     
     if len(clusterIndices) == 0:
         logging.debug("Found no clusters!")
-        return
     
     # Try to fit the light curve with a point-lens, point-source event shape
+    fractionalErrors = []
     for clusterIdx in clusterIndices:
         fitParameters, goodness = fit_lightcurve_cluster(lightCurve, clusterIdx)
         logging.info("Fit Parameters:\n\t- u0 = {0}\n\t- t0 = {1}\n\t- tE = {2}".format(*fitParameters))
         
+        err = np.log(np.fabs(fitParameters[0] - eventParameters[0])/eventParameters[0]) + \
+              ((fitParameters[1] - eventParameters[1])/eventParameters[1])**2 + \
+              ((fitParameters[2] - eventParameters[2])/eventParameters[2])**2
+
+        fractionalErrors.append(err)
+        
+        """
         ax = lightCurve.plot()
         modelT = np.arange(min(lightCurve.mjd), max(lightCurve.mjd), 0.1)
         ax.plot(modelT, FluxToRMag(fluxModel(modelT, *fitParameters)), 'r-')
-        plt.show()
-        
+        plt.show()"""
+    
     logging.info("-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~")    
-    #successes += 1
     
-    if not addEvent:
-        falsePositives.value += 1
+    foundEvent = len(clusterIndices) > 0
+    
+    success = 0
+    if addEvent and foundEvent:
+        success = 1
+        falsePositive = len(clusterIndices) - 1
+    elif not addEvent and foundEvent:
+        falsePositive = len(clusterIndices)
     else:
-        counter.value += 1
-
-def run(number_of_simulations=1000):
-    logging.debug("Number of simulations to run: {0}".format(number_of_simulations))
+        falsePositive = 0
     
-    lightCurves = []
-    for lc in session.query(LightCurve).filter(func.array_upper(LightCurve.mjd, 1) >= 150).all():
-        try:
-            lightCurves.append(PTFLightCurve(lc))
-        except ValueError:
-            logging.debug("Light curve rejected due to bad points")
-            logging.debug(lc.mag_error)
-            
-    logging.debug("Light curves loaded...")
+    if len(fractionalErrors) == 0:
+        fractionalError = 0
+    else:
+        fractionalError = min(fractionalErrors)
+    return (eventAdded, success, falsePositive, fractionalError)
+
+def run(lightCurves, number_of_simulations=1000):
+    logging.debug("Number of simulations to run: {0}".format(number_of_simulations))
     
     lightCurveQueue = []
     for idx in np.random.randint(len(lightCurves), size=number_of_simulations):
@@ -344,34 +352,19 @@ def run(number_of_simulations=1000):
     for ptfLightCurve in lightCurveQueue:
         work(ptfLightCurve)
     """
-        
-    # Multiprocessing way to do it!
-    # Multiprocessing Method!
-    counter = None
-    chisq = None
-
-    def init(cnt, numEv, fPos):
-        ''' store the counter for later use '''
-        global counter, numEvents, falsePositives
-        counter = cnt
-        numEvents = numEv
-        falsePositives = fPos
     
-    counter = multiprocessing.Value('i', 0)
-    numEvents = multiprocessing.Value('i', 0)
-    falsePositives = multiprocessing.Value('i', 0)
-    pool = multiprocessing.Pool(initializer = init, initargs = (counter, numEvents, falsePositives))
-    p = pool.map_async(work, lightCurveQueue)
-    p.wait()
+    pool = multiprocessing.Pool()
+    async_results = [pool.apply_async(work, (lightCurveQueue[i],)) for i in range(number_of_simulations)]
+    simulationInfo = np.array([tuple(r.get()) for r in async_results], dtype=[("events", int), ("successes", int), ("falsePositives", int), ("fractionalError", float)]).view(np.recarray)
     
-    print counter.value
-    print numEvents.value
-    print falsePositives.value
+    numSuccesses = sum(simulationInfo.successes)
+    numEvents = sum(simulationInfo.events)
+    numFalsePositives = sum(simulationInfo.falsePositives)
     
-    print "Fraction:", counter.value/float(numEvents.value)
-    print "False positives:", falsePositives.value
+    print "Success fraction:", float(numSuccesses) / float(numEvents)
+    print "False positive fraction:", float(numFalsePositives) / float(number_of_simulations)
     
-    return 
+    return
     
 if __name__ == "__main__":
     np.random.seed(101)
@@ -381,10 +374,23 @@ if __name__ == "__main__":
                     help="Be chatty (default = False)")
     parser.add_option("-q", "--quiet", action="store_true", dest="quiet", default=False,
                     help="Be quiet! (default = False)")
+    parser.add_option("-N", "--simulation-iterations", type=int, dest="numSimulations", default=1000,
+                    help="Be quiet! (default = False)")
     
     (options, args) = parser.parse_args()
     if options.verbose: logging.basicConfig(level=logging.DEBUG, format='%(message)s')
-    elif options.quiet: logging.basicConfig(level=logging.WARN, format='%(message)s')
+    elif options.quiet: logging.basicConfig(level=logging.ERROR, format='%(message)s')
     else: logging.basicConfig(level=logging.INFO, format='%(message)s')
-        
-    s = run(10)
+    
+    lightCurves = []
+    #for lc in session.query(LightCurve).filter(func.array_upper(LightCurve.mjd, 1) >= 150).all():
+    for lc in session.query(LightCurve).filter(func.array_upper(LightCurve.mjd, 1) >= 50).filter(func.array_upper(LightCurve.mjd, 1) < 100).all():
+        try:
+            lightCurves.append(PTFLightCurve(lc))
+        except ValueError:
+            logging.debug("Light curve rejected due to bad points")
+            logging.debug(lc.mag_error)
+            
+    logging.debug("Light curves loaded...")
+    
+    s = run(lightCurves, options.numSimulations)
