@@ -25,7 +25,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
                     
     db = lsd.DB("/scr4/bsesar")
-    exposureData = db.query("mjd, ptf_field, ccdid, fid, ra, dec, l, b, medfwhm, limitmag, mumax_med, mumax_rms FROM ptf_exp")
+    results = db.query("mjd, ptf_field, ccdid, fid, ra, dec, l, b, medfwhm, limitmag, mumax_med, mumax_rms FROM ptf_exp")
+    exposureData = [tuple(row) for row in results]
     
     exposureDataArray = np.array(exposureData, dtype=[("mjd", float),\
                                                       ("fieldid", int), \
