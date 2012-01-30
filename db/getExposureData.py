@@ -27,7 +27,7 @@ if __name__ == "__main__":
     db = lsd.DB("/scr4/bsesar")
     exposureData = db.query("mjd, ptf_field, ccdid, fid, ra, dec, l, b, medfwhm, limitmag, mumax_med, mumax_rms FROM ptf_exp")
     
-    exposureDataArray = np.array(exposureData, dtype=[("mjd", float),\ 
+    exposureDataArray = np.array(exposureData, dtype=[("mjd", float),\
                                                       ("fieldid", int), \
                                                       ("ccdid", int), \
                                                       ("filterid", int), \
