@@ -1,5 +1,5 @@
 """ 
-    Take PTF Exposure information from ../pickles/ptf_exp.pickle and load it
+    Take PTF Exposure information from a pickle and load it
     into the `ptf_microlensing` database.
     
     ** SQL TO CREATE TABLE IS AT BOTTOM **
