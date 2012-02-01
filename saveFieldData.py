@@ -23,7 +23,7 @@ except ImportError:
 import numpy as np
 
 def saveFieldLightCurves(fieldid, fieldDict):
-    thisField = fieldDict[fieldID]
+    thisField = fieldDict[fieldid]
         
     radius = 0.7 #degrees
     bounds_t  = lb.intervalset((40000, 60000))
@@ -57,7 +57,7 @@ def getDenseFields():
     # Have to open list of fields, for now just do:
     fieldids = [3419]
     
-    f = open("fieldDict.pickle")
+    f = open("../microlensing/fieldDict.pickle")
     global fieldDict
     fieldDict = pickle.load(f)
     f.close()
