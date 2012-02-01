@@ -25,8 +25,8 @@ import numpy as np
 def saveFieldLightCurves(fieldid, filename="fieldDict.pickle"):
     try:
         # if fieldDict is defined and global
-        thisField = fieldDict[fieldID]
-    except:
+        thisField = fieldDict[fieldid]
+    except NameError:
         f = open(filename)
         fieldDict = pickle.load(f)
         f.close()
@@ -63,7 +63,7 @@ def getDenseFields():
     # Have to open list of fields, for now just do:
     fieldids = [3419]
     
-    f = open("fieldDict.pickle")
+    f = open("../microlensing/fieldDict.pickle")
     global fieldDict
     fieldDict = pickle.load(f)
     f.close()
