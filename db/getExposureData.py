@@ -36,6 +36,7 @@ if __name__ == "__main__":
                                                       ("dec", float), \
                                                       ("l", float), \
                                                       ("b", float), \
+                                                      ("limitmag", float), \
                                                       ("medfwhm", float), \
                                                       ("mumax_med", float), \
                                                       ("mumax_rms", float)]).view(np.recarray)
