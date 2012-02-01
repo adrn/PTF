@@ -1,4 +1,8 @@
 """ 
+    Contains a function that accepts a filename representing a chunk of 
+    PTF data and loads it into the light_curve table in the 
+    ptf_microlensing database.
+    
     Take PTF light curve data from ./lightcurves/*.pickle and load it
     into a postgres database.
     
@@ -17,24 +21,31 @@ from argparse import ArgumentParser
 
 import numpy as np
 import sqlalchemy
-from sqlalchemy import create_engine, MetaData
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, scoped_session
-from sqlalchemy.schema import Table
 
 from DatabaseConnection import *
 from NumpyAdaptors import *
-session = Session
 
-parser = ArgumentParser(description="Populate the BOSS part of the spectradb database")
-parser.add_argument("-o", "--overwrite", action="store_true", dest="overwrite", default=False,
-                help="Overwrite all data in the database (default = False)")
-parser.add_argument("-v", "--verbose", action="store_true", dest="verbose", default=False,
-                help="Be chatty (default = False)")
+def loadData(filename):
+    """ Given the filename of a pickle containing PTF
+        light curve data, load it into the light_curve
+        table of ptf_microlensing
+    """
+    if args.overwrite:
+        
 
-args = parser.parse_args()
-if args.verbose: logging.basicConfig(level=logging.DEBUG, format='%(message)s')
-else: logging.basicConfig(level=logging.INFO, format='%(message)s')
+if __name__ == "__main__":
+    parser = ArgumentParser()
+    parser.add_argument("-o", "--overwrite", action="store_true", dest="overwrite", default=False,
+                    help="Overwrite all data in the database (default = False)")
+    parser.add_argument("-v", "--verbose", action="store_true", dest="verbose", default=False,
+                    help="Be chatty (default = False)")
+    parser.add_argument("-f", "--file", dest="file", default="",
+                    help="The path to the .pickle file that contains the PTF data")
+    
+    global args
+    args = parser.parse_args()
+    if args.verbose: logging.basicConfig(level=logging.DEBUG, format='%(message)s')
+    else: logging.basicConfig(level=logging.INFO, format='%(message)s')
 
 if args.overwrite:
     session.query(LightCurve).delete()

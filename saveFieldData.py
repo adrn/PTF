@@ -22,14 +22,8 @@ except ImportError:
     
 import numpy as np
 
-def saveFieldLightCurves(fieldid, filename="fieldDict.pickle"):
-    try:
-        # if fieldDict is defined and global
-        thisField = fieldDict[fieldID]
-    except:
-        f = open(filename)
-        fieldDict = pickle.load(f)
-        f.close()
+def saveFieldLightCurves(fieldid, fieldDict):
+    thisField = fieldDict[fieldID]
         
     radius = 0.7 #degrees
     bounds_t  = lb.intervalset((40000, 60000))
@@ -70,7 +64,7 @@ def getDenseFields():
     
     for fieldid in fieldids:
         logging.debug("Field {0}".format(fieldid))
-        saveFieldLightCurves(fieldid)
+        saveFieldLightCurves(fieldid, fieldDict)
 
 
 if __name__ == "__main__":
