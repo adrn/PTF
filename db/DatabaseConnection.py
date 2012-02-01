@@ -1,7 +1,7 @@
 import sqlalchemy
-from sqlalchemy import create_engine, MetaData
+from sqlalchemy import create_engine, MetaData, Table, Column, Integer, BigInteger, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, scoped_session, deferred
+from sqlalchemy.orm import sessionmaker, scoped_session, deferred, relationship
 from sqlalchemy.schema import Column
 from sqlalchemy.types import Float
 from sqlalchemy.dialects.postgresql import ARRAY
@@ -9,7 +9,7 @@ from sqlalchemy.sql.expression import func
 
 import numpy as np
 
-__all__ = ["Session", "Base", "engine", "LightCurve", "SimLightCurve"]
+__all__ = ["session", "Session", "Base", "engine", "LightCurve", "CCDExposure", "Field"]
 
 class Singleton(type):
 	def __init__(cls, name, bases, dict):
@@ -36,7 +36,7 @@ class DatabaseConnection(object):
 db_config = {
 	'user'     : 'adrian',
 	'password' : 'lateralus0',
-	'database' : 'ptf_microlensing',
+	'database' : 'ptf_microlensing_test',
 	'host'     : 'localhost',
 	'port'     : 5432
 }
@@ -47,40 +47,35 @@ db = DatabaseConnection(database_connection_string=database_connection_string)
 engine = db.engine
 metadata = db.metadata
 Session = db.Session
+session = Session
 Base = db.Base
 
-# Model Class for simulation light curves
-class SimLightCurve(Base):
-    __tablename__ = 'simulation_light_curve'
+# Model Class for true PTF light curves
+class CCDExposure(Base):
+    __tablename__ = 'ccd_exposure'
+    __table_args__ = {'autoload' : True}
+
+class Field(Base):
+    __tablename__ = 'field'
     __table_args__ = {'autoload' : True}
     
-    mjd = deferred(Column(ARRAY(Float)))
-    mag = deferred(Column(ARRAY(Float)))
-    mag_error = deferred(Column(ARRAY(Float)))
-    
-    def __repr__(self):
-        return "<{0} -- objid: {1}>".format(self.__class__.__name__, self.objid)
-    
     @property
-    def amjd(self):
-        return np.array(self.mjd)
-    
-    @property
-    def amag(self):
-        return np.array(self.mag)
-    
-    @property
-    def amag_error(self):
-        return np.array(self.mag_error)
+    def numberOfExposures(self):
+        session = Session.object_session(self)
+        
+        numExps = []
+        for ccdid in range(12):
+            numExps.append(session.query(Exposure).join(Field).filter(Exposure.ccdid == ccdid).filter(Field.id == self.id).count())
+        
+        return max(numExps)
 
-# Model Class for true PTF light curves
 class LightCurve(Base):
     __tablename__ = 'light_curve'
     __table_args__ = {'autoload' : True}
     
-    mjd = deferred(Column(ARRAY(Float)))
-    mag = deferred(Column(ARRAY(Float)))
-    mag_error = deferred(Column(ARRAY(Float)))
+    #mjd = deferred(Column(ARRAY(Float)))
+    #mag = deferred(Column(ARRAY(Float)))
+    #mag_error = deferred(Column(ARRAY(Float)))
     
     def __repr__(self):
         return "<{0} -- objid: {1}>".format(self.__class__.__name__, self.objid)
@@ -96,3 +91,13 @@ class LightCurve(Base):
     @property
     def amag_error(self):
         return np.array(self.mag_error)
+
+class CCDExposureToLightcurve(Base):
+    __tablename__ = 'ccd_exposure_to_light_curve'
+    __table_args__ = {'autoload' : True}
+
+
+CCDExposure.field = relationship(Field, backref="ccd_exposures")
+CCDExposure.lightCurves = relationship(LightCurve,
+                    secondary=CCDExposureToLightcurve.__table__,
+                    backref="ccdExposures")

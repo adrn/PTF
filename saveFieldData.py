@@ -22,36 +22,32 @@ except ImportError:
     
 import numpy as np
 
-def fieldToRADec(thisField):
-    """ Takes a PTF Field ID and returns the RA/Dec of
-        the field center.
-    """
-    
-    ra = np.mean([thisField[thisField.ccdid == 8].ra[0], thisField[thisField.ccdid == 9].ra[0]])
-    dec = np.mean([thisField[thisField.ccdid == 0].dec[0], thisField[thisField.ccdid == 6].dec[0]])
-    logging.debug("Field center RA/Dec: {0}, {1}".format(ra, dec))
-    
-    return (ra, dec)
-    
-def saveLightCurves(field, id):
-    """ Given a PTF Field ID, select all light curves from
-        the field.
-    """
-    ra, dec = fieldToRADec(field)
-    bounds_xy = lb.rectangle(ra-3.5/2, dec-2.31/2, ra+3.5/2, dec+2.31/2) # (ra,dec)_bottomleft, (ra,dec)_topright
-    bounds_t  = lb.intervalset((40000, 60000))
-    
-    for thisCCD in range(1, 13):
-        if os.path.exists("{0}_{1}.pickle".format(id, thisCCD)):
-            logging.info("{0}_{1}.pickle exists! Skipping...".format(id, thisCCD))
-            continue
-    
-        results = db.query("ptf_det.ra as ra, ptf_det.dec as dec, mjd, mag_abs/1000. as mag, magerr_abs/1000. as magErr, \
-            apbsrms as sys_err, fid, obj_id \
-            FROM ptf_exp, ptf_det, ptf_obj \
-            WHERE ((flags & 1) == 0) & ((imaflags_iso & 4053) == 0) & (flags < 8) & (apbsrms > 0) & (ccdid == {0})".format(thisCCD))\
-        .fetch(bounds=[(bounds_xy, bounds_t)])
+def saveFieldLightCurves(fieldid, filename="fieldDict.pickle"):
+    try:
+        # if fieldDict is defined and global
+        thisField = fieldDict[fieldID]
+    except:
+        f = open(filename)
+        fieldDict = pickle.load(f)
+        f.close()
         
+    radius = 0.7 #degrees
+    bounds_t  = lb.intervalset((40000, 60000))
+    for ccdid in range(0, 12):
+        ra = np.mean(thisField[thisField.ccdid == ccdid].ra)
+        dec = np.mean(thisField[thisField.ccdid == ccdid].dec)
+        
+        bounds_xy = lb.beam(ra, dec, radius)
+        results = db.query("ptf_det.ra as ra, ptf_det.dec as dec, mjd, mag_abs/1000. as mag, magerr_abs/1000. as magErr, \
+                apbsrms as sys_err, fid, obj_id \
+                FROM ptf_exp, ptf_det, ptf_obj \
+                WHERE ((flags & 1) == 0) & ((imaflags_iso & 4053) == 0) & (flags < 8) & (apbsrms > 0) & (ccdid == {0}) & (ptf_field == {1})".format(thisCCD, fieldid))\
+            .fetch(bounds=[(bounds_xy, bounds_t)])
+        
+        print len(results)
+        sys.exit(0)
+
+        """
         logging.info("CCD {0} had {1} detected sources".format(thisCCD, len(results)))
         resultsArray = np.array(results, dtype=[('ra', float), ('dec', float), ('mjd', float), ('mag', float), ('mag_err', float), \
             ('sys_err', np.float32), ('filterid', np.uint8), ('obj_id', np.uint64)])
@@ -60,18 +56,22 @@ def saveLightCurves(field, id):
         f = open("{0}_{1}.pickle".format(id, thisCCD), "w")
         pickle.dump(resultsArray, f)
         f.close()
+        """
     
-def main(min_number_observations=150):
+def getDenseFields():
+    
+    # Have to open list of fields, for now just do:
+    fieldids = [3419]
+    
     f = open("fieldDict.pickle")
+    global fieldDict
     fieldDict = pickle.load(f)
     f.close()
     
-    for fieldID in fieldDict.keys():
-        thisField = fieldDict[fieldID]
-        logging.debug("Field {0}, {1} observations".format(fieldID, len(thisField[thisField.ccdid == 1])))
-        
-        if len(thisField[thisField.ccdid == 1]) > min_number_observations:
-            saveLightCurves(thisField, fieldID)
+    for fieldid in fieldids:
+        logging.debug("Field {0}".format(fieldid))
+        saveFieldLightCurves(fieldid)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
@@ -89,4 +89,4 @@ if __name__ == "__main__":
     elif args.quiet: logging.basicConfig(level=logging.ERROR)
     else: logging.basicConfig(level=logging.INFO)
     
-    main()
+    getDenseFields()
