@@ -24,7 +24,7 @@ try:
     db = lsd.DB("/scr4/bsesar")
     
 except ImportError:
-    raise logging.warn("LSD package not found! Did you mean to run this on navtara?")
+    logging.warn("LSD package not found! Did you mean to run this on navtara?")
 
 try:
     import apwlib.geometry as g
@@ -36,7 +36,7 @@ from NumpyAdaptors import *
 
 # ~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
-def saveExposureData(filename="data/exposureTable.pickle", overwrite=False, logger=None, verbosity=None):
+def saveExposureData(filename="data/exposureData.pickle", overwrite=False, logger=None, verbosity=None):
     """ Queries LSD and saves the information to be loaded into
         the ccd_exposure table of ptf_microlensing.
     """
@@ -63,10 +63,10 @@ def saveExposureData(filename="data/exposureTable.pickle", overwrite=False, logg
     logger.debug("saveExposureData: {0} rows returned from ptf_exp".format(len(exposureData)))
     
     exposureDataArray = np.array(exposureData, dtype=[("mjd", np.float64),\
-                                                      ("exp_id", "|S20"), \
-                                                      ("field_id", np.uint8), \
-                                                      ("ccd_id", np.uint8), \
-                                                      ("filter_id", np.uint8), \
+                                                      ("exp_id", int), \
+                                                      ("field_id", int), \
+                                                      ("ccd_id", int), \
+                                                      ("filter_id", int), \
                                                       ("ra", np.float64), \
                                                       ("dec", np.float64), \
                                                       ("l", np.float64), \
@@ -80,7 +80,7 @@ def saveExposureData(filename="data/exposureTable.pickle", overwrite=False, logg
     
     return True
 
-def loadExposureData(filename="data/exposureTable.pickle", logger=None, verbosity=None):
+def loadExposureData(filename="data/exposureData.pickle", logger=None, verbosity=None):
     """ Loads a dump of the ptf_exp table into the ptf_microlensing databse """
     
     if logger == None:
@@ -99,7 +99,9 @@ def loadExposureData(filename="data/exposureTable.pickle", logger=None, verbosit
     f.close()
     logger.info("Pickle loaded")
     
-    fieldids = np.unique(exposureData.fieldid)
+    fieldids = np.unique(exposureData.field_id)
+    print fieldids
+    sys.exit(0)
     
     for fieldid in fieldids:
         logger.debug("Processing field {0}".format(fieldid))
@@ -119,6 +121,7 @@ def loadExposureData(filename="data/exposureTable.pickle", logger=None, verbosit
             field = Field()
             field.id = fieldid
             session.add(field)
+            session.flush()
         
         # See if the exposure data is already loaded into the database, or if only some of it is loaded
         for ccdid in range(12):
@@ -132,17 +135,17 @@ def loadExposureData(filename="data/exposureTable.pickle", logger=None, verbosit
                 for exposure in ccdData:
                     if Session.query(CCDExposure).filter(CCDExposure.field_id == fieldid).\
                                                   filter(CCDExposure.ccd_id == ccdid).\
-                                                  filter(CCDExposure.exp_id == row["exp_id"]).count() == 0:
+                                                  filter(CCDExposure.exp_id == exposure["exp_id"]).count() == 0:
                         ccdExposure = CCDExposure()
                         ccdExposure.field_id = fieldid
-                        ccdExposure.exp_id = row["exp_id"]
-                        ccdExposure.mjd = row["mjd"]
-                        ccdExposure.ccdid = row["ccd_id"]
-                        ccdExposure.filter_id = row["filter_id"]
-                        ccdExposure.ra = row["ra"]
-                        ccdExposure.dec = row["dec"]
-                        ccdExposure.l = row["l"]
-                        ccdExposure.b = row["b"]
+                        ccdExposure.exp_id = exposure["exp_id"]
+                        ccdExposure.mjd = exposure["mjd"]
+                        ccdExposure.ccd_id = exposure["ccd_id"]
+                        ccdExposure.filter_id = exposure["filter_id"]
+                        ccdExposure.ra = exposure["ra"]
+                        ccdExposure.dec = exposure["dec"]
+                        ccdExposure.l = exposure["l"]
+                        ccdExposure.b = exposure["b"]
                         session.add(ccdExposure)
                     else:
                         pass
@@ -242,8 +245,8 @@ def transferExposureData(overwrite=False, logger=None, verbosity=None):
     except IOError:
         db = lsd.DB("/scr4/bsesar")
         results = db.query("mjd, exp_id, ptf_field, ccdid, fid, ra, dec, l, b FROM ptf_exp").fetch()
-        exposureData = [tuple(row) for row in results]
-        logger.debug("{0} rows returned from ptf_exp".format(len(exposureData)))
+        exposureData = [tuple(exposure) for exposure in results]
+        logger.debug("{0} exposures returned from ptf_exp".format(len(exposureData)))
 
         f = open("data/exposureData.pickle", "w")
         pickle.dump(exposureData, f)
