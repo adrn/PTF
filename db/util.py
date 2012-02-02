@@ -181,12 +181,14 @@ def loadLightCurvesFromField(fieldid, minimumNumberOfExposures=25, logger=None, 
         if numberOfExposures < minimumNumberOfExposures:
             logger.info("This field {0} only has {1} observations! Exiting this field...".format(fieldid, numberOfExposures))
             return False
+            
+        logger.info("Field {0} has {1} observations...".format(fieldid, numberOfExposures))
         
         ra = session.query(func.avg(CCDExposure.ra)).filter(CCDExposure.field_id == fieldid).filter(CCDExposure.ccd_id == ccdid).all()[0][0]
         dec = session.query(func.avg(CCDExposure.dec)).filter(CCDExposure.field_id == fieldid).filter(CCDExposure.ccd_id == ccdid).all()[0][0]
         
         print ra, dec
-        sys.exit(0)
+        break
         
         logger.debug("CCD position: {0}, {1}".format(ra, dec))
         bounds_xy = lb.beam(ra, dec, radius)
