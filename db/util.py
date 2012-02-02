@@ -14,6 +14,7 @@ import logging
 
 # Third party libraries
 import numpy as np
+from sqlalchemy import func
 
 # External packages
 try:
