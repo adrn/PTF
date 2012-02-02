@@ -232,20 +232,32 @@ def transferExposureData(overwrite=False, logger=None, verbosity=None):
         else:
             logger.setLevel(verbosity)
     
-    db = lsd.DB("/scr4/bsesar")
-    results = db.query("mjd, exp_id, ptf_field, ccdid, fid, ra, dec, l, b FROM ptf_exp").fetch()
-    exposureData = [tuple(row) for row in results]
-    logger.debug("{0} rows returned from ptf_exp".format(len(exposureData)))
+    f = open("data/exposureData.pickle")
+    exposureData = pickle.load(f) 
+    f.close()
     
-    exposureData = np.array(exposureData, dtype=[("mjd", np.float64),\
-                                                      ("exp_id", np.uint8), \
-                                                      ("field_id", np.uint8), \
-                                                      ("ccd_id", np.dtype("u1")), \
-                                                      ("filter_id", np.dtype("u1")), \
-                                                      ("ra", np.float64), \
-                                                      ("dec", np.float64), \
-                                                      ("l", np.float64), \
-                                                      ("b", np.float64)]).view(np.recarray)
+    try:
+        f = open("data/exposureData.pickle")
+        exposureData = pickle.load(f) 
+        f.close()
+    except:
+        db = lsd.DB("/scr4/bsesar")
+        results = db.query("mjd, exp_id, ptf_field, ccdid, fid, ra, dec, l, b FROM ptf_exp").fetch()
+        exposureData = [tuple(row) for row in results]
+        logger.debug("{0} rows returned from ptf_exp".format(len(exposureData)))
+        
+        exposureData = np.array(exposureData, dtype=[("mjd", np.float64),\
+                                                          ("exp_id", np.uint8), \
+                                                          ("field_id", np.uint8), \
+                                                          ("ccd_id", np.uint8), \
+                                                          ("filter_id", np.uint8), \
+                                                          ("ra", np.float64), \
+                                                          ("dec", np.float64), \
+                                                          ("l", np.float64), \
+                                                          ("b", np.float64)]).view(np.recarray)
+        f = open("data/exposureData.pickle", "w")
+        pickle.dump(exposureData, f)
+        f.close()
     
     fieldids = np.unique(exposureData.fieldid)
     
