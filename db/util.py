@@ -42,6 +42,7 @@ def saveExposureData(filename="exposureTable.pickle", overwrite=False, logger=No
     
     if logger == None:
         logger = logging.getLogger("SaveExposureData")
+        logger.propagate = False
         ch = logging.StreamHandler()
         logger.addHandler(ch)
         if verbosity == None:
@@ -83,6 +84,7 @@ def loadExposureData(filename="exposureTable.pickle", logger=None, verbosity=Non
     
     if logger == None:
         logger = logging.getLogger("LoadExposureData")
+        logger.propagate = False
         ch = logging.StreamHandler()
         logger.addHandler(ch)
         if verbosity == None:
@@ -164,6 +166,7 @@ def loadLightCurvesFromField(fieldid, minimumNumberOfExposures=25, logger=None, 
     
     if logger == None:
         logger = logging.getLogger("loadLightCurvesFromField")
+        logger.propagate = False
         ch = logging.StreamHandler()
         logger.addHandler(ch)
         if verbosity == None:
@@ -186,9 +189,6 @@ def loadLightCurvesFromField(fieldid, minimumNumberOfExposures=25, logger=None, 
         
         ra = session.query(func.avg(CCDExposure.ra)).filter(CCDExposure.field_id == fieldid).filter(CCDExposure.ccd_id == ccdid).all()[0][0]
         dec = session.query(func.avg(CCDExposure.dec)).filter(CCDExposure.field_id == fieldid).filter(CCDExposure.ccd_id == ccdid).all()[0][0]
-        
-        print ra, dec
-        break
         
         logger.debug("CCD position: {0}, {1}".format(ra, dec))
         bounds_xy = lb.beam(ra, dec, radius)

@@ -11,6 +11,7 @@ ALTER TABLE field OWNER TO adrian;
 CREATE TABLE ccd_exposure
 (
   pk serial NOT NULL,
+  exp_id bigint NOT NULL,
   mjd double precision NOT NULL,
   field_id integer NOT NULL,
   ccd_id smallint NOT NULL,
