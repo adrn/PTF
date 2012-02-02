@@ -217,7 +217,7 @@ def loadLightCurvesFromField(fieldid, minimumNumberOfExposures=25, ccdids=range(
         
     return True
 
-def loadExposureData(overwrite=False, logger=None, verbosity=None):
+def transferExposureData(overwrite=False, logger=None, verbosity=None):
     """ Queries LSD and then remotely loads the information into
         the ccd_exposure table of ptf_microlensing.
     """
