@@ -36,7 +36,7 @@ class DatabaseConnection(object):
 db_config = {
 	'user'     : 'adrian',
 	'password' : 'lateralus0',
-	'database' : 'ptf_microlensing_test',
+	'database' : 'ptf',
 	'host'     : 'deimos.astro.columbia.edu',
 	'port'     : 5432
 }
