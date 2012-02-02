@@ -63,7 +63,7 @@ def saveExposureData(filename="data/exposureData.pickle", overwrite=False, logge
     logger.debug("saveExposureData: {0} rows returned from ptf_exp".format(len(exposureData)))
     
     exposureDataArray = np.array(exposureData, dtype=[("mjd", np.float64),\
-                                                      ("exp_id", int), \
+                                                      ("exp_id", np.uint64), \
                                                       ("field_id", int), \
                                                       ("ccd_id", int), \
                                                       ("filter_id", int), \
@@ -100,8 +100,6 @@ def loadExposureData(filename="data/exposureData.pickle", logger=None, verbosity
     logger.info("Pickle loaded")
     
     fieldids = np.unique(exposureData.field_id)
-    print fieldids
-    sys.exit(0)
     
     for fieldid in fieldids:
         logger.debug("Processing field {0}".format(fieldid))
@@ -132,6 +130,7 @@ def loadExposureData(filename="data/exposureData.pickle", logger=None, verbosity
             # If there are more exposures in the file than in the database, this means there are new exposure
             #   in the file to be loaded into the database
             if numberOfExposuresInPickle > numberOfExposuresInDatabase:
+                logger.debug("Field {0}, CCD {1}: Exposures not loaded".format(fieldid, ccdid))
                 for exposure in ccdData:
                     if Session.query(CCDExposure).filter(CCDExposure.field_id == fieldid).\
                                                   filter(CCDExposure.ccd_id == ccdid).\
@@ -165,10 +164,8 @@ def loadExposureData(filename="data/exposureData.pickle", logger=None, verbosity
             
     return True
 
-def loadLightCurvesFromField(fieldid, minimumNumberOfExposures=25, ccdids=range(0,12), ogger=None, verbosity=None):
-    """ Experimental function to directly load the ptf_microlensing database
-        from navtara via a remote psql connection
-    """
+def saveLightCurvesFromField(fieldid, minimumNumberOfExposures=25, ccdids=range(0,12), logger=None, verbosity=None):
+    """ Given a ptf field id, save all light curves if it has enough exposures """
     
     if logger == None:
         logger = logging.getLogger("loadLightCurvesFromField")
@@ -186,6 +183,10 @@ def loadLightCurvesFromField(fieldid, minimumNumberOfExposures=25, ccdids=range(
     bounds_t  = lb.intervalset((40000, 60000)) # Cover the whole survey
     
     for ccdid in ccdids:
+        filename = "data/{0}_{1}.pickle".format(fieldid, ccdid)
+        if os.path.exists(filename):
+            raise FileError("{0} already exists!".format(filename))
+        
         numberOfExposures = session.query(CCDExposure).filter(CCDExposure.field_id == fieldid).filter(CCDExposure.ccd_id == ccdid).count()
         if numberOfExposures < minimumNumberOfExposures:
             logger.info("This field {0} only has {1} observations! Exiting this field...".format(fieldid, numberOfExposures))
@@ -208,7 +209,14 @@ def loadLightCurvesFromField(fieldid, minimumNumberOfExposures=25, ccdids=range(
             ('sys_err', np.float32), ('filter_id', np.uint8), ('obj_id', np.uint64), ('field_id', np.uint32), ('ccd_id', np.uint8), ('flags', np.uint16), ('imaflags_iso', np.uint16)])
         resultsArray = resultsArray.view(np.recarray)
         logger.info("CCD {0} had {1} detected sources and {2} observations".format(ccdid, len(results)/numberOfExposures, numberOfExposures))
-            
+        
+        f = open(filename, "w")
+        pickle.dump(resultsArray, f)
+        f.close()
+        
+        logger.info("Done with field {0} and ccd {1}!".format(fieldid, ccdid))
+        
+        """
         for objid in np.unique(resultsArray.obj_id):
             lightCurveData = resultsArray[resultsArray.obj_id == objid]
             lightCurve = LightCurve()
@@ -220,107 +228,27 @@ def loadLightCurvesFromField(fieldid, minimumNumberOfExposures=25, ccdids=range(
             lightCurve.ra = lightCurveData.ra
             lightCurve.dec = lightCurveData.dec
             lightCurve.ccdExposures = session.query(CCDExposure).filter(CCDExposure.field_id == fieldid).filter(CCDExposure.ccd_id == ccdid).all()
+        """
         
     return True
 
-def transferExposureData(overwrite=False, logger=None, verbosity=None):
-    """ Queries LSD and then remotely loads the information into
-        the ccd_exposure table of ptf_microlensing.
-    """
+def saveWellSampledDenseFields(minimumNumberOfExposures=25, logger=None, verbosity=None):
+    """ """
+    fieldids = []
     
-    if logger == None:
-        logger = logging.getLogger("SaveExposureData")
-        logger.propagate = False
-        ch = logging.StreamHandler()
-        logger.addHandler(ch)
-        if verbosity == None:
-            logger.setLevel(logging.INFO)
-        else:
-            logger.setLevel(verbosity)
-        
-    try:
-        f = open("data/exposureData.pickle")
-        exposureData = pickle.load(f) 
-        f.close()
-    except IOError:
-        db = lsd.DB("/scr4/bsesar")
-        results = db.query("mjd, exp_id, ptf_field, ccdid, fid, ra, dec, l, b FROM ptf_exp").fetch()
-        exposureData = [tuple(exposure) for exposure in results]
-        logger.debug("{0} exposures returned from ptf_exp".format(len(exposureData)))
-
-        f = open("data/exposureData.pickle", "w")
-        pickle.dump(exposureData, f)
-        f.close()
-    print exposureData[0]
-
-    exposureData = np.array(exposureData, dtype=[("mjd", np.float64),\
-                                                          ("exp_id", "|S20"), \
-                                                          ("field_id", np.uint8), \
-                                                          ("ccd_id", np.uint8), \
-                                                          ("filter_id", np.uint8), \
-                                                          ("ra", np.float64), \
-                                                          ("dec", np.float64), \
-                                                          ("l", np.float64), \
-                                                          ("b", np.float64)]).view(np.recarray)
+    # Globulars
+    globularData = np.genfromtxt("data/globularClusters.txt", delimiter=",", usecols=[1,2], dtype=[("ra", "|S20"),("dec", "|S20")]).view(np.recarray)
+    for raStr,decStr in zip(globularData.ra, globularData.dec):
+        ra = g.RA.fromHours(raStr).degrees
+        dec = g.Dec.fromDegrees(decStr).degrees
+        fieldids += [x[0] for x in session.query(Field.id).join(CCDExposure).filter(func.q3c_radial_query(CCDExposure.ra, CCDExposure.dec, ra, dec, 20./60)).all()] # 20 arcminutes
     
-    fieldids = np.unique(exposureData.field_id)
+    # M31
+    fieldids += [x[0] for x in session.query(Field.id).join(CCDExposure).filter(func.q3c_radial_query(CCDExposure.ra, CCDExposure.dec, ra, dec, 5.)).all()] # ~5 degrees
     
-    for fieldid in fieldids:
-        logger.debug("Processing field {0}".format(fieldid))
-        
-        # Start a sqlalchemy database session to allow for modifying and adding data to the DB
-        Session.begin()
-        
-        # Select only the data for the current field
-        thisData = exposureData[exposureData.field_id == fieldid]
-        
-        # Try to get the existing database information for the field, but if it doesn't
-        #   exist this will create one and add it to the current session
-        try:
-            field = Session.query(Field).filter(Field.id == fieldid).one()
-        except sqlalchemy.orm.exc.NoResultFound:
-            logger.debug("Field not found in database")
-            field = Field()
-            field.id = fieldid
-            session.add(field)
-        
-        # See if the exposure data is already loaded into the database, or if only some of it is loaded
-        for ccdid in range(12):
-            ccdData = thisData[thisData.ccd_id == ccdid]
-            numberOfExposuresInPickle = len(ccdData)
-            numberOfExposuresInDatabase = Session.query(CCDExposure).filter(CCDExposure.field_id == fieldid).filter(CCDExposure.ccd_id == ccdid).count()
-            
-            # If there are more exposures in the file than in the database, this means there are new exposure
-            #   in the file to be loaded into the database
-            if numberOfExposuresInPickle > numberOfExposuresInDatabase:
-                for exposure in ccdData:
-                    if Session.query(CCDExposure).filter(CCDExposure.field_id == fieldid).\
-                                                  filter(CCDExposure.ccd_id == ccdid).\
-                                                  filter(CCDExposure.exp_id == exposure["exp_id"]).count() == 0:
-                        ccdExposure = CCDExposure()
-                        ccdExposure.field_id = fieldid
-                        ccdExposure.exp_id = exposure["exp_id"]
-                        ccdExposure.mjd = exposure["mjd"]
-                        ccdExposure.ccd_id = exposure["ccd_id"]
-                        ccdExposure.filter_id = exposure["filter_id"]
-                        ccdExposure.ra = exposure["ra"]
-                        ccdExposure.dec = exposure["dec"]
-                        ccdExposure.l = exposure["l"]
-                        ccdExposure.b = exposure["b"]
-                        session.add(ccdExposure)
-                    else:
-                        pass
-            
-            # If the number of exposures are equal, the database is up to date
-            elif numberOfExposuresInPickle == numberOfExposuresInDatabase:
-                logger.debug("Field {0}, CCD {1}: All exposures loaded!".format(fieldid, ccdid))
-                continue
-            
-            # If the number of exposures in the file is less than the number in the database, something went wrong!
-            elif numberOfExposuresInPickle < numberOfExposuresInDatabase:
-                logger.warning("Field {0}, CCD {1}: There are more entries in the database than in the load file!".format(fieldid, ccdid))
-        
-            Session.flush()
-        logger.debug("Done with field {0}".format(fieldid))
-            
-    return True
+    # Bulge
+    fieldids += [x[0] for x in session.query(Field.id).join(CCDExposure).filter(func.q3c_radial_query(CCDExposure.l, CCDExposure.b, 0., 0., 15.)).all()] # ~15 degrees of galactic center
+    
+    for fieldid in np.unique(fieldids):
+        if session.query(CCDExposure).filter(CCDExposure.field_id == fieldid).filter(CCDExposure.ccd_id == 0).count() > minimumNumberOfExposures:
+            success = saveLightCurvesFromField(fieldid, logger=logger, verbosity=verbosity)
