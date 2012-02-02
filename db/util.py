@@ -24,7 +24,7 @@ try:
     db = lsd.DB("/scr4/bsesar")
     
 except ImportError:
-    raise ImportError("LSD package not found! Did you mean to run this on navtara?")
+    raise logging.warn("LSD package not found! Did you mean to run this on navtara?")
 
 try:
     import apwlib.geometry as g
