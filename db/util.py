@@ -232,12 +232,6 @@ def transferExposureData(overwrite=False, logger=None, verbosity=None):
         else:
             logger.setLevel(verbosity)
     
-    if filename.strip == "":
-        raise ValueError("filename parameter must not be empty!")
-    elif os.path.exists(filename):
-        if overwrite: os.remove(filename)
-        else: raise FileError("File {0} already exists! If you want to overwrite it, set 'overwrite=True'".format(filename))
-    
     db = lsd.DB("/scr4/bsesar")
     results = db.query("mjd, exp_id, ptf_field, ccdid, fid, ra, dec, l, b FROM ptf_exp").fetch()
     exposureData = [tuple(row) for row in results]
