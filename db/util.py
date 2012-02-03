@@ -244,6 +244,8 @@ def saveWellSampledDenseFields(minimumNumberOfExposures=25, logger=None, verbosi
         fieldids += [x[0] for x in session.query(Field.id).join(CCDExposure).filter(func.q3c_radial_query(CCDExposure.ra, CCDExposure.dec, ra, dec, 20./60)).all()] # 20 arcminutes
     
     # M31
+    ra = g.RA.fromHours("00 42 44.3").degrees
+    dec = g.Dec.fromHours("+41 16 9").degrees
     fieldids += [x[0] for x in session.query(Field.id).join(CCDExposure).filter(func.q3c_radial_query(CCDExposure.ra, CCDExposure.dec, ra, dec, 5.)).all()] # ~5 degrees
     
     # Bulge
