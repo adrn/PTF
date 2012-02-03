@@ -9,7 +9,7 @@ from sqlalchemy.sql.expression import func
 
 import numpy as np
 
-__all__ = ["session", "Session", "Base", "engine", "LightCurve", "CCDExposure", "Field"]
+__all__ = ["session", "Session", "Base", "engine", "LightCurve", "CCDExposure", "Field", "CCDExposureToLightcurve"]
 
 class Singleton(type):
 	def __init__(cls, name, bases, dict):

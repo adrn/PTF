@@ -150,7 +150,8 @@ def loadExposureData(filename="data/exposureData.pickle", logger=None, verbosity
                         session.add(ccdExposure)
                     else:
                         pass
-                session.flush()
+                session.commit()
+                session.begin()
             
             # If the number of exposures are equal, the database is up to date
             elif numberOfExposuresInPickle == numberOfExposuresInDatabase:
@@ -302,21 +303,34 @@ def loadLightCurves(filename, logger=None, verbosity=None):
         else:
             logger.setLevel(verbosity)
     
+    logger.debug("Opening {}...".format(filename))
     f = open(filename)
     results = pickle.load(f)
     f.close()
+    logger.debug("File loaded!")
     
     resultsArray = np.array(results, dtype=[('ra', np.float64), ('dec', np.float64), ('mjd', np.float64), ('mag', np.float64), ('mag_err', np.float64), \
         ('sys_err', np.float32), ('filter_id', np.uint8), ('obj_id', np.uint64), ('field_id', np.uint32), ('ccd_id', np.uint8), ('flags', np.uint16), ('imaflags_iso', np.uint16)])
     
     resultsArray = resultsArray.view(np.recarray)
+    logger.debug("Data converted to recarray")
+    
     if len(np.unique(resultsArray.field_id)) > 1 or len(np.unique(resultsArray.ccd_id)) > 1: 
         raise ValueError("More than one field or ccd id for this pickle!")
     
     fieldid = resultsArray.field_id[0]
     ccdid = resultsArray.ccd_id[0]
     
-    for objid in np.unique(resultsArray.obj_id):
+    exposures = session.query(CCDExposure).filter(CCDExposure.field_id == fieldid).filter(CCDExposure.ccd_id == ccdid).all()
+    existingObjids = session.query(LightCurve.objid).join(CCDExposureToLightcurve, CCDExposure).filter(CCDExposure.field_id == fieldid).\
+                                                      filter(CCDExposure.ccd_id == ccdid).distinct().all()
+    existingObjids = np.unique([x[0] for x in existingObjids])
+    logger.debug("Existing objids: {0}".format(len(existingObjids)))
+    notLoadedObjids = np.array(list(set(resultsArray.obj_id).symmetric_difference(set(existingObjids))))
+    
+    session.begin()
+    logger.debug("Starting database load...")
+    for objid in notLoadedObjids:
         lightCurveData = resultsArray[resultsArray.obj_id == objid]
         lightCurve = LightCurve()
         lightCurve.objid = objid
@@ -326,4 +340,12 @@ def loadLightCurves(filename, logger=None, verbosity=None):
         lightCurve.sys_error = lightCurveData.sys_err
         lightCurve.ra = lightCurveData.ra
         lightCurve.dec = lightCurveData.dec
-        lightCurve.ccdExposures = session.query(CCDExposure).filter(CCDExposure.field_id == fieldid).filter(CCDExposure.ccd_id == ccdid).all()
+        lightCurve.ccdExposures = exposures
+        
+        if len(session.new) == 1000:
+            session.commit()
+            logger.debug("1000 light curves committed!")
+            session.begin()
+        
+    session.commit()
+    
