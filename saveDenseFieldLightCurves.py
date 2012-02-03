@@ -19,6 +19,8 @@ if __name__ == "__main__":
                     help="")
     parser.add_argument("-v", "--verbose", action="store_true", dest="verbose", default=False,
                     help="Be chatty!")
+    parser.add_argument("-f", "--filename", type=str, dest="filename", default="data/denseFields.pickle",
+                    help="Data file containing unique field ids for dense fields")
     
     args = parser.parse_args()
     if args.verbose:
@@ -26,7 +28,7 @@ if __name__ == "__main__":
     else:
         verbosity = logging.INFO
         
-    saveWellSampledDenseFields(args.minimum, verbosity=verbosity)
+    saveWellSampledDenseFields(filename=args.filename, minimumNumberOfExposures=args.minimum, verbosity=verbosity)
     
 else:
     raise ImportError("saveDenseFieldLightCurves.py should be run as a standalone script, not imported!")

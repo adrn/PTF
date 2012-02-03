@@ -11,6 +11,8 @@ import os
 import cPickle as pickle
 import argparse
 import logging
+import warnings
+warnings.filterwarnings(action="ignore", message="Skipped unsupported reflection of expression-based index q3c_ccd_exposure[_a-z]+")
 
 # Third party libraries
 import numpy as np
@@ -185,14 +187,15 @@ def saveLightCurvesFromField(fieldid, minimumNumberOfExposures=25, ccdids=range(
     for ccdid in ccdids:
         filename = "data/{0}_{1}.pickle".format(fieldid, ccdid)
         if os.path.exists(filename):
-            raise FileError("{0} already exists!".format(filename))
+            logger.warn("{0} already exists!".format(filename))
+            continue
         
         numberOfExposures = session.query(CCDExposure).filter(CCDExposure.field_id == fieldid).filter(CCDExposure.ccd_id == ccdid).count()
         if numberOfExposures < minimumNumberOfExposures:
-            logger.info("This field {0} only has {1} observations! Exiting this field...".format(fieldid, numberOfExposures))
-            return False
+            logger.info("This ccd {0} only has {1} observations! Exiting this field...".format(ccdid, numberOfExposures))
+            continue
             
-        logger.info("Field {0} has {1} observations...".format(fieldid, numberOfExposures))
+        logger.info("Field {0}:{1} has {2} observations...".format(fieldid, ccdid, numberOfExposures))
         
         ra = session.query(func.avg(CCDExposure.ra)).filter(CCDExposure.field_id == fieldid).filter(CCDExposure.ccd_id == ccdid).all()[0][0]
         dec = session.query(func.avg(CCDExposure.dec)).filter(CCDExposure.field_id == fieldid).filter(CCDExposure.ccd_id == ccdid).all()[0][0]
@@ -204,53 +207,123 @@ def saveLightCurvesFromField(fieldid, minimumNumberOfExposures=25, ccdids=range(
                 FROM ptf_exp, ptf_det, ptf_obj \
                 WHERE ((ccdid == {0}) & (ptf_field == {1}))".format(ccdid, fieldid))\
             .fetch(bounds=[(bounds_xy, bounds_t)])
-        
-        resultsArray = np.array(results, dtype=[('ra', np.float64), ('dec', np.float64), ('mjd', np.float64), ('mag', np.float64), ('mag_err', np.float64), \
-            ('sys_err', np.float32), ('filter_id', np.uint8), ('obj_id', np.uint64), ('field_id', np.uint32), ('ccd_id', np.uint8), ('flags', np.uint16), ('imaflags_iso', np.uint16)])
-        resultsArray = resultsArray.view(np.recarray)
-        logger.info("CCD {0} had {1} detected sources and {2} observations".format(ccdid, len(results)/numberOfExposures, numberOfExposures))
+
+        #resultsArray = np.array(results, dtype=[('ra', np.float64), ('dec', np.float64), ('mjd', np.float64), ('mag', np.float64), ('mag_err', np.float64), \
+        #    ('sys_err', np.float32), ('filter_id', np.uint8), ('obj_id', np.uint64), ('field_id', np.uint32), ('ccd_id', np.uint8), ('flags', np.uint16), ('imaflags_iso', np.uint16)])
+        #
+        #resultsArray = resultsArray.view(np.recarray)
+        #logger.info("CCD {0} had {1} detected sources and {2} observations".format(ccdid, len(results)/numberOfExposures, numberOfExposures))
+        logger.info("Saving file...{0}".format(filename))
         
         f = open(filename, "w")
-        pickle.dump(resultsArray, f)
+        #pickle.dump(resultsArray, f)
+        pickle.dump(results, f)
         f.close()
         
         logger.info("Done with field {0} and ccd {1}!".format(fieldid, ccdid))
         
-        """
-        for objid in np.unique(resultsArray.obj_id):
-            lightCurveData = resultsArray[resultsArray.obj_id == objid]
-            lightCurve = LightCurve()
-            lightCurve.objid = objid
-            lightCurve.mag = lightCurveData.mag
-            lightCurve.mag_error = lightCurveData.mag_err
-            lightCurve.mjd = lightCurveData.mjd
-            lightCurve.sys_error = lightCurveData.sys_err
-            lightCurve.ra = lightCurveData.ra
-            lightCurve.dec = lightCurveData.dec
-            lightCurve.ccdExposures = session.query(CCDExposure).filter(CCDExposure.field_id == fieldid).filter(CCDExposure.ccd_id == ccdid).all()
-        """
-        
     return True
 
-def saveWellSampledDenseFields(minimumNumberOfExposures=25, logger=None, verbosity=None):
+def saveWellSampledDenseFields(filename="data/denseFields.pickle", minimumNumberOfExposures=25, logger=None, verbosity=None):
     """ """
+    if logger == None:
+        logger = logging.getLogger("saveWellSampledDenseFields")
+        logger.propagate = False
+        ch = logging.StreamHandler()
+        logger.addHandler(ch)
+        if verbosity == None:
+            logger.setLevel(logging.INFO)
+        else:
+            logger.setLevel(verbosity)
+    
     fieldids = []
     
-    # Globulars
-    globularData = np.genfromtxt("data/globularClusters.txt", delimiter=",", usecols=[1,2], dtype=[("ra", "|S20"),("dec", "|S20")]).view(np.recarray)
-    for raStr,decStr in zip(globularData.ra, globularData.dec):
-        ra = g.RA.fromHours(raStr).degrees
-        dec = g.Dec.fromDegrees(decStr).degrees
-        fieldids += [x[0] for x in session.query(Field.id).join(CCDExposure).filter(func.q3c_radial_query(CCDExposure.ra, CCDExposure.dec, ra, dec, 20./60)).all()] # 20 arcminutes
+    if not os.path.exists(filename):
+        # Globulars
+        globularData = np.genfromtxt("data/globularClusters.txt", delimiter=",", usecols=[1,2], dtype=[("ra", "|S20"),("dec", "|S20")]).view(np.recarray)
+        logger.debug("Globular data loaded...")
+        
+        for raStr,decStr in zip(globularData.ra, globularData.dec):
+            ra = g.RA.fromHours(raStr).degrees
+            dec = g.Dec.fromDegrees(decStr).degrees
+            newFields = list(np.unique([x[0] for x in session.query(Field.id).join(CCDExposure).filter(func.q3c_radial_query(CCDExposure.ra, CCDExposure.dec, ra, dec, 20./60)).all()])) # 20 arcminutes
+            fieldids += newFields
+            if len(newFields) == 0:
+                logger.debug("No fields for RA/Dec: {},{}".format(ra,dec))
+            else:
+                logger.debug("Fields: {0}, RA/Dec: {1},{2}".format(",".join([str(x) for x in newFields]), ra,dec))
+            
+        # M31
+        ra = g.RA.fromHours("00 42 44.3").degrees
+        dec = g.Dec.fromDegrees("+41 16 09").degrees
+        fieldids += [x[0] for x in session.query(Field.id).join(CCDExposure).filter(func.q3c_radial_query(CCDExposure.ra, CCDExposure.dec, ra, dec, 5.)).all()] # ~5 degrees
+        
+        # Bulge
+        fieldids += [x[0] for x in session.query(Field.id).join(CCDExposure).filter(func.q3c_radial_query(CCDExposure.l, CCDExposure.b, 0., 0., 15.)).all()] # ~15 degrees of galactic center
+        
+        f = open(filename, "w")
+        pickle.dump(np.unique(fieldids), f)
+        f.close()
     
-    # M31
-    ra = g.RA.fromHours("00 42 44.3").degrees
-    dec = g.Dec.fromHours("+41 16 9").degrees
-    fieldids += [x[0] for x in session.query(Field.id).join(CCDExposure).filter(func.q3c_radial_query(CCDExposure.ra, CCDExposure.dec, ra, dec, 5.)).all()] # ~5 degrees
+    f = open(filename)
+    fieldids = pickle.load(f)
+    f.close()
     
-    # Bulge
-    fieldids += [x[0] for x in session.query(Field.id).join(CCDExposure).filter(func.q3c_radial_query(CCDExposure.l, CCDExposure.b, 0., 0., 15.)).all()] # ~15 degrees of galactic center
+    if os.path.exists("data/doneFields.pickle"):
+        f = open("data/doneFields.pickle")
+        doneFields = pickle.load(f)
+        f.close()
+    else:
+        doneFields = []
     
-    for fieldid in np.unique(fieldids):
+    for fieldid in fieldids:
+        if fieldid in doneFields: 
+            logger.info("Field {0} has already been processed".format(fieldid))
+            continue
+        
         if session.query(CCDExposure).filter(CCDExposure.field_id == fieldid).filter(CCDExposure.ccd_id == 0).count() > minimumNumberOfExposures:
             success = saveLightCurvesFromField(fieldid, logger=logger, verbosity=verbosity)
+            if success:
+                doneFields.append(fieldid)
+                f = open("data/doneFields.pickle", "w")
+                pickle.dump(doneFields, f)
+                f.close()
+
+def loadLightCurves(filename, logger=None, verbosity=None):
+    """ """
+    
+    if logger == None:
+        logger = logging.getLogger("saveWellSampledDenseFields")
+        logger.propagate = False
+        ch = logging.StreamHandler()
+        logger.addHandler(ch)
+        if verbosity == None:
+            logger.setLevel(logging.INFO)
+        else:
+            logger.setLevel(verbosity)
+    
+    f = open(filename)
+    results = pickle.load(f)
+    f.close()
+    
+    resultsArray = np.array(results, dtype=[('ra', np.float64), ('dec', np.float64), ('mjd', np.float64), ('mag', np.float64), ('mag_err', np.float64), \
+        ('sys_err', np.float32), ('filter_id', np.uint8), ('obj_id', np.uint64), ('field_id', np.uint32), ('ccd_id', np.uint8), ('flags', np.uint16), ('imaflags_iso', np.uint16)])
+    
+    resultsArray = resultsArray.view(np.recarray)
+    if len(np.unique(resultsArray.field_id)) > 1 or len(np.unique(resultsArray.ccd_id)) > 1: 
+        raise ValueError("More than one field or ccd id for this pickle!")
+    
+    fieldid = resultsArray.field_id[0]
+    ccdid = resultsArray.ccd_id[0]
+    
+    for objid in np.unique(resultsArray.obj_id):
+        lightCurveData = resultsArray[resultsArray.obj_id == objid]
+        lightCurve = LightCurve()
+        lightCurve.objid = objid
+        lightCurve.mag = lightCurveData.mag
+        lightCurve.mag_error = lightCurveData.mag_err
+        lightCurve.mjd = lightCurveData.mjd
+        lightCurve.sys_error = lightCurveData.sys_err
+        lightCurve.ra = lightCurveData.ra
+        lightCurve.dec = lightCurveData.dec
+        lightCurve.ccdExposures = session.query(CCDExposure).filter(CCDExposure.field_id == fieldid).filter(CCDExposure.ccd_id == ccdid).all()
