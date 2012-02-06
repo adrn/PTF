@@ -11,8 +11,6 @@ import os
 import cPickle as pickle
 import argparse
 import logging
-import warnings
-warnings.filterwarnings(action="ignore", message="Skipped unsupported reflection of expression-based index q3c_ccd_exposure[_a-z]+")
 
 # Third party libraries
 import numpy as np
@@ -225,7 +223,7 @@ def saveLightCurvesFromField(fieldid, minimumNumberOfExposures=25, ccdids=range(
         
     return True
 
-def saveWellSampledDenseFields(filename="data/denseFields.pickle", minimumNumberOfExposures=25, logger=None, verbosity=None):
+def saveWellSampledDenseFields(filename="data/denseFields.pickle", minimumNumberOfExposures=25, logger=None, verbosity=None, fieldid=None):
     """ """
     if logger == None:
         logger = logging.getLogger("saveWellSampledDenseFields")
@@ -237,9 +235,13 @@ def saveWellSampledDenseFields(filename="data/denseFields.pickle", minimumNumber
         else:
             logger.setLevel(verbosity)
     
-    fieldids = []
     
-    if not os.path.exists(filename):
+    if field == None:
+        fieldids = []
+    else:
+        fieldids = list(field)
+    
+    if not os.path.exists(filename) and len(fieldids) == 0:
         # Globulars
         globularData = np.genfromtxt("data/globularClusters.txt", delimiter=",", usecols=[1,2], dtype=[("ra", "|S20"),("dec", "|S20")]).view(np.recarray)
         logger.debug("Globular data loaded...")
@@ -340,6 +342,8 @@ def loadLightCurves(filename, logger=None, verbosity=None):
         lightCurve.sys_error = lightCurveData.sys_err
         lightCurve.ra = lightCurveData.ra
         lightCurve.dec = lightCurveData.dec
+        lightCurve.flags = lightCurveData["flags"]
+        lightCurve.imaflags = lightCurveData.imaflags_iso
         lightCurve.ccdExposures = exposures
         
         if len(session.new) == 1000:
@@ -348,4 +352,3 @@ def loadLightCurves(filename, logger=None, verbosity=None):
             session.begin()
         
     session.commit()
-    

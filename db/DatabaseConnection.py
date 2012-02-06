@@ -1,3 +1,6 @@
+import warnings
+warnings.filterwarnings(action="ignore", message="Skipped unsupported reflection of expression-based index q3c_ccd_exposure[_a-z]+")
+
 import sqlalchemy
 from sqlalchemy import create_engine, MetaData, Table, Column, Integer, BigInteger, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
@@ -91,6 +94,14 @@ class LightCurve(Base):
     @property
     def amag_error(self):
         return np.array(self.mag_error)
+    
+    @property
+    def aflags(self):
+        return np.array(self.flags, dtype=int)
+    
+    @property
+    def aimaflags(self):
+        return np.array(self.imaflags, dtype=int)
 
 class CCDExposureToLightcurve(Base):
     __tablename__ = 'ccd_exposure_to_light_curve'
