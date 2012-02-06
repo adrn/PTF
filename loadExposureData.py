@@ -1,6 +1,6 @@
 """
-    Extract the entire ptf_exp table from the PTF 
-    Large Survey Database and save it into a pickle.
+    Load the ptf_exp table dump from the PTF 
+    Large Survey Database into the ptf database
     
     ** This script should be run on navtara **
 
@@ -11,7 +11,7 @@ import os, sys
 from argparse import ArgumentParser
 import logging
 
-from db.util import saveExposureData
+from db.util import loadExposureData
 
 if __name__ == "__main__":    
     parser = ArgumentParser()
@@ -26,7 +26,7 @@ if __name__ == "__main__":
         verbosity = logging.DEBUG
     else:
         verbosity = logging.INFO
-    saveExposureData(overwrite=args.overwrite, verbosity=verbosity)
+    loadExposureData(verbosity=verbosity)
     
 else:
-    raise ImportError("saveExposureData.py should be run as a standalone script, not imported!")
+    raise ImportError("loadExposureData.py should be run as a standalone script, not imported!")

@@ -34,11 +34,15 @@ CREATE TABLE light_curve
 (
   pk bigserial NOT NULL,
   objid numeric NOT NULL,
+  mjd double precision[] NOT NULL,
   mag double precision[] NOT NULL,
   mag_error double precision[] NOT NULL,
   sys_error double precision[] NOT NULL,
   ra double precision[] NOT NULL,
   "dec" double precision[] NOT NULL,
+  flags numeric[] NOT NULL,
+  imaflags numeric[] NOT NULL,
+  candidate integer,
   CONSTRAINT light_curve_pk PRIMARY KEY (pk)
 )
 WITH (
