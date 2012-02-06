@@ -15,7 +15,7 @@ for row in data:
     ra = g.RA.fromHours(row["ra"])
     dec = g.Dec.fromDegrees(row["dec"])
     radius = 5./3600.
-    bounds_xy = lb.beam(ra, dec, radius)
+    bounds_xy = lb.beam(ra.degrees, dec.degrees, radius)
     allBounds.append((bounds_xy, bounds_t))
 
 results = db.query("ptf_det.ra as ra, ptf_det.dec as dec, mjd, mag_abs/1000. as mag, magerr_abs/1000. as magErr, \
