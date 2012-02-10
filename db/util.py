@@ -9,7 +9,6 @@
 import sys
 import os
 import cPickle as pickle
-import argparse
 import logging
 
 # Third party libraries
@@ -204,7 +203,7 @@ def saveLightCurvesFromField(fieldid, minimumNumberOfExposures=25, ccdids=range(
         results = db.query("ptf_det.ra as ra, ptf_det.dec as dec, mjd, mag_abs/1000. as mag, magerr_abs/1000. as magErr, \
                 apbsrms as sys_err, fid, obj_id, ptf_field, ccdid, flags, imaflags_iso \
                 FROM ptf_exp, ptf_det, ptf_obj \
-                WHERE ((ccdid == {0}) & (ptf_field == {1}))".format(ccdid, fieldid))\
+                WHERE ((ccdid == {0}) & (ptf_field == {1}) & (flags & 1) == 0) & ((imaflags_iso & 3797) == 0) & (flags < 8) & (apbsrms > 0))".format(ccdid, fieldid))\
             .fetch(bounds=[(bounds_xy, bounds_t)])
 
         #resultsArray = np.array(results, dtype=[('ra', np.float64), ('dec', np.float64), ('mjd', np.float64), ('mag', np.float64), ('mag_err', np.float64), \
@@ -333,7 +332,9 @@ def loadLightCurves(filename, logger=None, verbosity=None):
     session.begin()
     logger.debug("Starting database load...")
     for objid in notLoadedObjids:
+        print objid
         lightCurveData = resultsArray[resultsArray.obj_id == objid]
+        if len(lightCurveData) < 25: continue
         lightCurve = LightCurve()
         lightCurve.objid = objid
         lightCurve.mag = lightCurveData.mag
