@@ -3,6 +3,14 @@
 """
     Provides utility functions for the various PTF microlensing
     simulations we will run.
+    
+    I imagine the simulation will go like this:
+        - Read in light curve
+        - Throw away data points so left with 15, 25, 50, 75, 100, 125, 150, 175, 200
+        - Add microlensing event
+        - Try to detect event
+        - Repeat N times
+        
 """
 
 __author__ = "adrn <adrn@astro.columbia.edu>"
