@@ -6,14 +6,17 @@
 """
 
 # System libraries
-import sys
-import os
+import sys, os
 import cPickle as pickle
+from cStringIO import StringIO
 import argparse
 import logging
+import urllib, urllib2, base64
+import gzip
 
 # Third party libraries
 import numpy as np
+import pyfits as pf
 import sqlalchemy
 from sqlalchemy import func
 
@@ -21,7 +24,7 @@ from sqlalchemy import func
 try:
     import lsd
     import lsd.bounds as lb
-    db = lsd.DB("/scr4/bsesar")
+    db = lsd.DB("/scr/bsesar/projects/DB")
     
 except ImportError:
     logging.warn("LSD package not found! Did you mean to run this on navtara?")
@@ -31,11 +34,166 @@ try:
 except ImportError:
     raise ImportError("apwlib not found! Do: 'git clone git@github.com:adrn/apwlib.git' and run 'python setup.py install'")
 
-from DatabaseConnection import *
-from NumpyAdaptors import *
+#from DatabaseConnection import *
+#from NumpyAdaptors import *
 
 # ~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
+def getLogger(logger, verbosity, name="db.util"):
+    if logger == None:
+        logger = logging.getLogger(name)
+        logger.propagate = False
+        ch = logging.StreamHandler()
+        logger.addHandler(ch)
+        if verbosity == None:
+            logger.setLevel(logging.INFO)
+        else:
+            logger.setLevel(verbosity)
+    else:
+        logger.propagate = False
+    
+    return logger
+
+def getLightCurvesRadial(ra, dec, radius, logger=None, verbosity=None):
+    """ """
+    logger = getLogger(logger, verbosity, name="getLightCurvesRadial")
+    
+    bounds_t  = lb.intervalset((40000, 60000)) # Cover the whole survey
+    bounds_xy = lb.beam(ra, dec, radius)
+    
+    results = db.query("mjd, ptf_obj.ra, ptf_obj.dec, obj_id, mag_abs/1000. as mag, magerr_abs/1000. as magErr, apbsrms as sys_err, fid, flags, imaflags_iso \
+                        FROM ptf_det, ptf_obj, ptf_exp\
+                        WHERE ((flags & 1) == 0) & ((imaflags_iso & 3797`) == 0) & (flags < 8) & (apbsrms > 0) & (fid == 2)").fetch(bounds=[(bounds_xy, bounds_t)])
+    
+    resultsArray = np.array(results, dtype=[('mjd', np.float64), ('ra', np.float64), ('dec', np.float64), ('obj_id', np.uint64), ('mag', np.float64), ('mag_err', np.float64), \
+                        ('sys_err', np.float32), ('filter_id', np.uint8),  ('flags', np.uint16), ('imaflags_iso', np.uint16)])
+    resultsArray = resultsArray.view(np.recarray)
+    
+    logger.debug("Number of unique objid's: {0}".format(len(np.unique(resultsArray.obj_id))))
+    
+    return resultsArray
+
+def writeDenseCoordinatesFile(filename="data/denseCoordinates.pickle", overwrite=False, logger=None, verbosity=None):
+    """ Reads in data/globularClusters.txt and writes a pickle containing an array of ra,dec's for
+        the clusters, bulge, and M31
+    
+    """
+    allRAs = []
+    allDecs = []
+    
+    if os.path.exists(filename) and not overwrite:
+        return True
+    elif os.path.exists(filename) and overwrite:
+        if not os.path.splitext(filename)[1] == ".pickle":
+            raise IOError("You can only overwrite .pickle files!")
+        os.remove(filename)
+    
+    logger = getLogger(logger, verbosity)
+    
+    globularData = np.genfromtxt("data/globularClusters.txt", delimiter=",", usecols=[1,2], dtype=[("ra", "|S20"),("dec", "|S20")]).view(np.recarray)
+    logger.debug("Globular data loaded...")
+    
+    arcmins = 10.
+    for raStr,decStr in zip(globularData.ra, globularData.dec):
+        ra = g.RA.fromHours(raStr).degrees
+        dec = g.Dec.fromDegrees(decStr).degrees
+        
+        bounds_t  = lb.intervalset((40000, 60000)) # Cover the whole survey
+        bounds_xy = lb.beam(ra, dec, arcmins/60.)
+        
+        logger.debug("Checking whether {0},{1} is in survey footprint...".format(ra,dec))
+        results = db.query("obj_id FROM ptf_obj").fetch(bounds=[(bounds_xy, bounds_t)])
+        
+        if len(results) > 1:
+            logger.debug("Found {0} objects within {1} arcminutes of {2},{3}".format(len(results), arcmins, ra, dec))
+            allRAs.append(ra)
+            allDecs.append(dec)
+        else:
+            logger.debug("No objects found within {1} arcminutes of {2},{3}".format(len(results), arcmins, ra, dec))
+        
+    # M31
+    ra = g.RA.fromHours("00 42 44.3").degrees
+    dec = g.Dec.fromDegrees("+41 16 09").degrees
+    allRAs.append(ra)
+    allDecs.append(dec)
+    
+    # Bulge
+    ra = g.RA.fromHours("17:45:40.04").degrees
+    dec = g.Dec.fromDegrees("-29:00:28.1").degrees
+    allRAs.append(ra)
+    allDecs.append(dec)
+    
+    denseCoordinates = []
+    for ra,dec in zip(allRAs, allDecs):
+        denseCoordinates.append((ra,dec))
+    
+    f = open(filename, "w")
+    pickle.dump(np.array(denseCoordinates, dtype=[("ra",float),("dec",float)]).view(np.recarray), f)
+    f.close()
+    
+    return True
+
+def matchRADecToImages(ra, dec, logger=None, verbosity=None):
+    """ Accepts an ra and dec in degrees, returns a list of images matched 
+        to the ipac database.
+    """
+    logger = getLogger(logger, verbosity, name="matchRADecToImages")
+    url = "http://kanaloa.ipac.caltech.edu/ibe/search/ptf/dev/process?POS={0},{1}".format(ra,dec)
+    logger.debug("Image Search URL: {0}".format(url))
+    
+    request = urllib2.Request(url)
+    base64string = base64.encodestring('%s:%s' % ("PTF", "palomar")).replace('\n', '')
+    request.add_header("Authorization", "Basic %s" % base64string)
+    file = StringIO(urllib2.urlopen(request).read())
+    filenames = np.genfromtxt(file, skiprows=4, usecols=[20], dtype=str)
+    logger.debug("Image downloaded.")
+    logger.debug("{0} images in list".format(len(filenames)))
+    
+    return sorted(list(filenames))
+
+def getFITSCutout(ra, dec, size=0.5, save=False, logger=None, verbosity=None):
+    """ Accepts an ra, dec, and size in degrees and downloads a cutout
+        of a PTF image from the IPAC site.
+    """
+    logger = getLogger(logger, verbosity, name="getFITSCutout")
+    
+    images = matchRADecToImages(ra, dec, logger=logger, verbosity=verbosity)
+    imageURL = "http://kanaloa.ipac.caltech.edu/ibe/data/ptf/dev/process/" + images[-1]
+    
+    urlParams = {'center': '{0},{1}deg'.format(ra, dec),\
+                 'size': '{0}deg'.format(size)}
+    
+    request = urllib2.Request(imageURL +"?{}".format(urllib.urlencode(urlParams)))
+    base64string = base64.encodestring('%s:%s' % ("PTF", "palomar")).replace('\n', '')
+    request.add_header("Authorization", "Basic %s" % base64string)
+    
+    logger.debug("Image Full URL: {0}".format(request.get_full_url()))
+    
+    f = StringIO(urllib2.urlopen(request).read())
+    gz = gzip.GzipFile(fileobj=f, mode="rb")
+    gz.seek(0)
+    
+    fitsFile = StringIO(gz.read())
+    fitsFile.seek(0)
+    
+    hdulist = pf.open(fitsFile, mode="readonly")
+    logger.debug("Image loaded. Size: {0} x {1}".format(*hdulist[0].data.shape))
+    
+    if save:
+        filename = os.path.join("images", "{0}_{1}_{2}x{3}deg.fits".format(g.RA.fromDegrees(ra).string(sep="-"), g.Dec.fromDegrees(dec).string(sep="-"), size, size))
+        logger.debug("Writing file to: {0}".format(filename))
+        hdulist.writeto(filename)
+        return True
+    else:
+        return hdulist
+        
+        
+        
+        
+        
+        
+        
+    
 def saveExposureData(filename="data/exposureData.pickle", overwrite=False, logger=None, verbosity=None):
     """ Queries LSD and saves the information to be loaded into
         the ccd_exposure table of ptf_microlensing.
@@ -223,7 +381,7 @@ def saveLightCurvesFromField(fieldid, minimumNumberOfExposures=25, ccdids=range(
         
     return True
 
-def saveWellSampledDenseFields(filename="data/denseFields.pickle", minimumNumberOfExposures=25, logger=None, verbosity=None, fieldid=None):
+def saveWellSampledDenseFields(filename="data/denseFields.pickle", minimumNumberOfExposures=25, logger=None, verbosity=None, field=None):
     """ """
     if logger == None:
         logger = logging.getLogger("saveWellSampledDenseFields")
@@ -239,9 +397,9 @@ def saveWellSampledDenseFields(filename="data/denseFields.pickle", minimumNumber
     if field == None:
         fieldids = []
     else:
-        fieldids = list(field)
+        fieldids = [field]
     
-    if not os.path.exists(filename) and len(fieldids) == 0:
+    if not os.path.exists(filename):
         # Globulars
         globularData = np.genfromtxt("data/globularClusters.txt", delimiter=",", usecols=[1,2], dtype=[("ra", "|S20"),("dec", "|S20")]).view(np.recarray)
         logger.debug("Globular data loaded...")
@@ -268,9 +426,10 @@ def saveWellSampledDenseFields(filename="data/denseFields.pickle", minimumNumber
         pickle.dump(np.unique(fieldids), f)
         f.close()
     
-    f = open(filename)
-    fieldids = pickle.load(f)
-    f.close()
+    if len(fieldids) == 0:
+        f = open(filename)
+        fieldids = pickle.load(f)
+        f.close()
     
     if os.path.exists("data/doneFields.pickle"):
         f = open("data/doneFields.pickle")
