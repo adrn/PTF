@@ -43,7 +43,7 @@ def getOneCluster(name, ra, dec, radius=10, overwrite=False, skip=False):
     outputFilename = os.path.join("data", "lightcurves", "{0}.pickle".format(name))
     logging.debug("Output file: {0}".format(outputFilename))
     
-    elif os.path.exists(outputFilename) and not overwrite:
+    if os.path.exists(outputFilename) and not overwrite:
         if skip: return
         
         logging.info("{0} already exists!".format(outputFilename))
