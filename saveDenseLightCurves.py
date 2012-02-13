@@ -10,6 +10,7 @@ import logging
 import cPickle as pickle
 
 # Third-party
+import sqlalchemy
 import numpy as np
 import apwlib.geometry as g
 import apwlib.convert as c
@@ -65,17 +66,7 @@ def getOneCluster(name, ra, dec, radius=10, overwrite=False, skip=False):
     pickle.dump(lightCurves, f)
     f.close()
     
-    return
-
-def loadLightCurves():
-    pickles = glob.glob("data/lightcurves/*.pickle")
-    
-    for file in pickles:
-        try:
-            dbu.loadLightCurves(file)
-        except sqlalchemy.exc.IntegrityError:
-            logging.info("File already loaded!")
-            
+    return            
 
 def saveLightCurves():
     globularData = np.genfromtxt("data/globularClusters.txt", delimiter=",", usecols=[0,1,2], dtype=[("name", "|S20"), ("ra", "|S20"),("dec", "|S20")]).view(np.recarray)
@@ -103,7 +94,18 @@ def saveLightCurves():
     ra = g.RA.fromHours("17:45:40.04")
     dec = g.Dec.fromDegrees("-29:00:28.1")
     getOneCluster("M31", ra, dec, radius=10.*60, skip=True)
+
+def loadLightCurves():
+    pickles = glob.glob("data/lightcurves/*.pickle")
     
+    for file in pickles:
+        logging.debug("loading file {0}".format(file))
+        try:
+            dbu.loadLightCurves(file)
+        except sqlalchemy.exc.IntegrityError:
+            logging.info("File already loaded!")
+            dbu.session.close()
+
 
 if __name__ == "__main__":
     lsdLogger = logging.getLogger("lsd.pool2")

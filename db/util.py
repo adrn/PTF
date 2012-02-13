@@ -13,19 +13,17 @@ import argparse
 import logging
 import urllib, urllib2, base64
 import gzip
+import socket
 
 # Third party libraries
 import numpy as np
 import pyfits as pf
 
 # External packages
-try:
+if socket.gethostname() == "kepler" or socket.gethostname() == "navtara":
     import lsd
     import lsd.bounds as lb
     db = lsd.DB("/scr/bsesar/projects/DB")
-    
-except ImportError:
-    logging.warn("LSD package not found! Did you mean to run this on kepler?")
 
 try:
     import apwlib.geometry as g
@@ -37,31 +35,19 @@ try:
     from sqlalchemy import func
 except ImportError:
     logging.warn("sqlalchemy not found! Postgres database functions won't work.")
-    
-#from DatabaseConnection import *
-#from NumpyAdaptors import *
+
+try:
+    from DatabaseConnection import *
+    from NumpyAdaptors import *
+except:
+    logging.warn("Connection to deimos could not be established. Postgres database features won't work.")
 
 # ~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
-def getLogger(verbosity, name="db.util"):
-    """ Helper function for creating a Python logger """
-    
-    logger = logging.getLogger(name)
-    logger.propagate = False
-    ch = logging.StreamHandler()
-    logger.addHandler(ch)
-    if verbosity == None:
-        logger.setLevel(logging.INFO)
-    else:
-        logger.setLevel(verbosity)
-    
-    return logger
-
-def writeDenseCoordinatesFile(filename="data/denseCoordinates.pickle", overwrite=False, logger=None):
+def writeDenseCoordinatesFile(filename="data/denseCoordinates.pickle", overwrite=False):
     """ Reads in data/globularClusters.txt and writes a pickle containing an array of ra,dec's for
         the given clusters, bulge, and M31    
     """
-    if logger == None: logger = logging
     
     # Create empty lists to store all of the RA and Dec values
     allRAs = []
@@ -77,7 +63,7 @@ def writeDenseCoordinatesFile(filename="data/denseCoordinates.pickle", overwrite
     
     # Read in globular data from text file
     globularData = np.genfromtxt("data/globularClusters.txt", delimiter=",", usecols=[1,2], dtype=[("ra", "|S20"),("dec", "|S20")]).view(np.recarray)
-    logger.debug("Globular data loaded...")
+    logging.debug("Globular data loaded...")
     
     arcmins = 10.
     for raStr,decStr in zip(globularData.ra, globularData.dec):
@@ -89,15 +75,15 @@ def writeDenseCoordinatesFile(filename="data/denseCoordinates.pickle", overwrite
         bounds_t  = lb.intervalset((40000, 60000)) # Cover the whole survey
         bounds_xy = lb.beam(ra, dec, arcmins/60.)
         
-        logger.debug("Checking whether {0},{1} is in survey footprint...".format(ra,dec))
+        logging.debug("Checking whether {0},{1} is in survey footprint...".format(ra,dec))
         results = db.query("obj_id FROM ptf_obj").fetch(bounds=[(bounds_xy, bounds_t)])
         
         if len(results) > 1:
-            logger.debug("Found {0} objects within {1} arcminutes of {2},{3}".format(len(results), arcmins, ra, dec))
+            logging.debug("Found {0} objects within {1} arcminutes of {2},{3}".format(len(results), arcmins, ra, dec))
             allRAs.append(ra)
             allDecs.append(dec)
         else:
-            logger.debug("No objects found within {1} arcminutes of {2},{3}".format(len(results), arcmins, ra, dec))
+            logging.debug("No objects found within {1} arcminutes of {2},{3}".format(len(results), arcmins, ra, dec))
         
     # M31
     ra = g.RA.fromHours("00 42 44.3").degrees
@@ -121,33 +107,30 @@ def writeDenseCoordinatesFile(filename="data/denseCoordinates.pickle", overwrite
     
     return True
 
-def matchRADecToImages(ra, dec, size=None, logger=None):
+def matchRADecToImages(ra, dec, size=None):
     """ This function is a wrapper around the IPAC PTF image server. This function 
         accepts an RA and Dec in degrees, and optionally a size, and returns a list 
         of images that overlap the given coordinates.
     """
-    if logger == None: logger = logging
         
     if size == None: url = "http://kanaloa.ipac.caltech.edu/ibe/search/ptf/dev/process?POS={0},{1}".format(ra,dec)
     else: url = "http://kanaloa.ipac.caltech.edu/ibe/search/ptf/dev/process?POS={0},{1}&SIZE={2}".format(ra,dec,size)
-    logger.debug("Image Search URL: {0}".format(url))
+    logging.debug("Image Search URL: {0}".format(url))
     
     request = urllib2.Request(url)
     base64string = base64.encodestring('%s:%s' % ("PTF", "palomar")).replace('\n', '')
     request.add_header("Authorization", "Basic %s" % base64string)
     file = StringIO(urllib2.urlopen(request).read())
     filenames = np.genfromtxt(file, skiprows=4, usecols=[20], dtype=str)
-    logger.debug("Image downloaded.")
-    logger.debug("{0} images in list".format(len(filenames)))
+    logging.debug("Image downloaded.")
+    logging.debug("{0} images in list".format(len(filenames)))
     
     return sorted(list(filenames))
 
-def getAllImages(imageList, prefix, logger=None):
+def getAllImages(imageList, prefix):
     """ Takes a list of PTF IPAC image basenames and downloads and saves them to the
         prefix directory.
-    """
-    if logger == None: logger = logging
-    
+    """    
     fieldList = dict()
     
     # Get any existing FITS files in the directory
@@ -214,14 +197,13 @@ def getAllImages(imageList, prefix, logger=None):
         hdulist.writeto(file)
         fieldList[field].append(ccd)
     
-def getFITSCutout(ra, dec, size=0.5, save=False, logger=None):
+def getFITSCutout(ra, dec, size=0.5, save=False):
     """ This function is a wrapper around the IPAC PTF image server cutout feature. 
         Given an RA, Dec, and size in degrees, download a FITS cutout of the given
         coordinates +/- the size.
     """
-    if logger == None: logger = logging
     
-    images = matchRADecToImages(ra, dec, logger=logger, verbosity=verbosity)
+    images = matchRADecToImages(ra, dec)
     imageURL = "http://kanaloa.ipac.caltech.edu/ibe/data/ptf/dev/process/" + images[-1]
     
     urlParams = {'center': '{0},{1}deg'.format(ra, dec),\
@@ -231,7 +213,7 @@ def getFITSCutout(ra, dec, size=0.5, save=False, logger=None):
     base64string = base64.encodestring('%s:%s' % ("PTF", "palomar")).replace('\n', '')
     request.add_header("Authorization", "Basic %s" % base64string)
     
-    logger.debug("Image Full URL: {0}".format(request.get_full_url()))
+    logging.debug("Image Full URL: {0}".format(request.get_full_url()))
     
     f = StringIO(urllib2.urlopen(request).read())
     gz = gzip.GzipFile(fileobj=f, mode="rb")
@@ -241,28 +223,26 @@ def getFITSCutout(ra, dec, size=0.5, save=False, logger=None):
     fitsFile.seek(0)
     
     hdulist = pf.open(fitsFile, mode="readonly")
-    logger.debug("Image loaded. Size: {0} x {1}".format(*hdulist[0].data.shape))
+    logging.debug("Image loaded. Size: {0} x {1}".format(*hdulist[0].data.shape))
     
     if save:
         ra = g.RA.fromDegrees(ra)
         dec = g.Dec.fromDegrees(dec)
         filename = os.path.join("images", "{0}_{1}_{2}x{3}deg.fits".format(ra.string(sep="-"), dec.string(sep="-"), size, size))
-        logger.debug("Writing file to: {0}".format(filename))
+        logging.debug("Writing file to: {0}".format(filename))
         hdulist.writeto(filename)
         return True
     else:
         return hdulist
 
-def getLightCurvesRadial(ra, dec, radius, logger=None):
+def getLightCurvesRadial(ra, dec, radius):
     """ Selects light curves from the Large Survey Database (LSD) on kepler
         given an ra and dec in degrees, and a radius in degrees. The constraints
         in the query are taken from the LSD wiki:
             http://www.oir.caltech.edu/twiki_ptf/bin/viewauth/Main/LSDNavtara
         except here I allow for saturated magnitude measurements in case a 
         microlensing event causes a star to saturate temporarily.
-    """
-    if logger == None: logger = logging
-    
+    """    
     bounds_t  = lb.intervalset((40000, 60000)) # Cover the whole survey
     bounds_xy = lb.beam(ra, dec, radius)
     
@@ -274,7 +254,7 @@ def getLightCurvesRadial(ra, dec, radius, logger=None):
                         ('sys_err', np.float32), ('filter_id', np.uint8),  ('flags', np.uint16), ('imaflags_iso', np.uint16)])
     resultsArray = resultsArray.view(np.recarray)
     
-    logger.debug("Number of unique objid's: {0}".format(len(np.unique(resultsArray.obj_id))))
+    logging.debug("Number of unique objid's: {0}".format(len(np.unique(resultsArray.obj_id))))
     
     return resultsArray
     
@@ -287,11 +267,11 @@ def loadLightCurves(filename):
     f.close()
     logging.debug("File loaded!")
     
-    #session.begin()
+    session.begin()
     logging.debug("Starting database load...")
     for objid in np.unique(resultsArray.obj_id):
-        print objid
         lightCurveData = resultsArray[resultsArray.obj_id == objid]
+        if len(lightCurveData.mag) < 10: continue
         
         lightCurve = LightCurve()
         lightCurve.objid = objid
@@ -303,10 +283,13 @@ def loadLightCurves(filename):
         lightCurve.dec = lightCurveData.dec
         lightCurve.flags = lightCurveData["flags"]
         lightCurve.imaflags = lightCurveData.imaflags_iso
+        lightCurve.filter_id = list(lightCurveData.filter_id)
+        session.add(lightCurve)
         
         if len(session.new) == 1000:
-            #session.commit()
+            session.commit()
             logging.debug("1000 light curves committed!")
-            #session.begin()
-        
-    #session.commit()
+            session.begin()
+    
+    logging.info("All light curves committed!")
+    session.commit()

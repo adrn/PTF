@@ -78,6 +78,10 @@ class LightCurve(Base):
         return np.array(self.mag_error)
     
     @property
+    def asys_error(self):
+        return np.array(self.sys_error)
+    
+    @property
     def aflags(self):
         return np.array(self.flags, dtype=int)
     
