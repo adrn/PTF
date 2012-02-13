@@ -57,31 +57,6 @@ def getLogger(verbosity, name="db.util"):
     
     return logger
 
-def getLightCurvesRadial(ra, dec, radius, logger=None):
-    """ Selects light curves from the Large Survey Database (LSD) on kepler
-        given an ra and dec in degrees, and a radius in degrees. The constraints
-        in the query are taken from the LSD wiki:
-            http://www.oir.caltech.edu/twiki_ptf/bin/viewauth/Main/LSDNavtara
-        except here I allow for saturated magnitude measurements in case a 
-        microlensing event causes a star to saturate temporarily.
-    """
-    if logger == None: logger = logging
-    
-    bounds_t  = lb.intervalset((40000, 60000)) # Cover the whole survey
-    bounds_xy = lb.beam(ra, dec, radius)
-    
-    results = db.query("mjd, ptf_obj.ra, ptf_obj.dec, obj_id, mag_abs/1000. as mag, magerr_abs/1000. as magErr, apbsrms as sys_err, fid, flags, imaflags_iso \
-                        FROM ptf_det, ptf_obj, ptf_exp\
-                        WHERE ((flags & 1) == 0) & ((imaflags_iso & 3797) == 0) & (flags < 8) & (apbsrms > 0) & (fid == 2)").fetch(bounds=[(bounds_xy, bounds_t)])
-    
-    resultsArray = np.array(results, dtype=[('mjd', np.float64), ('ra', np.float64), ('dec', np.float64), ('obj_id', np.uint64), ('mag', np.float64), ('mag_err', np.float64), \
-                        ('sys_err', np.float32), ('filter_id', np.uint8),  ('flags', np.uint16), ('imaflags_iso', np.uint16)])
-    resultsArray = resultsArray.view(np.recarray)
-    
-    logger.debug("Number of unique objid's: {0}".format(len(np.unique(resultsArray.obj_id))))
-    
-    return resultsArray
-
 def writeDenseCoordinatesFile(filename="data/denseCoordinates.pickle", overwrite=False, logger=None):
     """ Reads in data/globularClusters.txt and writes a pickle containing an array of ra,dec's for
         the given clusters, bulge, and M31    
@@ -277,7 +252,32 @@ def getFITSCutout(ra, dec, size=0.5, save=False, logger=None):
         return True
     else:
         return hdulist
-        
+
+def getLightCurvesRadial(ra, dec, radius, logger=None):
+    """ Selects light curves from the Large Survey Database (LSD) on kepler
+        given an ra and dec in degrees, and a radius in degrees. The constraints
+        in the query are taken from the LSD wiki:
+            http://www.oir.caltech.edu/twiki_ptf/bin/viewauth/Main/LSDNavtara
+        except here I allow for saturated magnitude measurements in case a 
+        microlensing event causes a star to saturate temporarily.
+    """
+    if logger == None: logger = logging
+    
+    bounds_t  = lb.intervalset((40000, 60000)) # Cover the whole survey
+    bounds_xy = lb.beam(ra, dec, radius)
+    
+    results = db.query("mjd, ptf_obj.ra, ptf_obj.dec, obj_id, mag_abs/1000. as mag, magerr_abs/1000. as magErr, apbsrms as sys_err, fid, flags, imaflags_iso \
+                        FROM ptf_det, ptf_obj, ptf_exp\
+                        WHERE ((flags & 1) == 0) & ((imaflags_iso & 3797) == 0) & (flags < 8) & (apbsrms > 0) & (fid == 2)").fetch(bounds=[(bounds_xy, bounds_t)])
+    
+    resultsArray = np.array(results, dtype=[('mjd', np.float64), ('ra', np.float64), ('dec', np.float64), ('obj_id', np.uint64), ('mag', np.float64), ('mag_err', np.float64), \
+                        ('sys_err', np.float32), ('filter_id', np.uint8),  ('flags', np.uint16), ('imaflags_iso', np.uint16)])
+    resultsArray = resultsArray.view(np.recarray)
+    
+    logger.debug("Number of unique objid's: {0}".format(len(np.unique(resultsArray.obj_id))))
+    
+    return resultsArray
+    
 def loadLightCurves(filename, logger=None):
     """ """
     
