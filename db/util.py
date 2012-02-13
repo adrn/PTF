@@ -278,41 +278,21 @@ def getLightCurvesRadial(ra, dec, radius, logger=None):
     
     return resultsArray
     
-def loadLightCurves(filename, logger=None):
+def loadLightCurves(filename):
     """ """
     
-    if logger == None: logger = logging
-    
-    logger.debug("Opening {}...".format(filename))
+    logging.debug("Opening {}...".format(filename))
     f = open(filename)
-    results = pickle.load(f)
+    resultsArray = pickle.load(f)
     f.close()
-    logger.debug("File loaded!")
+    logging.debug("File loaded!")
     
-    resultsArray = np.array(results, dtype=[('ra', np.float64), ('dec', np.float64), ('mjd', np.float64), ('mag', np.float64), ('mag_err', np.float64), \
-        ('sys_err', np.float32), ('filter_id', np.uint8), ('obj_id', np.uint64), ('field_id', np.uint32), ('ccd_id', np.uint8), ('flags', np.uint16), ('imaflags_iso', np.uint16)])
-    
-    resultsArray = resultsArray.view(np.recarray)
-    logger.debug("Data converted to recarray")
-    
-    if len(np.unique(resultsArray.field_id)) > 1 or len(np.unique(resultsArray.ccd_id)) > 1: 
-        raise ValueError("More than one field or ccd id for this pickle!")
-    
-    fieldid = resultsArray.field_id[0]
-    ccdid = resultsArray.ccd_id[0]
-    
-    exposures = session.query(CCDExposure).filter(CCDExposure.field_id == fieldid).filter(CCDExposure.ccd_id == ccdid).all()
-    existingObjids = session.query(LightCurve.objid).join(CCDExposureToLightcurve, CCDExposure).filter(CCDExposure.field_id == fieldid).\
-                                                      filter(CCDExposure.ccd_id == ccdid).distinct().all()
-    existingObjids = np.unique([x[0] for x in existingObjids])
-    logger.debug("Existing objids: {0}".format(len(existingObjids)))
-    notLoadedObjids = np.array(list(set(resultsArray.obj_id).symmetric_difference(set(existingObjids))))
-    
-    session.begin()
-    logger.debug("Starting database load...")
-    for objid in notLoadedObjids:
+    #session.begin()
+    logging.debug("Starting database load...")
+    for objid in np.unique(resultsArray.obj_id):
+        print objid
         lightCurveData = resultsArray[resultsArray.obj_id == objid]
-        if len(lightCurveData) < 25: continue
+        
         lightCurve = LightCurve()
         lightCurve.objid = objid
         lightCurve.mag = lightCurveData.mag
@@ -323,11 +303,10 @@ def loadLightCurves(filename, logger=None):
         lightCurve.dec = lightCurveData.dec
         lightCurve.flags = lightCurveData["flags"]
         lightCurve.imaflags = lightCurveData.imaflags_iso
-        lightCurve.ccdExposures = exposures
         
         if len(session.new) == 1000:
-            session.commit()
-            logger.debug("1000 light curves committed!")
-            session.begin()
+            #session.commit()
+            logging.debug("1000 light curves committed!")
+            #session.begin()
         
-    session.commit()
+    #session.commit()
