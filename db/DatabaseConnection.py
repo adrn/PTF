@@ -2,17 +2,15 @@ import warnings
 warnings.filterwarnings(action="ignore", message="Skipped unsupported reflection of expression-based index q3c_ccd_exposure[_a-z]+")
 
 import sqlalchemy
-from sqlalchemy import create_engine, MetaData, Table, Column, Integer, BigInteger, ForeignKey
+from sqlalchemy import create_engine, MetaData, Column, Float
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, scoped_session, deferred, relationship
-from sqlalchemy.schema import Column
-from sqlalchemy.types import Float
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.sql.expression import func
 
 import numpy as np
 
-__all__ = ["session", "Session", "Base", "engine", "LightCurve", "CCDExposure", "Field", "CCDExposureToLightcurve"]
+__all__ = ["session", "Session", "Base", "engine", "LightCurve"]
 
 class Singleton(type):
 	def __init__(cls, name, bases, dict):
@@ -54,31 +52,15 @@ session = Session
 Base = db.Base
 
 # Model Class for true PTF light curves
-class CCDExposure(Base):
-    __tablename__ = 'ccd_exposure'
-    __table_args__ = {'autoload' : True}
-
-class Field(Base):
-    __tablename__ = 'field'
-    __table_args__ = {'autoload' : True}
-    
-    @property
-    def numberOfExposures(self):
-        session = Session.object_session(self)
-        
-        numExps = []
-        for ccdid in range(12):
-            numExps.append(session.query(Exposure).join(Field).filter(Exposure.ccdid == ccdid).filter(Field.id == self.id).count())
-        
-        return max(numExps)
 
 class LightCurve(Base):
     __tablename__ = 'light_curve'
     __table_args__ = {'autoload' : True}
     
-    #mjd = deferred(Column(ARRAY(Float)))
-    #mag = deferred(Column(ARRAY(Float)))
-    #mag_error = deferred(Column(ARRAY(Float)))
+    mjd = deferred(Column(ARRAY(Float)))
+    mag = deferred(Column(ARRAY(Float)))
+    mag_error = deferred(Column(ARRAY(Float)))
+    sys_error = deferred(Column(ARRAY(Float)))
     
     def __repr__(self):
         return "<{0} -- objid: {1}>".format(self.__class__.__name__, self.objid)
@@ -100,15 +82,12 @@ class LightCurve(Base):
         return np.array(self.flags, dtype=int)
     
     @property
-    def aimaflags(self):
-        return np.array(self.imaflags, dtype=int)
+    def aimaflags_iso(self):
+        return np.array(self.imaflags_iso, dtype=int)
 
-class CCDExposureToLightcurve(Base):
-    __tablename__ = 'ccd_exposure_to_light_curve'
-    __table_args__ = {'autoload' : True}
-
-
+"""
 CCDExposure.field = relationship(Field, backref="ccd_exposures")
 CCDExposure.lightCurves = relationship(LightCurve,
                     secondary=CCDExposureToLightcurve.__table__,
                     backref="ccdExposures")
+"""
