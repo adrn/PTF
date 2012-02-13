@@ -4,7 +4,7 @@
 """
 
 # Standard library
-import os, sys
+import os, sys, glob
 from argparse import ArgumentParser
 import logging
 import cPickle as pickle
@@ -66,8 +66,18 @@ def getOneCluster(name, ra, dec, radius=10, overwrite=False, skip=False):
     f.close()
     
     return
+
+def loadLightCurves():
+    pickles = glob.glob("data/lightcurves/*.pickle")
     
-def main():
+    for file in pickles:
+        try:
+            dbu.loadLightCurves(file)
+        except sqlalchemy.exc.IntegrityError:
+            logging.info("File already loaded!")
+            
+
+def saveLightCurves():
     globularData = np.genfromtxt("data/globularClusters.txt", delimiter=",", usecols=[0,1,2], dtype=[("name", "|S20"), ("ra", "|S20"),("dec", "|S20")]).view(np.recarray)
     
     if not os.path.exists("data/lightcurves"):
@@ -107,11 +117,16 @@ if __name__ == "__main__":
                     help="Overwrite all image files (default = False)")
     parser.add_argument("-v", "--verbose", action="store_true", dest="verbose", default=False,
                     help="Be chatty!")
+    parser.add_argument("-l", "--load", action="store_true", dest="load", default=False,
+                    help="Instead of saving light curves, load them into the database.")
     
     args = parser.parse_args()
     if args.verbose:
         logging.basicConfig(level=logging.DEBUG)
     else:
         logging.basicConfig(level=logging.INFO)
-        
-    main()
+    
+    if args.load:
+        loadLightCurves()
+    else:
+        saveLightCurves()
