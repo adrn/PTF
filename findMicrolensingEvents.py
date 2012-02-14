@@ -14,6 +14,7 @@ import sqlalchemy
 import numpy as np
 import apwlib.geometry as g
 import apwlib.convert as c
+import matplotlib.pyplot as plt
 
 # Project
 import db.util as dbu
@@ -51,7 +52,8 @@ def estimateContinuum(dbLightCurve, clipSigma=2.5):
 
 def findClusters(dbLightCurve, continuumMag, continuumSigma, num_points_per_cluster=4):
     # Determine which points are outside of continuumMag +/- 2 or 3 continuumSigma, and see if they are clustered
-    w = (dbLightCurve.mag > (continuumMag - 3*continuumSigma))
+    #w = (dbLightCurve.mag > (continuumMag - 3*continuumSigma))
+    w = (dbLightCurve.goodMag > (continuumMag - 3*continuumSigma))
     
     allGroups = []
     
@@ -89,11 +91,30 @@ def fitCluster(dbLightCurve, indices):
     full_out = so.fmin_powell(objective, p0, args=(dbLightCurve,), full_output=True, disp=0)
     print full_out
 
-def main(num=10):
-    lightCurves = dbu.session.query(dbu.LightCurve).limit(num).all()
+def main():
+    lightCurves = dbu.session.query(dbu.LightCurve).all()
+    print "light curves loaded"
     
     for lightCurve in lightCurves:
-        print estimateContinuum(lightCurve)
+        #if len(lightCurve.mjd) < 50: continue
+        if len(lightCurve.goodMJD) < 50: continue
+        
+        m, s = estimateContinuum(lightCurve)
+        clusterIndices = findClusters(lightCurve, m, s, 4)
+        
+        if len(clusterIndices) == 0: continue
+        
+        print lightCurve.ra, lightCurve.dec
+        
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        ax = lightCurve.plot(ax)
+        ax.axhline(m)
+        #for clusterIdx in clusterIndices:
+        #    ax.axvline(np.median(lightCurve.mjd[clusterIdx]))
+        ax.set_ylim(ax.get_ylim()[::-1])
+        plt.show()
+        del fig
     
 if __name__ == "__main__":
     main()

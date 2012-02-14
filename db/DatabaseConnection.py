@@ -82,12 +82,33 @@ class LightCurve(Base):
         return np.array(self.sys_error)
     
     @property
+    def error(self):
+        return np.sqrt(self.amag_error**2 + self.asys_error**2)
+    
+    @property
+    def goodMJD(self):
+        return self.amjd[self.error < 0.1]
+    
+    @property
+    def goodMag(self):
+        return self.amag[self.error < 0.1]
+    
+    @property
+    def goodError(self):
+        return self.error[self.error < 0.1]
+    
+    @property
     def aflags(self):
         return np.array(self.flags, dtype=int)
     
     @property
     def aimaflags_iso(self):
         return np.array(self.imaflags_iso, dtype=int)
+    
+    def plot(self, ax):
+        #ax.errorbar(self.mjd, self.mag, self.error, ls="none", marker=".", color="r")
+        ax.errorbar(self.goodMJD, self.goodMag, self.goodError, ls="none", marker=".", color="k", ms=2)
+        return ax
 
 """
 CCDExposure.field = relationship(Field, backref="ccd_exposures")

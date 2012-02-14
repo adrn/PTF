@@ -204,7 +204,11 @@ def getFITSCutout(ra, dec, size=0.5, save=False):
     """
     
     images = matchRADecToImages(ra, dec)
-    imageURL = "http://kanaloa.ipac.caltech.edu/ibe/data/ptf/dev/process/" + images[-1]
+
+    for image in images:
+        if "scie" in image: 
+            break
+    imageURL = "http://kanaloa.ipac.caltech.edu/ibe/data/ptf/dev/process/" + image
     
     urlParams = {'center': '{0},{1}deg'.format(ra, dec),\
                  'size': '{0}deg'.format(size)}
@@ -279,8 +283,8 @@ def loadLightCurves(filename):
         lightCurve.mag_error = lightCurveData.mag_err
         lightCurve.mjd = lightCurveData.mjd
         lightCurve.sys_error = lightCurveData.sys_err
-        lightCurve.ra = lightCurveData.ra
-        lightCurve.dec = lightCurveData.dec
+        lightCurve.ra = lightCurveData.ra[0]
+        lightCurve.dec = lightCurveData.dec[0]
         lightCurve.flags = lightCurveData["flags"]
         lightCurve.imaflags = lightCurveData.imaflags_iso
         lightCurve.filter_id = list(lightCurveData.filter_id)
