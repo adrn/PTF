@@ -36,12 +36,6 @@ try:
 except ImportError:
     logging.warn("sqlalchemy not found! Postgres database functions won't work.")
 
-try:
-    from DatabaseConnection import *
-    from NumpyAdaptors import *
-except:
-    logging.warn("Connection to deimos could not be established. Postgres database features won't work.")
-
 # ~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
 def writeDenseCoordinatesFile(filename="data/denseCoordinates.pickle", overwrite=False):
@@ -250,19 +244,44 @@ def getLightCurvesRadial(ra, dec, radius):
     bounds_t  = lb.intervalset((40000, 60000)) # Cover the whole survey
     bounds_xy = lb.beam(ra, dec, radius)
     
-    results = db.query("mjd, ptf_obj.ra, ptf_obj.dec, obj_id, mag_abs/1000. as mag, magerr_abs/1000. as magErr, apbsrms as sys_err, fid, flags, imaflags_iso \
+    query = db.query("mjd, ptf_obj.ra, ptf_obj.dec, obj_id, mag_abs/1000. as mag, magerr_abs/1000. as magErr, apbsrms as sys_err, fid, flags, imaflags_iso \
                         FROM ptf_det, ptf_obj, ptf_exp\
-                        WHERE ((flags & 1) == 0) & ((imaflags_iso & 3797) == 0) & (flags < 8) & (apbsrms > 0) & (fid == 2)").fetch(bounds=[(bounds_xy, bounds_t)])
+                        WHERE ((flags & 1) == 0) & ((imaflags_iso & 3797) == 0) & (flags < 8) & (apbsrms > 0) & (fid == 2)")
     
-    resultsArray = np.array(results, dtype=[('mjd', np.float64), ('ra', np.float64), ('dec', np.float64), ('obj_id', np.uint64), ('mag', np.float64), ('mag_err', np.float64), \
+    if radius > 0.5:
+        raise ValueError("Radius is too large to do a straight query! Consider using 'getLightCurvesRadialBig' instead")
+    else:
+        resultsArray = np.array(results, dtype=[('mjd', np.float64), ('ra', np.float64), ('dec', np.float64), ('obj_id', np.uint64), ('mag', np.float64), ('mag_err', np.float64), \
                         ('sys_err', np.float32), ('filter_id', np.uint8),  ('flags', np.uint16), ('imaflags_iso', np.uint16)])
-    resultsArray = resultsArray.view(np.recarray)
+        resultsArray = resultsArray.view(np.recarray)
     
     logging.debug("Number of unique objid's: {0}".format(len(np.unique(resultsArray.obj_id))))
     
     return resultsArray
+
+def getLightCurvesRadialBig(ra, dec, radius):
+    """ Selects light curves from the Large Survey Database (LSD) on kepler
+        given an ra and dec in degrees, and a radius in degrees. The constraints
+        in the query are taken from the LSD wiki:
+            http://www.oir.caltech.edu/twiki_ptf/bin/viewauth/Main/LSDNavtara
+        except here I allow for saturated magnitude measurements in case a 
+        microlensing event causes a star to saturate temporarily.
+    """    
+    bounds_t  = lb.intervalset((40000, 60000)) # Cover the whole survey
+    bounds_xy = lb.beam(ra, dec, radius)
     
-def loadLightCurves(filename):
+    query = db.query("mjd, ptf_obj.ra, ptf_obj.dec, obj_id, mag_abs/1000. as mag, magerr_abs/1000. as magErr, apbsrms as sys_err, fid, flags, imaflags_iso \
+                        FROM ptf_det, ptf_obj, ptf_exp\
+                        WHERE ((flags & 1) == 0) & ((imaflags_iso & 3797) == 0) & (flags < 8) & (apbsrms > 0) & (fid == 2)")
+    
+    for block in query.iterate(bounds=[(bounds_xy, bounds_t)], return_blocks=True):
+        resultsArray = np.array(results, dtype=[('mjd', np.float64), ('ra', np.float64), ('dec', np.float64), ('obj_id', np.uint64), ('mag', np.float64), ('mag_err', np.float64), \
+                        ('sys_err', np.float32), ('filter_id', np.uint8),  ('flags', np.uint16), ('imaflags_iso', np.uint16)])
+        resultsArray = resultsArray.view(np.recarray)
+        logging.debug("Number of unique objid's: {0}".format(len(np.unique(resultsArray.obj_id))))
+        yield resultsArray
+
+def loadLightCurves(filename, session, LightCurve):
     """ """
     
     logging.debug("Opening {}...".format(filename))
@@ -297,3 +316,8 @@ def loadLightCurves(filename):
     
     logging.info("All light curves committed!")
     session.commit()
+
+def plotLightCurves():
+    """ """
+    pass
+    

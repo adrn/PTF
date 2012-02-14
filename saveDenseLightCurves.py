@@ -17,7 +17,12 @@ import apwlib.convert as c
 
 # Project
 import db.util as dbu
-
+try:
+    from db.DatabaseConnection import *
+    from db.NumpyAdaptors import *
+except:
+    logging.warn("Connection to deimos could not be established. Postgres database features won't work.")
+    
 def getOneCluster(name, ra, dec, radius=10, overwrite=False, skip=False):
     """ Given one set of globular cluster coordinates, download all
         light curves around 12 arcminutes from the cluster center
@@ -66,7 +71,45 @@ def getOneCluster(name, ra, dec, radius=10, overwrite=False, skip=False):
     pickle.dump(lightCurves, f)
     f.close()
     
-    return            
+    return
+
+def getBigCluster(name, ra, dec, radius=1.0):
+    """ Given one set of globular cluster coordinates, download all
+        light curves around 12 arcminutes from the cluster center
+
+        Parameters
+        -----------
+        name : string
+            The name of the globular cluster
+        ra : float, apwlib.geometry.RA
+            A Right Ascension in decimal degrees
+        dec : float, apwlib.geometry.Dec
+            A Declination in decimal degrees
+        radius : float, optional
+            Radius in DEGREES to search for light curves around the given ra, dec
+    """
+    ra = c.parseDegrees(ra)
+    dec = c.parseDegrees(dec)
+    radiusDegrees = radius
+    
+    logging.debug("{0},{1} with radius={2} deg".format(ra, dec, radiusDegrees))
+    
+    outputFilename = os.path.join("data", "lightcurves", "{0}_{1}.pickle")
+    lightCurveGen = dbu.getLightCurvesRadialBig(ra, dec, radiusDegrees)
+    
+    ii = 1
+    while True:
+        try:
+            lightCurves = lightCurveGen.next()
+            logging.debug("Output file: {0}".format(outputFilename.format(name, ii)))
+            f = open(outputFilename.format(name, ii), "w")
+            pickle.dump(lightCurves, f)
+            f.close()
+            ii += 1
+        except StopIteration:
+            return
+    
+    return
 
 def saveLightCurves():
     globularData = np.genfromtxt("data/globularClusters.txt", delimiter=",", usecols=[0,1,2], dtype=[("name", "|S20"), ("ra", "|S20"),("dec", "|S20")]).view(np.recarray)
@@ -88,12 +131,12 @@ def saveLightCurves():
     # M31
     ra = g.RA.fromHours("00 42 44.3")
     dec = g.Dec.fromDegrees("+41 16 09")
-    getOneCluster("M31", ra, dec, radius=2.2*60, skip=True)
+    getBigCluster("M31", ra, dec, radius=2.2, skip=True)
     
     # Bulge
     ra = g.RA.fromHours("17:45:40.04")
     dec = g.Dec.fromDegrees("-29:00:28.1")
-    getOneCluster("M31", ra, dec, radius=10.*60, skip=True)
+    getBigCluster("Bulge", ra, dec, radius=10., skip=True)
 
 def loadLightCurves():
     pickles = glob.glob("data/lightcurves/*.pickle")
@@ -101,7 +144,7 @@ def loadLightCurves():
     for file in pickles:
         logging.debug("loading file {0}".format(file))
         try:
-            dbu.loadLightCurves(file)
+            dbu.loadLightCurves(file, session, LightCurve)
         except sqlalchemy.exc.IntegrityError:
             logging.info("File already loaded!")
             dbu.session.close()
