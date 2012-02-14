@@ -12,17 +12,20 @@ import cPickle as pickle
 # Third-party
 import sqlalchemy
 import numpy as np
+import pyfits as pf
 import apwlib.geometry as g
 import apwlib.convert as c
 
 # Project
-import db.util as dbu
+import ptf.db.util as dbu
+"""
 try:
-    from db.DatabaseConnection import *
-    from db.NumpyAdaptors import *
+    from ptf.db.DatabaseConnection import *
+    from ptf.db.NumpyAdaptors import *
 except:
     logging.warn("Connection to deimos could not be established. Postgres database features won't work.")
-    
+"""
+
 def getOneCluster(name, ra, dec, radius=10, overwrite=False, skip=False):
     """ Given one set of globular cluster coordinates, download all
         light curves around 12 arcminutes from the cluster center
@@ -94,7 +97,7 @@ def getBigCluster(name, ra, dec, radius=1.0):
     
     logging.debug("{0},{1} with radius={2} deg".format(ra, dec, radiusDegrees))
     
-    outputFilename = os.path.join("data", "lightcurves", "{0}_{1}.pickle")
+    outputFilename = os.path.join("data", "lightcurves", "{0}_{1}.fits")
     lightCurveGen = dbu.getLightCurvesRadialBig(ra, dec, radiusDegrees)
     
     ii = 1
@@ -102,9 +105,15 @@ def getBigCluster(name, ra, dec, radius=1.0):
         try:
             lightCurves = lightCurveGen.next()
             logging.debug("Output file: {0}".format(outputFilename.format(name, ii)))
-            f = open(outputFilename.format(name, ii), "w")
-            pickle.dump(lightCurves, f)
-            f.close()
+            
+            #f = open(outputFilename.format(name, ii), "w")
+            #pickle.dump(lightCurves, f)
+            #f.close()
+            
+            # Write to a FITS file instead!
+            hdu = pf.BinTableHDU(lightCurves)
+            hdu.writeto(outputFilename.format(name, ii))
+        
             ii += 1
         except StopIteration:
             return
@@ -131,12 +140,12 @@ def saveLightCurves():
     # M31
     ra = g.RA.fromHours("00 42 44.3")
     dec = g.Dec.fromDegrees("+41 16 09")
-    getBigCluster("M31", ra, dec, radius=2.2, skip=True)
+    getBigCluster("M31", ra, dec, radius=2.2)
     
     # Bulge
     ra = g.RA.fromHours("17:45:40.04")
     dec = g.Dec.fromDegrees("-29:00:28.1")
-    getBigCluster("Bulge", ra, dec, radius=10., skip=True)
+    getBigCluster("Bulge", ra, dec, radius=10.)
 
 def loadLightCurves():
     pickles = glob.glob("data/lightcurves/*.pickle")

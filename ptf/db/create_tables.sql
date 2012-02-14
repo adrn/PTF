@@ -9,7 +9,7 @@ CREATE TABLE light_curve
   ra double precision[] NOT NULL,
   "dec" double precision[] NOT NULL,
   flags numeric[] NOT NULL,
-  filter_id smallint NOT NULL,
+  filter_id integer[] NOT NULL,
   imaflags numeric[] NOT NULL,
   candidate integer,
   CONSTRAINT light_curve_pk PRIMARY KEY (pk)

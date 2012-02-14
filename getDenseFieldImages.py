@@ -29,7 +29,7 @@ def singleField(verbosity):
     except IOError:
         raise IOError("data/denseCoordinates.pickle doesn't exist!\n Did you 'git pull' from navtara?")
     
-    logger = dbu.getLogger(None, verbosity, name="getDenseFieldImages")
+    logger = dbu.getLogger(verbosity, name="getDenseFieldImages")
     size = 0.5
     
     for ra,dec in denseCoordinates:
@@ -65,7 +65,7 @@ def allFields(verbosity):
     except IOError:
         raise IOError("data/denseCoordinates.pickle doesn't exist!\n Did you 'git pull' from navtara?")
     
-    logger = dbu.getLogger(None, verbosity, name="getDenseFieldImages")
+    logger = dbu.getLogger(verbosity, name="getDenseFieldImages")
     size = 0.5
     
     for ra,dec in denseCoordinates:
