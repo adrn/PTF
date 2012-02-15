@@ -17,8 +17,9 @@ import apwlib.convert as c
 import matplotlib.pyplot as plt
 
 # Project
-import db.util as dbu
-import simulation.util as simu
+import ptf.simulation.util as simu
+
+from ptf.db.DatabaseConnection import *
 
 def estimateContinuum(dbLightCurve, clipSigma=2.5):
     """ Estimate the continuum of the light curve using sigma clipping """
@@ -92,7 +93,7 @@ def fitCluster(dbLightCurve, indices):
     print full_out
 
 def main():
-    lightCurves = dbu.session.query(dbu.LightCurve).all()
+    lightCurves = session.query(LightCurve).all()
     print "light curves loaded"
     
     for lightCurve in lightCurves:
@@ -102,7 +103,10 @@ def main():
         m, s = estimateContinuum(lightCurve)
         clusterIndices = findClusters(lightCurve, m, s, 4)
         
-        if len(clusterIndices) == 0: continue
+        if len(clusterIndices) == 0: 
+            lightCurve.candidate = 0
+            session.flush()
+            continue
         
         print lightCurve.ra, lightCurve.dec
         

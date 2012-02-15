@@ -85,39 +85,3 @@ def getLightCurvesRadialBig(ra, dec, radius, min_number=10):
         resultsArray = resultsArray.view(np.recarray)
         logging.debug("Number of unique objid's: {0}".format(len(np.unique(resultsArray.objid))))
         yield resultsArray
-
-def loadLightCurves(filename, session, LightCurve):
-    """ """
-    
-    logging.debug("Opening {}...".format(filename))
-    f = open(filename)
-    resultsArray = pickle.load(f)
-    f.close()
-    logging.debug("File loaded!")
-    
-    session.begin()
-    logging.debug("Starting database load...")
-    for objid in np.unique(resultsArray.obj_id):
-        lightCurveData = resultsArray[resultsArray.obj_id == objid]
-        if len(lightCurveData.mag) < 10: continue
-        
-        lightCurve = LightCurve()
-        lightCurve.objid = objid
-        lightCurve.mag = lightCurveData.mag
-        lightCurve.mag_error = lightCurveData.mag_err
-        lightCurve.mjd = lightCurveData.mjd
-        lightCurve.sys_error = lightCurveData.sys_err
-        lightCurve.ra = lightCurveData.ra[0]
-        lightCurve.dec = lightCurveData.dec[0]
-        lightCurve.flags = lightCurveData["flags"]
-        lightCurve.imaflags = lightCurveData.imaflags_iso
-        lightCurve.filter_id = list(lightCurveData.filter_id)
-        session.add(lightCurve)
-        
-        if len(session.new) == 1000:
-            session.commit()
-            logging.debug("1000 light curves committed!")
-            session.begin()
-    
-    logging.info("All light curves committed!")
-    session.commit()
