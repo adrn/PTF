@@ -36,9 +36,78 @@ def FluxToRMag(f):
     # Accepts a flux in Janskys
     return -2.5*np.log10(f/2875.)
 
-def model(t, *p):
-    p = dict(zip(["u0", "t0", "tE", "F0"], p))
-    return p["F0"]*MicrolensingEvent.A_u(MicrolensingEvent.u_t(t, p["u0"], p["t0"], p["tE"]))
+def u_t(t, u_0, t_0, t_E):
+    return np.sqrt(u_0**2 + ((t - t_0)/t_E)**2)
+
+def A_u(u):
+    return (u**2 + 2) / (u*np.sqrt(u**2 + 4))
+
+def fluxModel(t, **p):
+    return p["F0"]*A_u(u_t(t, p["u0"], p["t0"], p["tE"]))
+
+def estimateContinuum(mjd, mag, error, clipSigma=2.):
+    """ Estimate the continuum of the light curve using sigma clipping """
+    
+    rootVariance = np.std(mag)
+    b = np.median(mag)
+    
+    mags = mag
+    mjds = mjd
+    sigmas = error
+    
+    while True:
+        w = np.fabs(mags - np.median(mags)) < clipSigma*rootVariance
+        
+        new_mags = mags[w]
+        new_mjds = mjds[w]
+        new_sigmas = sigmas[w]
+        
+        if (len(mags) - len(new_mags)) <= (0.02*len(mags)):
+            break
+        else:
+            mags = new_mags
+            mjds = new_mjds
+            sigmas = new_sigmas
+            rootVariance = np.std(mags)
+    
+    continuumMag = fit_line(mjds, mags, sigmas)
+    continuumSigma = rootVariance
+    
+    return continuumMag, continuumSigma
+
+def findClusters(mag, continuumMag, continuumSigma, num_points_per_cluster=4, num_sigma=3.):
+    # Determine which points are outside of continuumMag +/- 2 or 3 continuumSigma, and see if they are clustered
+    w = (mag > (continuumMag - num_sigma*continuumSigma))
+    
+    allGroups = []
+    
+    group = []
+    in_group = False
+    group_finished = False
+    for idx, pt in enumerate(np.logical_not(w)):
+        if len(group) > 0:
+            in_group = True
+        
+        if pt:
+            group.append(idx)
+        else:
+            if in_group and len(group) >= num_points_per_cluster:
+                allGroups.append(np.array(group))
+                
+            in_group = False
+            group = []
+    
+    if in_group and len(group) >= num_points_per_cluster:
+        allGroups.append(np.array(group))
+    
+    return allGroups
+        
+        
+        
+###########################################################################        
+        
+        
+        
 
 class MicrolensingEvent:
     """ You can create event with your own parameters like so:
@@ -57,26 +126,21 @@ class MicrolensingEvent:
     def A_u(u):
         return (u**2 + 2) / (u*np.sqrt(u**2 + 4))
     
-    @staticmethod
-    def AndParameters(mjd):
-        eventParameters = dict()
-        
-        # THIS IS WRONG AND SHOULD BE A DRAW FROM THE u0 DISTRIBUTION -- uniform!
-        eventParameters["u0"] = np.exp(-10.0*np.random.uniform())
-        
-        # Draw from uniform distribution between min(mjd), max(mjd)
-        eventParameters["t0"] = np.random.uniform(min(mjd), max(mjd))
-        
-        # THIS IS WRONG AND SHOULD BE A DRAW FROM THE OBSERVED 
-        #   TIMESCALE DISTRIBUTION from literature (MACHO)
-        eventParameters["tE"] = np.random.uniform(5., 100.)
-        
-        return MicrolensingEvent(**eventParameters)
-    
     def __init__(self, **kwargs):
-        self.u0 = kwargs["u0"]
-        self.t0 = kwargs["t0"]
-        self.tE = kwargs["tE"]
+        if len(kwargs.keys()) == 3:
+            self.u0 = kwargs["u0"]
+            self.t0 = kwargs["t0"]
+            self.tE = kwargs["tE"]
+        else:
+            # THIS IS WRONG AND SHOULD BE A DRAW FROM THE u0 DISTRIBUTION -- uniform!
+            self.u0 = np.exp(-10.0*np.random.uniform())
+            
+            # Draw from uniform distribution between min(mjd), max(mjd)
+            self.t0 = np.random.uniform(min(mjd), max(mjd))
+            
+            # THIS IS WRONG AND SHOULD BE A DRAW FROM THE OBSERVED 
+            #   TIMESCALE DISTRIBUTION from literature (MACHO)
+            self.tE = np.random.uniform(5., 100.)
     
     def fluxModel(self, t):
         return self.A_u(self.u_t(t, self.u0, self.t0, self.tE))
