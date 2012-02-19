@@ -225,8 +225,16 @@ if __name__ == "__main__":
     number_per_light_curve = 1000
     plot = False
     
-    light_curves = session.query(LightCurve).limit(number_of_light_curves).all()
-    
+    pre_light_curves = session.query(LightCurve).limit(number_of_light_curves*10).all()
+    count = 0
+    light_curves = []
+    for lc in pre_light_curves:
+        if count >= number_of_light_curves: break
+        
+        if 30 > len(lc.goodMjd) > 25:
+            light_curves.append(lc)
+            count += 1
+            
     sigma_to_mus = []
     Cons = []
     etas = []
