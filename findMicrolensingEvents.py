@@ -21,6 +21,19 @@ import ptf.simulation.util as simu
 
 from ptf.db.DatabaseConnection import *
 
+def plot_lightcurve(lightCurve, m, save=False):
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax = lightCurve.plot(ax)
+    ax.axhline(m)
+    ax.set_ylim(ax.get_ylim()[::-1])
+    
+    if save:
+        filename = os.path.join("plots", "{0}.png".format(lightCurve.objid))
+        plt.savefig(filename)
+    else:
+        plt.show()
+
 def estimateContinuum(dbLightCurve, clipSigma=2.5):
     """ Estimate the continuum of the light curve using sigma clipping """
     
@@ -51,10 +64,13 @@ def estimateContinuum(dbLightCurve, clipSigma=2.5):
     
     return continuumMag, continuumSigma
 
-def findClusters(dbLightCurve, continuumMag, continuumSigma, num_points_per_cluster=4):
+def findClusters(dbLightCurve, continuumMag, continuumSigma, num_points_per_cluster=4, sigma_multiplier=3.):
     # Determine which points are outside of continuumMag +/- 2 or 3 continuumSigma, and see if they are clustered
     #w = (dbLightCurve.mag > (continuumMag - 3*continuumSigma))
-    w = (dbLightCurve.goodMag > (continuumMag - 3*continuumSigma))
+    w = (dbLightCurve.goodMag > (continuumMag - sigma_multiplier*continuumSigma))
+    
+    # This allows for decreases in brightness as well -- e.g. from an eclipse!
+    #w = np.logical_or((dbLightCurve.goodMag > (continuumMag - 3*continuumSigma)), (dbLightCurve.goodMag < (continuumMag + 3*continuumSigma)))
     
     allGroups = []
     
@@ -93,32 +109,54 @@ def fitCluster(dbLightCurve, indices):
     print full_out
 
 def main():
-    lightCurves = session.query(LightCurve).all()
-    print "light curves loaded"
-    
-    for lightCurve in lightCurves:
-        #if len(lightCurve.mjd) < 50: continue
-        if len(lightCurve.goodMJD) < 50: continue
+    while True:
+        lightCurves = session.query(LightCurve).filter(LightCurve.candidate == None).limit(100).all()
+        if len(lightCurves) == 0: break
         
-        m, s = estimateContinuum(lightCurve)
-        clusterIndices = findClusters(lightCurve, m, s, 4)
+        logging.info("Light curves loaded!")
+
+        for lightCurve in lightCurves:
+            #if len(lightCurve.mjd) < 50: continue
+            
+            if len(lightCurve.goodMJD) < 10:
+                logging.debug("Skipping light curve, not enough good data points...{0}".format(len(lightCurve.goodMJD)))
+                lightCurve.candidate = 999
+                continue
+            
+            if len(lightCurve.goodMJD) < 25:
+                mjd = np.sort(lightCurve.goodMJD)
+                medCadence = np.median(mjd[1:]-mjd[:-1])
+                
+                if medCadence > 5:
+                    lightCurve.candidate = 999
+                    logging.debug("Skipping light curve due to bad cadence...{0}".format(medCadence))
+                    continue
+            
+            m, s = estimateContinuum(lightCurve)
+            clusterIndices = findClusters(lightCurve, m, s, 4, sigma_multiplier=2.5)
+            
+            if len(clusterIndices) == 0: 
+                logging.debug("No clusters found for this light curve")
+                lightCurve.candidate = 0
+                continue
+            
+            logging.info("-------------------------------------------------\nLight curve candidate!\n {0},{1}\nObjid: {2}\n-------------------------------------------------".format(lightCurve.ra, lightCurve.dec, lightCurve.objid))
+            
+            lightCurve.candidate = 1
+            
+            plot_lightcurve(lightCurve, m, save=True)
         
-        if len(clusterIndices) == 0: 
-            lightCurve.candidate = 0
-            session.flush()
-            continue
-        
-        print lightCurve.ra, lightCurve.dec
-        
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        ax = lightCurve.plot(ax)
-        ax.axhline(m)
-        #for clusterIdx in clusterIndices:
-        #    ax.axvline(np.median(lightCurve.mjd[clusterIdx]))
-        ax.set_ylim(ax.get_ylim()[::-1])
-        plt.show()
-        del fig
+        session.flush()
     
 if __name__ == "__main__":
+    parser = ArgumentParser()
+    parser.add_argument("-v", "--verbose", action="store_true", dest="verbose", default=False,
+                    help="Be chatty!")
+    
+    args = parser.parse_args()
+    if args.verbose:
+        logging.basicConfig(level=logging.DEBUG)
+    else:
+        logging.basicConfig(level=logging.INFO)
+        
     main()

@@ -87,15 +87,15 @@ class LightCurve(Base):
     
     @property
     def goodMJD(self):
-        return self.amjd[self.error < 0.1]
+        return self.amjd[(self.error < 0.1) & (np.array(self.filter_id) == 2)]
     
     @property
     def goodMag(self):
-        return self.amag[self.error < 0.1]
+        return self.amag[(self.error < 0.1) & (np.array(self.filter_id) == 2)]
     
     @property
     def goodError(self):
-        return self.error[self.error < 0.1]
+        return self.error[(self.error < 0.1) & (np.array(self.filter_id) == 2)]
     
     @property
     def aflags(self):
@@ -105,10 +105,39 @@ class LightCurve(Base):
     def aimaflags_iso(self):
         return np.array(self.imaflags_iso, dtype=int)
     
+    @property
+    def afilter_id(self):
+        return np.array(self.filter_id, dtype=int)
+    
+    @property
+    def Rmjd(self):
+        return self.amjd[self.afilter_id == 2]
+    
+    @property
+    def gmjd(self):
+        return self.amjd[self.afilter_id == 1]
+    
+    @property
+    def Rmag(self):
+        return self.amag[self.afilter_id == 2]
+    
+    @property
+    def gmag(self):
+        return self.amag[self.afilter_id == 1]
+        
+    @property
+    def Rerror(self):
+        return self.error[self.afilter_id == 2]
+    
+    @property
+    def gerror(self):
+        return self.error[self.afilter_id == 1]
+    
     def plot(self, ax):
         #ax.errorbar(self.mjd, self.mag, self.error, ls="none", marker=".", color="r")
-        ax.errorbar(self.goodMJD, self.goodMag, self.goodError, ls="none", marker=".", color="k", ms=2)
-        return ax
+        ax.errorbar(self.Rmjd, self.Rmag, self.Rerror, ls="none", marker="o", color="r", ms=5, ecolor='0.3')
+        ax.errorbar(self.gmjd, self.gmag, self.gerror, ls="none", marker="o", color="g", ms=5, ecolor='0.3')
+        
 
 """
 CCDExposure.field = relationship(Field, backref="ccd_exposures")

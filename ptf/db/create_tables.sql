@@ -35,3 +35,8 @@ CREATE INDEX light_curve_filter_id_idx
   ON light_curve
   USING btree
   (filter_id);
+
+CREATE INDEX light_curve_candidate_idx
+  ON light_curve
+  USING btree
+  (candidate);
