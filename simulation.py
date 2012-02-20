@@ -4,6 +4,8 @@ from argparse import ArgumentParser
 import logging
 
 # Third party
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -218,20 +220,27 @@ def plot_five_by_five(varIndices, varIndicesNoEvent):
 
 # ===========================================================================================
 
+def simulation1(number_of_light_curves, number_per_light_curve):
+    """ Default values should be something like
+            number_of_light_curves = 10
+            number_per_light_curve = 1000
+    """
+            
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.ERROR)
     
-    number_of_light_curves = 10
-    number_per_light_curve = 1000
+    number_of_light_curves = 1000
+    number_per_light_curve = 100
     plot = False
     
-    pre_light_curves = session.query(LightCurve).limit(number_of_light_curves*10).all()
+    pre_light_curves = session.query(LightCurve).limit(number_of_light_curves*1000).all()
     count = 0
     light_curves = []
     for lc in pre_light_curves:
         if count >= number_of_light_curves: break
         
-        if 30 > len(lc.goodMjd) > 25:
+        if 60 > len(lc.goodMJD) > 50:
             light_curves.append(lc)
             count += 1
             
@@ -294,13 +303,18 @@ if __name__ == "__main__":
     kk = 0
     params = ["sigma_to_mu", "Con", "eta", "J", "K"]
     for ii in range(5):
+        if params[ii] == "J":
+            bins = np.arange(0, 2500, 100)
+        else:
+            bins = 50
         fig = plt.figure()
         ax = fig.add_subplot(111)
-        ax.hist(varIndicesNoEvent[params[ii]], color='b', alpha=0.4)
-        ax.hist(varIndices[params[ii]], color='r', alpha=0.4)
+        ax.hist(varIndicesNoEvent[params[ii]], color='b', alpha=0.4, bins=bins)
+        ax.hist(varIndices[params[ii]], color='r', alpha=0.4, bins=bins)
         fig.savefig("plots/{0}_hist.png".format(params[ii]))
         
         for jj in range(5):
+            if ii == jj: continue
             fig = plt.figure()
             ax1 = fig.add_subplot(121)
             ax1.plot(varIndicesNoEvent[params[ii]], varIndicesNoEvent[params[jj]], 'b.', alpha=0.4)
