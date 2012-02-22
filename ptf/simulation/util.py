@@ -25,7 +25,7 @@ def straight(t, b):
     return np.ones((len(t),), dtype=float)*b
 
 def fit_line(x, y, sigma_y):
-    popt, pcov = curve_fit(straight, x, y, sigma=sigma_y)
+    popt, pcov = curve_fit(straight, x, y, sigma=sigma_y, p0=(np.median(y),))
     return popt[0]
 
 def RMagToFlux(R):
