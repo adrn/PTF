@@ -1,6 +1,7 @@
 # Standard library
 import os, sys
-from argparse import ArgumentParser
+import argparse
+import re
 import logging
 
 # Third party
@@ -8,6 +9,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.stats import scoreatpercentile
 
 # Project
 import ptf.simulation.util as simu
@@ -44,8 +46,11 @@ class PTFLightCurve:
         """
         
         # If u0 is not specified, draw from u0 distribution
-        # [TODO: right now this just added by hand!]
-        if u0 == None: self.u0 = np.exp(-10.0*np.random.uniform())
+        #   - see for example Popowski & Alcock 
+        #   - u0 maximum defined by detection limit of survey, but in our
+        #       case assum the amplifcation should be >1.5. Using eq. 1 from
+        #       Popowski & Alcock, this corresponds to a maximum u0 of ~0.8
+        if u0 == None: self.u0 = np.random.uniform()*0.8
         else: self.u0 = float(u0)
         
         # If t0 is not specified, draw from uniform distribution between days
@@ -163,7 +168,7 @@ def computeVariabilityIndices(lightCurve):
             a SimulatedLightCurve object to compute the indices from
     """
     N = len(lightCurve.mjd)
-    contMag, contSig = simu.estimateContinuum(lightCurve.mjd, lightCurve.mag, lightCurve.error)\
+    contMag, contSig = simu.estimateContinuum(lightCurve.mjd, lightCurve.mag, lightCurve.error)
     
     # ===========================
     # Compute variability indices
@@ -195,155 +200,169 @@ def computeVariabilityIndices(lightCurve):
     
     return sigma_to_mu, Con, eta, J, K
 
-def plot_five_by_five(varIndices, varIndicesNoEvent):
-    kk = 0
-    fig = plt.figure()
-    params = ["sigma_to_mu", "Con", "eta", "J", "K"]
-    for ii in range(5):
-        for jj in range(5):
-            ax = fig.add_subplot(5,5,jj+5*ii+1)
-            if ii == jj:
-                ax.hist(varIndicesNoEvent[params[ii]], color='b', alpha=0.4)
-                ax.hist(varIndices[params[ii]], color='r', alpha=0.4)
-            else:
-                ax.plot(varIndicesNoEvent[params[ii]], varIndicesNoEvent[params[jj]], 'b.', alpha=0.2)
-                ax.plot(varIndices[params[ii]], varIndices[params[jj]], 'r.', alpha=0.2)
-            
-            if ii == 4:
-                ax.set_xlabel(params[kk])
-                kk += 1
-            
-            if jj in [0, 5, 10, 15, 20]:
-                ax.set_ylabel(params[ii])
+def plot_five_by_five(varIndicesNoEvent, varIndicesWithEvent, plot_prefix="plots"):
+    """ Generate a plot of each variabilty index vs. each other on a 5x5 grid """
     
-    plt.show()
-
-# ===========================================================================================
-
-def simulation1(number_of_light_curves, number_per_light_curve):
-    """ Default values should be something like
-            number_of_light_curves = 10
-            number_per_light_curve = 1000
-    """
-            
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.ERROR)
-    
-    number_of_light_curves = 1000
-    number_per_light_curve = 100
-    plot = False
-    
-    pre_light_curves = session.query(LightCurve).limit(number_of_light_curves*1000).all()
-    count = 0
-    light_curves = []
-    for lc in pre_light_curves:
-        if count >= number_of_light_curves: break
-        
-        if 60 > len(lc.goodMJD) > 50:
-            light_curves.append(lc)
-            count += 1
-            
-    sigma_to_mus = []
-    Cons = []
-    etas = []
-    Js = []
-    Ks = []
-    
-    for jj in range(number_of_light_curves):
-        mjd = None
-        for ii in range(number_per_light_curve):
-            """if mjd == None:
-                lightCurve = SimulatedLightCurve(randomize_cadence=True, number_of_observations=100)
-                mjd = lightCurve.mjd
-            else:
-                #lightCurve = SimulatedLightCurve(mjd=mjd)
-                # [TODO: possible hack..]
-                lightCurve = SimulatedLightCurve(mjd=mjd)
-            """
-            lightCurve = PTFLightCurve(light_curves[jj].mjd, light_curves[jj].mag, light_curves[jj].error)
-            lightCurve.addMicrolensingEvent()
-            
-            sigma_to_mu, Con, eta, J, K = computeVariabilityIndices(lightCurve)
-            sigma_to_mus.append(sigma_to_mu)
-            Cons.append(Con)
-            etas.append(eta)
-            Js.append(J)
-            Ks.append(K)
-    
-    varIndices = np.array(zip(sigma_to_mus, Cons, etas, Js, Ks), dtype=[("sigma_to_mu",float), ("Con",float), ("eta",float), ("J",float), ("K",float)]).view(np.recarray)
-    
-    sigma_to_mus = []
-    Cons = []
-    etas = []
-    Js = []
-    Ks = []
-    for jj in range(number_of_light_curves):
-        mjd = None
-        for ii in range(number_per_light_curve):
-            """if mjd == None:
-                lightCurve = SimulatedLightCurve(randomize_cadence=True, number_of_observations=100)
-                mjd = lightCurve.mjd
-            else:
-                #lightCurve = SimulatedLightCurve(mjd=mjd)
-                # [TODO: possible hack..]
-                lightCurve = SimulatedLightCurve(mjd=mjd)
-            """
-            lightCurve = PTFLightCurve(light_curves[jj].mjd, light_curves[jj].mag, light_curves[jj].error)
-            
-            sigma_to_mu, Con, eta, J, K = computeVariabilityIndices(lightCurve)
-            sigma_to_mus.append(sigma_to_mu)
-            Cons.append(Con)
-            etas.append(eta)
-            Js.append(J)
-            Ks.append(K)
-    
-    varIndicesNoEvent = np.array(zip(sigma_to_mus, Cons, etas, Js, Ks), dtype=[("sigma_to_mu",float), ("Con",float), ("eta",float), ("J",float), ("K",float)]).view(np.recarray)
+    if not os.path.exists(plot_prefix): os.mkdir(plot_prefix)
     
     kk = 0
     params = ["sigma_to_mu", "Con", "eta", "J", "K"]
-    for ii in range(5):
+    for ii in range(len(params)):
         if params[ii] == "J":
             bins = np.arange(0, 2500, 100)
         else:
             bins = 50
         fig = plt.figure()
         ax = fig.add_subplot(111)
-        ax.hist(varIndicesNoEvent[params[ii]], color='b', alpha=0.4, bins=bins)
-        ax.hist(varIndices[params[ii]], color='r', alpha=0.4, bins=bins)
+        ax.hist(varIndicesNoEvent[params[ii]], color='b', alpha=0.4, bins=bins, normed=True)
+        ax.hist(varIndicesWithEvent[params[ii]], color='r', alpha=0.4, bins=bins, normed=True)
         fig.savefig("plots/{0}_hist.png".format(params[ii]))
         
-        for jj in range(5):
+        # Plot-fu to make pretty figures
+        for jj in range(len(params)):
             if ii == jj: continue
             fig = plt.figure()
             ax1 = fig.add_subplot(121)
-            ax1.plot(varIndicesNoEvent[params[ii]], varIndicesNoEvent[params[jj]], 'b.', alpha=0.4)
+            #ax1.plot(varIndicesNoEvent[params[ii]], varIndicesNoEvent[params[jj]], 'b.', alpha=0.4)
+            ax1.loglog(varIndicesNoEvent[params[ii]], varIndicesNoEvent[params[jj]], 'b.', alpha=0.2)
             
             ax2 = fig.add_subplot(122)
-            ax2.plot(varIndices[params[ii]], varIndices[params[jj]], 'r.', alpha=0.4)
+            #ax2.plot(varIndicesWithEvent[params[ii]], varIndicesWithEvent[params[jj]], 'r.', alpha=0.4)
+            ax2.loglog(varIndicesWithEvent[params[ii]], varIndicesWithEvent[params[jj]], 'r.', alpha=0.2)
             
             xmin1,xmax1 = ax1.get_xlim()
             xmin2,xmax2 = ax2.get_xlim()
-            newXMin = min([xmin1,xmin2])
-            newXMax = max([xmax1,xmax2])
-            ax1.set_xlim(newXMin-(newXMax-newXMin)/10., newXMax+(newXMax-newXMin)/10.)
-            ax2.set_xlim(newXMin-(newXMax-newXMin)/10., newXMax+(newXMax-newXMin)/10.)
+            ax1.set_xlim(min(xmin1, xmin2), max(xmax1, xmax2))
+            ax2.set_xlim(min(xmin1, xmin2), max(xmax1, xmax2))
             
             ymin1,ymax1 = ax1.get_ylim()
             ymin2,ymax2 = ax2.get_ylim()
-            newYMin = min([ymin1,ymin2])
-            newYMax = max([ymax1,ymax2])
-            ax1.set_ylim(newYMin-(newYMax-newYMin)/10., newYMax+(newYMax-newYMin)/10.)
-            ax2.set_ylim(newYMin-(newYMax-newYMin)/10., newYMax+(newYMax-newYMin)/10.)
+            ax1.set_ylim(min(ymin1, ymin2), max(ymax1, ymax2))
+            ax2.set_ylim(min(ymin1, ymin2), max(ymax1, ymax2))
             
-            ax1.set_xlabel(params[jj])
-            ax2.set_xlabel(params[jj])
-            ax1.set_ylabel(params[ii])
-            fig.savefig("plots/{0}_vs_{1}.png".format(params[ii], params[jj]))
+            ax1.set_xlabel(params[ii])
+            ax2.set_xlabel(params[ii])
+            ax1.set_ylabel(params[jj])
+            fig.savefig(os.path.join(plot_prefix, "{0}_vs_{1}.png".format(params[ii], params[jj])))
 
+# ===========================================================================================
 
-#ax.axhline(contMag, c='r', alpha=0.5)
-#ax.axhline(contMag+num_sigma*contSig, c='r', ls="--", alpha=0.5)
-#ax.axhline(contMag-num_sigma*contSig, c='r', ls="--", alpha=0.5)
-#for cluster in clusters:
-#    ax.plot(lightCurve.mjd[cluster], lightCurve.mag[cluster], 'go', ls='none')
+def simulation1(number_of_light_curves, number_per_light_curve, number_of_points_range=(50,60)):
+    """ Default values should be something like
+            number_of_light_curves = 10
+            number_per_light_curve = 1000
+    """
+    
+    # For each light curve, compute the variability indices WITHOUT adding a microlensing event
+    variabilityIndices = []
+    for jj in range(number_of_light_curves):
+        mjd = None
+        for ii in range(number_per_light_curve):
+            if mjd == None:
+                lightCurve = SimulatedLightCurve(randomize_cadence=True, number_of_observations=100)
+                mjd = lightCurve.mjd
+            else:
+                #lightCurve = SimulatedLightCurve(mjd=mjd)
+                # [TODO: possible hack..]
+                lightCurve = SimulatedLightCurve(mjd=mjd)
+            
+            variabilityIndices.append(computeVariabilityIndices(lightCurve))
+    
+    varIndicesNoEvent = np.array(variabilityIndices, dtype=[("sigma_to_mu",float), ("Con",float), ("eta",float), ("J",float), ("K",float)]).view(np.recarray)
+
+def simulation2(number_of_light_curves, number_per_light_curve, number_of_points_range=(50,60)):
+    """ Default values should be something like
+            number_of_light_curves = 10
+            number_per_light_curve = 1000
+    """
+    
+    offsetNumber = 0
+    q = 100
+    light_curves = []
+    
+    logging.debug("Selecting light curves from database...")
+    
+    # Select light curves with enough data points (as specified with number_of_points_range)
+    while len(light_curves) < number_of_light_curves:
+        pre_light_curves = session.query(LightCurve).group_by(LightCurve.pk).\
+                                                     offset(offsetNumber).\
+                                                     limit(number_of_light_curves*q).all()
+        offsetNumber += q
+        
+        # For each of the "pre-selected" light curves, count how many data points it has
+        for lc in pre_light_curves:
+            if number_of_points_range[0] < len(lc.goodMJD) < number_of_points_range[1]:
+                light_curves.append(lc)
+            
+            if len(light_curves) >= number_of_light_curves: break
+    
+    if len(light_curves) < number_of_light_curves: 
+        logging.warn("Only able to select {0} light curves with more than {1} but less than {2} observations.".format(len(light_curves), *number_of_points_range))
+        yesOrNo = raw_input("Is that ok? [y]/n:")
+        if yesOrNo == "y":
+            number_of_light_curves = len(light_curves)
+        else:
+            sys.exit(0)
+    else: 
+        logging.info("Selected {0} light curves with more than {1} but less than {2} observations.".format(len(light_curves), *number_of_points_range))
+    
+    # For each light curve, compute the variability indices WITHOUT adding a microlensing event
+    variabilityIndices = []
+    for jj in range(number_of_light_curves):
+        lightCurve = PTFLightCurve(light_curves[jj].mjd, light_curves[jj].mag, light_curves[jj].error)
+        try:
+            variabilityIndices.append(computeVariabilityIndices(lightCurve))
+        except TypeError:
+            logging.debug("Continuum fit failed!")
+            continue
+            
+    varIndicesNoEvent = np.array(variabilityIndices, dtype=[("sigma_to_mu",float), ("Con",float), ("eta",float), ("J",float), ("K",float)]).view(np.recarray)
+    logging.debug("Done with light curves with no events...")
+    
+    # For each light curve, compute the variability indices AFTER adding a microlensing event
+    variabilityIndices = []
+    for jj in range(number_of_light_curves):
+        logging.debug("Computing indices for light curve {0}".format(light_curves[jj].objid))
+        for ii in range(number_per_light_curve):
+            lightCurve = PTFLightCurve(light_curves[jj].mjd, light_curves[jj].mag, light_curves[jj].error)
+            lightCurve.addMicrolensingEvent()
+            try:
+                variabilityIndices.append(computeVariabilityIndices(lightCurve))
+            except TypeError:
+                logging.debug("Continuum fit failed!")
+                continue
+    
+    varIndicesWithEvent = np.array(variabilityIndices, dtype=[("sigma_to_mu",float), ("Con",float), ("eta",float), ("J",float), ("K",float)]).view(np.recarray)
+    logging.debug("Done with light curves with events...")
+    
+    logging.debug("Plotting...")
+    plot_five_by_five(varIndicesNoEvent, varIndicesWithEvent, plot_prefix="plots/{0}-{1}".format(*number_of_points_range))
+    
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-v", "--verbose", action="store_true", dest="verbose", default=False,
+                        help="Be chatty!")
+    parser.add_argument("-q", "--quiet", action="store_true", dest="quiet", default=False,
+                        help="Be quiet!")
+    parser.add_argument("-r", "--range", type=str, dest="range", default="(45,55)",
+        				help="Accepted range of number of observations")
+    parser.add_argument("-l", "--number-of-light-curves", type=int, dest="num_light_curves", default=1000,
+        				help="Number of light curves to select from the databse")
+    parser.add_argument("-s", "--number-of-simulations", type=int, dest="num_simulations", default=100,
+        				help="Number of simulations per light curve")
+    
+    args = parser.parse_args()
+    if args.verbose:
+        logging.basicConfig(level=logging.DEBUG)
+    elif args.quiet:
+        logging.basicConfig(level=logging.WARN)
+    else:
+        logging.basicConfig(level=logging.INFO)
+    
+    pattr = re.compile("^[\(|\s]{0,1}([0-9]+)[\,|\-|\s]([0-9]+)[\)|\s]{0,1}")
+    try:
+        num_observations_range = map(int, pattr.match(args.range.strip()).groups())
+    except ValueError:
+        raise ValueError("Invalid --range input, must be of the form 10-20 or (10,20)")
+            
+    simulation2(args.num_light_curves, args.num_simulations, num_observations_range)
