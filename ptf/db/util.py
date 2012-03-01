@@ -61,6 +61,50 @@ def getLightCurvesRadial(ra, dec, radius):
     logging.debug("Number of unique objid's: {0}".format(len(np.unique(resultsArray.obj_id))))
     
     return resultsArray
+    
+def saveLightCurvesRadial(ra, dec, filename="", radius=10, overwrite=False, skip=False):
+    """ Given one set of coordinates, download all
+        light curves around x arcminutes from the cluster center
+
+        Parameters
+        -----------
+        filename : string
+            The name of the output file
+        ra : float, apwlib.geometry.RA
+            A Right Ascension in decimal degrees
+        dec : float, apwlib.geometry.Dec
+            A Declination in decimal degrees
+        radius : float, optional
+            Radius in arcminutes to search for light curves around the given ra, dec
+        overwrite : bool, optional
+            If a pickle exists, do you want to overwrite it?
+    """
+    ra = c.parseDegrees(ra)
+    dec = c.parseDegrees(dec)
+    radiusDegrees = radius / 60.0
+    
+    logging.debug("{0},{1} with radius={2} deg".format(ra, dec, radiusDegrees))
+    
+    if filename.strip() == "":
+        outputFilename = os.path.join("data", "lightcurves", "{0}_{1}.pickle".format(ra.degrees, dec.degrees))
+    else:
+        outputFilename = filename
+    logging.debug("Output file: {0}".format(outputFilename))
+    
+    if os.path.exists(outputFilename) and not overwrite:
+        raise IOError("{0} already exists!".format(outputFilename))
+    elif os.path.exists(outputFilename) and overwrite:
+        logging.debug("You've chosen to overwrite the file!")
+        os.remove(outputFilename)
+        logging.debug("File deleted.")
+    
+    lightCurves = dbu.getLightCurvesRadial(ra, dec, radiusDegrees)
+    
+    f = open(outputFilename, "w")
+    pickle.dump(lightCurves, f)
+    f.close()
+    
+    return
 
 def getLightCurvesRadialBig(ra, dec, radius):
     """ Selects light curves from the Large Survey Database (LSD) on kepler
