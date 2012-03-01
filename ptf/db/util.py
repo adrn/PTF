@@ -86,7 +86,7 @@ def saveLightCurvesRadial(ra, dec, filename="", radius=10, overwrite=False, skip
     logging.debug("{0},{1} with radius={2} deg".format(ra, dec, radiusDegrees))
     
     if filename.strip() == "":
-        outputFilename = os.path.join("data", "lightcurves", "{0}_{1}.pickle".format(ra.degrees, dec.degrees))
+        outputFilename = os.path.join("data", "lightcurves", "{0}_{1}.fits".format(ra.degrees, dec.degrees))
     else:
         outputFilename = filename
     logging.debug("Output file: {0}".format(outputFilename))
@@ -100,9 +100,8 @@ def saveLightCurvesRadial(ra, dec, filename="", radius=10, overwrite=False, skip
     
     lightCurves = dbu.getLightCurvesRadial(ra, dec, radiusDegrees)
     
-    f = open(outputFilename, "w")
-    pickle.dump(lightCurves, f)
-    f.close()
+    hdu = pf.BinTableHDU(lightCurves)
+    hdu.writeto(outputFilename)
     
     return
 
