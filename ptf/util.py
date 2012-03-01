@@ -12,6 +12,7 @@ import gzip
 # Third party libraries
 import numpy as np
 import pyfits as pf
+import matplotlib.pyplot as plt
 
 try:
     import apwlib.geometry as g
@@ -154,7 +155,7 @@ def getFITSCutout(ra, dec, size=0.5, save=False):
     else:
         return hdulist
 
-def plotLightCurves():
+def plotLightCurve(lc):
     """ """
     pass
     

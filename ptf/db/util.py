@@ -62,7 +62,7 @@ def getLightCurvesRadial(ra, dec, radius):
     
     return resultsArray
 
-def getLightCurvesRadialBig(ra, dec, radius, min_number=10):
+def getLightCurvesRadialBig(ra, dec, radius):
     """ Selects light curves from the Large Survey Database (LSD) on kepler
         given an ra and dec in degrees, and a radius in degrees. The constraints
         in the query are taken from the LSD wiki:

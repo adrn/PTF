@@ -10,7 +10,7 @@ from sqlalchemy.sql.expression import func
 
 import numpy as np
 
-__all__ = ["session", "Session", "Base", "engine", "LightCurve"]
+__all__ = ["session", "Session", "Base", "engine", "LightCurve", "VariabilityIndices"]
 
 class Singleton(type):
 	def __init__(cls, name, bases, dict):
@@ -52,6 +52,22 @@ session = Session
 Base = db.Base
 
 # Model Class for true PTF light curves
+
+class VariabilityIndices(Base):
+    __tablename__ = 'variability_indices'
+    __table_args__ = {'autoload' : True}
+    
+    @property
+    def all_dict(self):
+        return {"sigma_mu" : self.sigma_mu,\
+                "con" : self.con,\
+                "eta" : self.eta,\
+                "J" : self.j,\
+                "K" : self.k}
+    
+    @property
+    def all_tuple(self):
+        return (self.sigma_mu, self.con, self.eta, self.j, self.k)
 
 class LightCurve(Base):
     __tablename__ = 'light_curve'
@@ -133,11 +149,21 @@ class LightCurve(Base):
     def gerror(self):
         return self.error[self.afilter_id == 1]
     
-    def plot(self, ax):
+    def plot(self, ax=None):
+        if ax == None:
+            import matplotlib as pyplot
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
+        # This should return a figure with 1 subplot if only R band, 2 subplots if R and g
         #ax.errorbar(self.mjd, self.mag, self.error, ls="none", marker=".", color="r")
-        ax.errorbar(self.Rmjd, self.Rmag, self.Rerror, ls="none", marker="o", color="r", ms=5, ecolor='0.3')
-        ax.errorbar(self.gmjd, self.gmag, self.gerror, ls="none", marker="o", color="g", ms=5, ecolor='0.3')
+        ax.errorbar(self.Rmjd, self.Rmag, self.Rerror, ls="none", marker="o", c='k', ecolor='0.7', capsize=0)
+        ax.set_xlabel("MJD")
+        ax.set_ylabel(r"$M_R$")
+        ax.set_ylim(ax.get_ylim()[::-1])
+        #ax.errorbar(self.gmjd, self.gmag, self.gerror, ls="none", marker="o", color="g", ms=5, ecolor='0.3')
+        return ax
         
+VariabilityIndices.light_curve = relationship(LightCurve, backref="variability_indices", uselist=False)
 
 """
 CCDExposure.field = relationship(Field, backref="ccd_exposures")
