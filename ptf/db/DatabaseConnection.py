@@ -161,7 +161,11 @@ class LightCurve(Base):
         ax.set_ylabel(r"$M_R$")
         ax.set_ylim(ax.get_ylim()[::-1])
         #ax.errorbar(self.gmjd, self.gmag, self.gerror, ls="none", marker="o", color="g", ms=5, ecolor='0.3')
-        return ax
+        
+        if ax == None:
+            plt.show()
+        else:
+            return ax
         
 VariabilityIndices.light_curve = relationship(LightCurve, backref="variability_indices", uselist=False)
 
