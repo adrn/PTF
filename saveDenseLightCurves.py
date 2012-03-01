@@ -8,6 +8,7 @@ import os, sys, glob
 from argparse import ArgumentParser
 import logging
 import cPickle as pickle
+import socket
 
 # Third-party
 import sqlalchemy
@@ -19,11 +20,12 @@ import apwlib.convert as c
 # Project
 import ptf.db.util as dbu
 
-try:
-    from ptf.db.DatabaseConnection import *
-    from ptf.db.NumpyAdaptors import *
-except:
-    logging.warn("Connection to deimos could not be established. Postgres database features won't work.")
+if socket.gethostname() != "kepler" and socket.gethostname() != "navtara":
+    try:
+        from ptf.db.DatabaseConnection import *
+        from ptf.db.NumpyAdaptors import *
+    except:
+        logging.warn("Connection to deimos could not be established. Postgres database features won't work.")
 
 
 def loadLightCurves(filename):
