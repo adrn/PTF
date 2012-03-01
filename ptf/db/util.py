@@ -25,6 +25,7 @@ if socket.gethostname() == "kepler" or socket.gethostname() == "navtara":
 
 try:
     import apwlib.geometry as g
+    import apwlib.geometry as c
 except ImportError:
     logging.warn("apwlib not found! Some functionality may not work correctly.\nDo: 'git clone git@github.com:adrn/apwlib.git' and run 'python setup.py install' to install.")
 
