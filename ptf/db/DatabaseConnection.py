@@ -151,7 +151,7 @@ class LightCurve(Base):
     
     def plot(self, ax=None):
         if ax == None:
-            import matplotlib as pyplot
+            import matplotlib.pyplot as plt
             fig = plt.figure()
             ax = fig.add_subplot(111)
         # This should return a figure with 1 subplot if only R band, 2 subplots if R and g
