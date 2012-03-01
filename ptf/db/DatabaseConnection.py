@@ -150,7 +150,8 @@ class LightCurve(Base):
         return self.error[self.afilter_id == 1]
     
     def plot(self, ax=None):
-        if ax == None:
+        ax_specified = ax == None
+        if ax_specified:
             import matplotlib.pyplot as plt
             fig = plt.figure()
             ax = fig.add_subplot(111)
@@ -162,7 +163,7 @@ class LightCurve(Base):
         ax.set_ylim(ax.get_ylim()[::-1])
         #ax.errorbar(self.gmjd, self.gmag, self.gerror, ls="none", marker="o", color="g", ms=5, ecolor='0.3')
         
-        if ax == None:
+        if ax_specified:
             plt.show()
         else:
             return ax
