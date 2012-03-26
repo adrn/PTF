@@ -195,8 +195,8 @@ class PTFLightCurve:
             logging.warn("t0 is outside of the mjd range for this light curve!")
         
         # If tE is not specified, draw from tE distribution
-        #   [TODO: I used Alcock's suggestion of a log uniform sampling from 1-2000 days
-        if tE == None: self.tE = 10**np.random.uniform(0., 2.5)
+        #   I used Alcock's suggestion of a log uniform sampling from 1-2000 days
+        if tE == None: self.tE = 10**np.random.uniform(0., 3.3012)
         else: self.tE = float(tE)
         
         flux = fluxModel(self.mjd, u0=self.u0, t0=self.t0, tE=self.tE, F0=1.)#self.F0)
@@ -232,7 +232,6 @@ class SimulatedLightCurve(PTFLightCurve):
             outliers : bool, optional
                 This controls whether to sample from an outlier distribution
                 when creating magnitude values for the light curve
-                [TODO: implement this!]
             
             Notes
             -----
