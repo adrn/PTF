@@ -14,6 +14,7 @@ import cPickle as pickle
 # Third-party
 import sqlalchemy
 import numpy as np
+import pyfits as pf
 import apwlib.geometry as g
 
 # Project
@@ -38,8 +39,12 @@ if __name__ == "__main__":
     else:
         verbosity = logging.INFO
     
-    ra = g.RA(args.ra)
-    dec = g.Dec(args.dec)
+    try:
+        ra = g.RA(args.ra)
+        dec = g.Dec(args.dec)
+    except:
+        ra = g.RA.fromDegrees(float(args.ra))
+        dec = g.Dec(float(args.dec))
     
     name = "{0}_{1}_{2}".format(ra.degrees, dec.degrees, args.radius)
     
@@ -49,10 +54,20 @@ if __name__ == "__main__":
     
         ii = 1
         while True:
+            s = os.statvfs("/home/aprice-whelan/ptf/data/lightcurves/")
+            mbAvailable = (s.f_bavail * s.f_frsize) / 1024. / 1024.
+            
+            if mbAvailable < 700: 
+                print "Not enough space left, rerun"
+                break
+            
             try:
                 lightCurves = lightCurveGen.next()
                 logging.debug("Output file: {0}".format(outputFilename.format(name, ii)))
                 
+                if ii < 36:
+                    ii += 1
+                    continue
                 # Write to a FITS file instead!
                 hdu = pf.BinTableHDU(lightCurves)
                 hdu.writeto(outputFilename.format(name, ii))

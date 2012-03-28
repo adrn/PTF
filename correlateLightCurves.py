@@ -11,6 +11,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 # Third party
 import numpy as np
+import pyfits as pf
 from sqlalchemy import func
 import apwlib.geometry as g
 import mlpy
