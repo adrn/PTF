@@ -159,9 +159,9 @@ def getCCDLightCurves(fieldid, ccdid):
     
     query = db.query("mjd, ptf_obj.ra, ptf_obj.dec, obj_id, mag_abs/1000. as mag, magerr_abs/1000. as magErr, apbsrms as sys_err, fid, flags, imaflags_iso \
                         FROM ptf_det, ptf_obj, ptf_exp\
-                        WHERE ((imaflags_iso & 3797) == 0) & (flags < 8) & (apbsrms > 0) & (ccdid == {1})".format(fieldid, ccdid))
+                        WHERE ccdid == {1}".format(fieldid, ccdid))
     
-    resultsArray = np.array(query.fetch(bounds=[(bounds_xy, bounds_t)]), dtype=[('mjd', np.float64), ('ra', np.float64), ('dec', np.float64), ('obj_id', np.int64), ('mag', np.float64), ('mag_err', np.float64), \
+    resultsArray = np.array(query.fetch(bounds=[(bounds_xy, bounds_t)]), dtype=[('mjd', np.float64), ('ra', np.float64), ('dec', np.float64), ('objid', np.int64), ('mag', np.float64), ('mag_err', np.float64), \
                         ('sys_err', np.float32), ('filter_id', np.uint8),  ('flags', np.int16), ('imaflags_iso', np.int16)])
     resultsArray = resultsArray.view(np.recarray)
     
