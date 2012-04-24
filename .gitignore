@@ -1,4 +1,5 @@
 *.pyc
 *.pickle
 *.png
+lc_merged*.txt
 2011\ Report/
