@@ -149,21 +149,34 @@ class LightCurve(Base):
     def gerror(self):
         return self.error[self.afilter_id == 1]
     
-    def plot(self, ax=None):
-        ax_specified = ax == None
-        if ax_specified:
+    def plot(self, ax=None, error_cut=None):
+        ax_not_specified = ax == None
+        if ax_not_specified:
             import matplotlib.pyplot as plt
             fig = plt.figure()
             ax = fig.add_subplot(111)
+        
+        if error_cut != None:
+            idx = self.Rerror < error_cut
+            mjd = self.Rmjd[idx]
+            mag = self.Rmag[idx]
+            error = self.Rerror[idx]
+        else:
+            mjd = self.Rmjd
+            mag = self.Rmag
+            error = self.Rerror
+        
+        if len(mjd) == 0: return
+        
         # This should return a figure with 1 subplot if only R band, 2 subplots if R and g
         #ax.errorbar(self.mjd, self.mag, self.error, ls="none", marker=".", color="r")
-        ax.errorbar(self.Rmjd, self.Rmag, self.Rerror, ls="none", marker="o", c='k', ecolor='0.7', capsize=0)
+        ax.errorbar(mjd, mag, error, ls="none", marker="o", c='k', ecolor='0.7', capsize=0)
         ax.set_xlabel("MJD")
         ax.set_ylabel(r"$M_R$")
         ax.set_ylim(ax.get_ylim()[::-1])
         #ax.errorbar(self.gmjd, self.gmag, self.gerror, ls="none", marker="o", color="g", ms=5, ecolor='0.3')
         
-        if ax_specified:
+        if ax_not_specified:
             plt.show()
         else:
             return ax

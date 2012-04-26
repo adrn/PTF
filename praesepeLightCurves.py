@@ -6,7 +6,6 @@
 
 # Standard library
 import os, sys, glob
-from argparse import ArgumentParser
 import logging
 
 # Third-party
@@ -115,16 +114,39 @@ def computeIndices():
     session.flush()
 
 def reComputeIndices():
-    lightCurves = session.query(LightCurve).filter(LightCurve.objid < 100000).all()
-    for lightCurve in lightCurves:
-        if lightCurve.variability_indices == None:
+    """ When I originally loaded the indices, I computed them based on the
+        full light curves. Now I want to do a cut on the bad data points, 
+        and flag light curves with only a few good points as 'bad' (ignore=True)
+    """
+    
+    for ii in range(session.query(LightCurve).filter(LightCurve.objid < 100000).count()/1000+1):
+        num_bad = 0.0
+        for lightCurve in session.query(LightCurve).filter(LightCurve.objid < 100000).order_by(LightCurve.objid).offset(ii*1000).limit(1000).all():
+            try:
+                # Remove old variability indices
+                var = session.query(VariabilityIndices).join(LightCurve).filter(LightCurve.objid == lightCurve.objid).one()
+                session.delete(var)
+            except sqlalchemy.orm.exc.NoResultFound:
+                pass
             
-            lc = simu.PTFLightCurve(lightCurve.mjd, lightCurve.mag, lightCurve.error)
+            # Only select points where the error is less than 0.1 mag
+            idx = lightCurve.error < 0.1
+            
+            # Check that less than half of the data points are bad
+            if float(sum(idx)) / len(lightCurve.error) <= 0.5:
+                logging.debug("Bad light curve -- ignore=True")
+                num_bad += 1
+                lightCurve.ignore = True
+                continue
+            
+            lc = simu.PTFLightCurve(lightCurve.amjd[idx], lightCurve.amag[idx], lightCurve.error[idx])
             try:
                 var_indices = simu.computeVariabilityIndices(lc)
             except NameError:
                 continue
             
+            logging.debug("Good light curve -- ignore=False")
+            lightCurve.ignore = False
             variabilityIndices = VariabilityIndices()
             variabilityIndices.sigma_mu = var_indices["sigma_mu"]
             variabilityIndices.con = var_indices["con"]
@@ -134,8 +156,9 @@ def reComputeIndices():
             variabilityIndices.light_curve = lightCurve
             session.add(variabilityIndices)
             
-        if len(session.new) == 1000:
-            session.flush()
+        logging.info("Fraction of good light curves: {}".format(1-num_bad/1000))
+        session.flush()
+        
     session.flush()
 
 def loadAndMatchTxtCoordinates(file, dtype=None):    
@@ -246,23 +269,26 @@ class VIFigure:
     def save(self):
         self.figure.savefig(self.filename)
 
-def plotIndices():    
+def plotIndices(figureFileName="plots/praesepe_5x5.png"):    
     # ** IF YOU CHANGE EITHER OF THESE LINES, YOU MUST ALSO CHANGE NAMES ABOVE! **
     varIndices = session.query(VariabilityIndices.sigma_mu, VariabilityIndices.con, VariabilityIndices.eta, VariabilityIndices.j, VariabilityIndices.k)\
                         .join(LightCurve)\
+                        .filter(LightCurve.ignore == False)\
                         .filter(LightCurve.objid < 100000).all()
+
     varIndicesArray = np.array(varIndices, dtype=zip(NAMES, [float]*len(NAMES))).view(np.recarray)
     
     
     # This code finds any known rotators from Agueros et al.
     knownRotators = loadAndMatchTxtCoordinates("data/praesepe_rotators.txt")
     #wang1995Members = loadAndMatchTxtCoordinates("data/praesepe_wang1995_members.txt")
+    
     kraus2007Members = loadAndMatchTxtCoordinates("data/praesepe_krauss2007_members.txt")
     rrLyrae = loadAndMatchTxtCoordinates("data/praesepe_rrlyrae.txt")
     eclipsing = loadAndMatchTxtCoordinates("data/praesepe_eclipsing.txt")
     wUma = loadAndMatchTxtCoordinates("data/praesepe_wuma.txt")
     
-    viFigure = VIFigure("plots/praesepe_5x5.png")
+    viFigure = VIFigure(figureFileName)
     for ii,yParameter in enumerate(NAMES):
         for jj,xParameter in enumerate(NAMES):            
             if ii > jj:
@@ -275,8 +301,7 @@ def plotIndices():
                 viAxis = VIAxis(xParameter, yParameter, plot_function="hist")
             
             viAxis.add_series(varIndicesArray[xParameter], varIndicesArray[yParameter], color="k", marker=".", alpha=0.3, linestyle="none", label="All Praesepe Field Stars")
-            #viAxis.add_series(wang1995Members[xParameter], wang1995Members[yParameter], color="g", marker="v", alpha=0.8, markersize=8, linestyle="none", label=u"Wang 1995 Member Catalog")
-            viAxis.add_series(kraus2007Members[xParameter], kraus2007Members[yParameter], color="g", marker="v", alpha=0.8, markersize=8, linestyle="none", label=u"Krauss 2007 Member Catalog")
+            viAxis.add_series(kraus2007Members[xParameter], kraus2007Members[yParameter], color="g", marker="v", alpha=0.8, markersize=8, linestyle="none", label=u"Kraus 2007 Member Catalog")
             viAxis.add_series(knownRotators[xParameter], knownRotators[yParameter], color="r", marker="*", alpha=0.8, markersize=10, linestyle="none", label=u"Agüeros et al. 2011 rotators")
             viAxis.add_series(rrLyrae[xParameter], rrLyrae[yParameter], color="c", marker="^", markersize=10, alpha=0.8, linestyle="none", label=u"Agüeros et al. 2011 RR Lyrae")
             viAxis.add_series(eclipsing[xParameter], eclipsing[yParameter], color="m", marker="^", markersize=10, alpha=0.8, linestyle="none", label=u"Agüeros et al. 2011 Eclipsing Binary")
@@ -296,22 +321,60 @@ def plotIndices():
                 
     viFigure.save()
 
-def _plotHighJLightCurves():
+def plotInterestingVariables():
+    lightCurves = session.query(LightCurve).join(VariabilityIndices).\
+                        filter(VariabilityIndices.eta < 1).\
+                        filter(LightCurve.ignore==False).\
+                        filter(VariabilityIndices.j > 100).\
+                        filter(LightCurve.objid<100000).all()
     
-    lightCurves = session.query(LightCurve)\
-                        .join(VariabilityIndices)\
-                        .filter(LightCurve.objid < 100000)\
-                        .filter(VariabilityIndices.j > 1000)\
-                        .all()
+    rrLyrae = [g.RADec((g.RA.fromDegrees(x[0]), g.Dec.fromDegrees(x[1]))) for x in np.genfromtxt("data/praesepe_rrlyrae.txt", delimiter=",")]
+    eclipsing = [g.RADec((g.RA.fromDegrees(x[0]), g.Dec.fromDegrees(x[1]))) for x in np.genfromtxt("data/praesepe_eclipsing.txt", delimiter=",")]
+    wUma = [g.RADec((g.RA.fromDegrees(x[0]), g.Dec.fromDegrees(x[1]))) for x in np.genfromtxt("data/praesepe_wuma.txt", delimiter=",")]
+    knownRotators = [g.RADec((g.RA.fromDegrees(x[0]), g.Dec.fromDegrees(x[1]))) for x in np.genfromtxt("data/praesepe_rotators.txt", delimiter=",")]
     
-    for lightCurve in lightCurves:
+    for lc in lightCurves:
+        lcRADec = g.RADec((g.RA.fromDegrees(lc.ra), g.Dec.fromDegrees(lc.dec)))
+        
+        title = ""
+        
+        for star in rrLyrae:
+            if lcRADec.subtends(star).degrees < 5./3600:
+                title = "RR Lyrae"
+        
+        for star in eclipsing:
+            if lcRADec.subtends(star).degrees < 5./3600:
+                title = "Eclipsing"
+        
+        for star in wUma:
+            if lcRADec.subtends(star).degrees < 5./3600:
+                title = "W Uma"
+        
+        for star in knownRotators:
+            if lcRADec.subtends(star).degrees < 5./3600:
+                title = "Rotator"
+        
         fig = plt.figure()
         ax = fig.add_subplot(111)
-        lightCurve.plot(ax)
-        fig.savefig("plots/praesepe/{0}.png".format(lightCurve.objid))
+        ax.set_title(title)
+        lc.plot(ax, error_cut=0.05)
+        fig.savefig("plots/praesepe/{}.png".format(lc.objid))
 
 if __name__ == "__main__":
-    #plotIndices()
-    _plotHighJLightCurves()
+    from argparse import ArgumentParser
+
+    parser = ArgumentParser(description="")
+    parser.add_argument("-v", "--verbose", action="store_true", dest="verbose", default=False,
+                    help="Be chatty (default = False)")
+    
+    args = parser.parse_args()
+    if args.verbose:
+        logging.basicConfig(level=logging.DEBUG)
+    else:
+        logging.basicConfig(level=logging.INFO)
+    
+    #plotIndices("plots/praesepe_5x5.png")
+    #reComputeIndices()
+    plotInterestingVariables()
     
     
