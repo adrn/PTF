@@ -1,5 +1,6 @@
 import warnings
 warnings.filterwarnings(action="ignore", message="Skipped unsupported reflection of expression-based index q3c_ccd_exposure[_a-z]+")
+import urllib
 
 import sqlalchemy
 from sqlalchemy import create_engine, MetaData, Column, Float
@@ -34,15 +35,14 @@ class DatabaseConnection(object):
 		self.Base = declarative_base(bind=self.engine)
 		self.Session = scoped_session(sessionmaker(bind=self.engine, autocommit=True, autoflush=False))
 
-db_config = {
-	'user'     : 'adrian',
-	'password' : 'lateralus0',
-	'database' : 'ptf',
-	'host'     : 'deimos.astro.columbia.edu',
-	'port'     : 5432
-}
+user = "adrian"
+password = 'cc.ppAPW1218+-*'
+database_name = "ptf"
+host = "deimos.astro.columbia.edu"
+port = 5432
 
-database_connection_string = 'postgresql://%s:%s@%s:%s/%s' % (db_config["user"], db_config["password"], db_config["host"], db_config["port"], db_config["database"])
+#database_connection_string = 'postgresql://%s:%s@%s:%s/%s' % (db_config["user"], db_config["password"], db_config["host"], db_config["port"], db_config["database"])
+database_connection_string = "postgresql://{user}:{password}@{host}:{port}/{db}".format(user=user, password=urllib.quote(password), host=host, port=port, db=database_name)
 
 db = DatabaseConnection(database_connection_string=database_connection_string)
 engine = db.engine
