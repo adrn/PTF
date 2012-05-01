@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """ Specify an objid as a command line argument, and this script will
     plot and show the light curve!
 """

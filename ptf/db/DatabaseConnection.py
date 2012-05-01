@@ -98,6 +98,10 @@ class LightCurve(Base):
         return np.array(self.sys_error)
     
     @property
+    def afield(self):
+        return np.array(self.field)
+    
+    @property
     def error(self):
         return np.sqrt(self.amag_error**2 + self.asys_error**2)
     

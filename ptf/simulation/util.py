@@ -16,6 +16,7 @@
 __author__ = "adrn <adrn@astro.columbia.edu>"
 
 import sys, os
+import logging
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -80,10 +81,8 @@ def estimateContinuum(mjd, mag, error, clipSigma=2.5):
     
     return continuumMag, continuumSigma
 
-def findClusters(mag, continuumMag, continuumSigma, num_points_per_cluster=4, num_sigma=3.):
-    # Determine which points are outside of continuumMag +/- 2 or 3 continuumSigma, and see if they are clustered
-    w = (mag > (continuumMag - num_sigma*continuumSigma))
-    
+def findClusters(w, mag, continuumMag, continuumSigma, num_points_per_cluster=4, num_sigma=3.):
+    # Determine which points are outside of continuumMag +/- 2 or 3 continuumSigma, and see if they are clustered    
     allGroups = []
     
     group = []
@@ -106,6 +105,18 @@ def findClusters(mag, continuumMag, continuumSigma, num_points_per_cluster=4, nu
         allGroups.append(np.array(group))
     
     return allGroups
+
+def findClustersBrighter(mag, continuumMag, continuumSigma, num_points_per_cluster=4, num_sigma=3.):
+    # Determine which points are outside of continuumMag +/- 2 or 3 continuumSigma, and see if they are clustered
+    w = (mag > (continuumMag - num_sigma*continuumSigma))
+    
+    return findClusters(w, mag, continuumMag, continuumSigma, num_points_per_cluster, num_sigma)
+
+def findClustersFainter(mag, continuumMag, continuumSigma, num_points_per_cluster=4, num_sigma=3.):
+    # Determine which points are outside of continuumMag +/- 2 or 3 continuumSigma, and see if they are clustered
+    w = (mag < (continuumMag - num_sigma*continuumSigma))
+    
+    return findClusters(w, mag, continuumMag, continuumSigma, num_points_per_cluster, num_sigma)
         
 def computeVariabilityIndices(lightCurve, tuple=False):
     """ Computes the 6 (5) variability indices as explained in M.-S. Shin et al. 2009
@@ -129,8 +140,14 @@ def computeVariabilityIndices(lightCurve, tuple=False):
 
     # Con : number of consecutive series of 3 points BRIGHTER than the light curve
     num_sigma = 2.
-    clusters = findClusters(lightCurve.mag, contMag, contSig, 3, num_sigma=num_sigma)
+    clusters = findClustersBrighter(lightCurve.mag, contMag, contSig, 3, num_sigma=num_sigma)
     Con = len(clusters) / (N - 2.)
+    
+    clusters = findClustersBrighter(lightCurve.mag, contMag, contSig, 3, num_sigma=2.5)
+    B = len(clusters) # Number of clusters of >3 points BRIGHTER than 2.5-sigma over the baseline
+    
+    clusters = findClustersFainter(lightCurve.mag, contMag, contSig, 3, num_sigma=2.5)
+    F = len(clusters) # Number of clusters of >3 points FAINTER than 2.5-sigma over the baseline
     
     # eta : ratio of mean square successive difference to the sample variance
     delta_squared = np.sum((lightCurve.mag[1:] - lightCurve.mag[:-1])**2 / (N - 1.))
@@ -152,8 +169,10 @@ def computeVariabilityIndices(lightCurve, tuple=False):
         return {"sigma_mu" : sigma_to_mu,\
                 "con" : Con,\
                 "eta" : eta,\
-                "J" : J,\
-                "K" : K}
+                "j" : J,\
+                "k" : K,\
+                "b" : B,\
+                "f" : F}
 
 class PTFLightCurve:
     
