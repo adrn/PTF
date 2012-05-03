@@ -236,7 +236,15 @@ class PTFLightCurve:
         
         ax.errorbar(self.mjd, self.mag, self.error, ls='none', marker='o', c='k', ecolor='0.7', capsize=0)
         ax.set_ylim(ax.get_ylim()[::-1])
-
+    
+    def lomb_scargle(self, ws):
+        try:
+            from scipy.signal import lombscargle
+        except ImportError:
+            raise ImportError("You must have Scipy >0.11dev installed for the Lomb-Scargle algorithm!")
+        
+        return lombscargle(self.mjd, self.mag, ws)
+    
 class SimulatedLightCurve(PTFLightCurve):
     
     def __init__(self, mjd, error, outliers=False):
