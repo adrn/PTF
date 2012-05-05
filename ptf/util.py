@@ -36,7 +36,7 @@ def matchRADecToImages(ra, dec, size=None):
     request = urllib2.Request(url)
     base64string = base64.encodestring('%s:%s' % ("PTF", "palomar")).replace('\n', '')
     request.add_header("Authorization", "Basic %s" % base64string)
-    file = StringIO(urllib2.urlopen(request).read())
+    file = StringIO.StringIO(urllib2.urlopen(request).read())
     filenames = np.genfromtxt(file, skiprows=4, usecols=[20], dtype=str)
     logging.debug("Image downloaded.")
     logging.debug("{0} images in list".format(len(filenames)))
@@ -134,8 +134,9 @@ def getFITSCutout(ra, dec, size=0.5, save=False):
     request.add_header("Authorization", "Basic %s" % base64string)
     
     logging.debug("Image Full URL: {0}".format(request.get_full_url()))
+    print request.get_full_url()
     
-    f = StringIO(urllib2.urlopen(request).read())
+    f = StringIO.StringIO(urllib2.urlopen(request).read())
     gz = gzip.GzipFile(fileobj=f, mode="rb")
     gz.seek(0)
     

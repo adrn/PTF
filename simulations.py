@@ -159,7 +159,6 @@ def detection_efficiency(number_of_light_curves=10000, baseline=365, pattern="un
         *Also see TODO's below*
         
     """
-    # Write the data to a pickle for faster plotting
     if kwargs.has_key("clumps"):
         clumpList = list(kwargs['clumps'])
     else:
