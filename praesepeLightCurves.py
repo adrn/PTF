@@ -22,6 +22,9 @@
     of our variability indices down to one number. We could similarly define such a factor
     for eclipses, or periodic stars down the road, but the idea is to be able to select out
     light curves on one number. 
+    
+    TODO : Make 3D version of 5 by 5 plot in case there are multiple peaks that are getting washed out
+            when plotting all the distributions as 2-d w/ opacity.
         
 """
 
@@ -45,6 +48,29 @@ from ptf.db.DatabaseConnection import *
 import ptf.simulation.util as simu
 
 ALL_INDICES = ["j", "k", "con", "sigma_mu", "eta", "b", "f"]
+
+import math
+
+def hsv2rgb(h, s, v):
+    h = float(h)
+    s = float(s)
+    v = float(v)
+    h60 = h / 60.0
+    h60f = math.floor(h60)
+    hi = int(h60f) % 6
+    f = h60 - h60f
+    p = v * (1 - s)
+    q = v * (1 - f * s)
+    t = v * (1 - (1 - f) * s)
+    r, g, b = 0, 0, 0
+    if hi == 0: r, g, b = v, t, p
+    elif hi == 1: r, g, b = q, v, p
+    elif hi == 2: r, g, b = p, v, t
+    elif hi == 3: r, g, b = p, q, v
+    elif hi == 4: r, g, b = t, p, v
+    elif hi == 5: r, g, b = v, p, q
+    #r, g, b = int(r * 255), int(g * 255), int(b * 255)
+    return (r, g, b)
 
 def txt_file_light_curve_to_recarray(filename):
     """ All columns in this file are:
@@ -162,7 +188,7 @@ def compute_indices():
             lc = simu.PTFLightCurve(lightCurve.amjd[idx], lightCurve.amag[idx], lightCurve.error[idx])
             try:
                 # Returns a dictionary with keys = the names of the indices
-                var_indices = simu.computeVariabilityIndices(lc)
+                var_indices = simu.compute_variability_indices(lc)
             except NameError:
                 continue
             
@@ -219,14 +245,97 @@ def high_error_weight(light_curve):
         For brighter sources, e.g. magnitude 15 or so, this amounts
         to removing points with > 1% errors, but for fainter sources,
         we allow for up to 5% error.
+        
     """
-    pass
+    # Only select points where the error is less than the acceptable percent error
+    #   based on a visual fit to the plot Nick sent on 4/30/12
+    median_magnitude = np.median(light_curve.mag)
+    if median_magnitude < 15:
+        percent_acceptable = 0.01
+    else:
+        percent_acceptable = 0.01 * 10**( (median_magnitude - 15.) / 7.153 )
+    
+    percent_error = (light_curve.error / np.array(light_curve.mag))
+    idx = percent_error > percent_acceptable
+    
+    weights = np.ones(len(light_curve.mag), dtype=float)
+    weights[idx] = percent_acceptable / percent_error[idx]
+    
+    return weights
 
+def high_error_test():
+    # Time the function
+    import time
+    lcs = session.query(LightCurve).filter(LightCurve.objid < 100000).limit(1000).all()
+    
+    times = []
+    for lc in lcs:
+        #print sum(high_error_weight(lc)), len(lc.mag)
+        a = time.time()
+        weights = high_error_weight(lc)
+        times.append(time.time() - a)
+        
+        if sum(weights) < len(lc.mag):
+            logging.debug("high_error_weight: {}".format(weights[weights != 1]))
+    
+    print "high_error_weight() average time: {}".format(np.mean(times))
+    
 def correlated_noise_weight(light_curve):
     """ Find all nearby light curves and see if they have correlated errors.
-        If they do, downweight those points in the weight vector.
+        If they do, downweight those points in the weight vector. It's very
+        unlikely that two nearby sources will be variable with the same
+        period, thus producing correlated outliers.
     """
-    pass
+    # Get all sources within 1 arcmin
+    nearby_sources = session.query(LightCurve).filter(func.q3c_radial_query(LightCurve.ra, LightCurve.dec, \
+                                                                            light_curve.ra, light_curve.dec, 0.0167)).all()
+    
+    light_curve_mag_array = np.array(light_curve.mag)
+    light_curve_mjd_array = np.array(light_curve.mjd)
+    mjd_set = set(light_curve.mjd)
+    for nearby_light_curve in nearby_sources:
+        if nearby_light_curve.objid == light_curve.objid: continue
+        
+        nearby_light_curve_mag_array = np.array(nearby_light_curve.mag)
+        nearby_light_curve_mjd_array = np.array(nearby_light_curve.mjd)
+        common_mjd = np.array(list(mjd_set.intersection(set(nearby_light_curve.mjd))))
+        
+        light_curve_idx = np.in1d(light_curve_mjd_array, common_mjd)
+        nearby_light_curve_idx = np.in1d(nearby_light_curve_mjd_array, common_mjd)
+        
+        # *** These are the two things to correlate!
+        a = light_curve_mag_array[light_curve_idx]
+        v = nearby_light_curve_mag_array[nearby_light_curve_idx]
+        
+        plt.clf()
+        plt.subplot(211)
+        plt.plot(common_mjd, a, 'ro')
+        plt.plot(common_mjd, v, 'bo')
+        plt.subplot(212)
+        plt.plot(common_mjd, np.correlate(a, v, "same"), 'k.')
+        plt.show()
+    
+    weights = np.ones(len(light_curve.mag), dtype=float)
+    
+    return weights
+
+def correlated_noise_test():
+    # Time the function
+    import time
+    lcs = session.query(LightCurve).filter(LightCurve.objid < 100000).limit(1000).all()
+    
+    times = []
+    for lc in lcs:
+        a = time.time()
+        weights = correlated_noise_weight(lc)
+        times.append(time.time() - a)
+        
+        if sum(weights) < len(lc.mag):
+            logging.debug("correlated_noise_weight: {}".format(weights[weights != 1]))
+        
+        break
+    
+    print "correlated_noise_weight() average time: {}".format(np.mean(times))
     
 def single_outlier_weight(light_curve):
     """ For multiple observations taken over one night, downweight any single
@@ -345,7 +454,24 @@ class VIFigure:
         print xOffset, yOffset"""
         
         for viSeries in vi_axis.series:
-            if vi_axis.plot_function == "loglog":                
+            
+            if vi_axis.plot_function == "hist":
+                thisSubplot.set_frame_on(False)
+                thisSubplot.get_yaxis().set_visible(False)
+                thisSubplot.get_xaxis().set_visible(False)
+                continue
+            
+            if viSeries.kwargs.has_key("colors"):
+                viSeries.kwargs["c"] = viSeries.kwargs["colors"]
+                del viSeries.kwargs["colors"]
+            
+            if vi_axis.plot_function == "loglog":
+                print np.fabs(viSeries.x)
+                thisSubplot.scatter(np.fabs(viSeries.x), np.fabs(viSeries.y), **viSeries.kwargs)
+            else:
+                thisSubplot.scatter(viSeries.x, viSeries.y, **viSeries.kwargs)
+            
+            """if vi_axis.plot_function == "loglog":              
                 #thisSubplot.loglog(viSeries.x + xOffset, viSeries.y + yOffset, **viSeries.kwargs)
                 thisSubplot.loglog(np.fabs(viSeries.x), np.fabs(viSeries.y), **viSeries.kwargs)
             
@@ -362,6 +488,11 @@ class VIFigure:
             
             else:
                 raise ValueError("Invalid plot_function! You specified: {}".format(vi_axis.plot_function))
+            """
+        
+        if vi_axis.plot_function == "loglog":
+            thisSubplot.set_xscale("log")
+            thisSubplot.set_yscale("log")
     
     def save(self):
         self.figure.savefig(self.filename, facecolor="#efefef")
@@ -453,22 +584,25 @@ def plotInterestingVariables():
         lc.plot(ax, error_cut=0.05)
         fig.savefig("plots/praesepe/{}.png".format(lc.objid))
 
-def single_field_add_microlensing(field, num_microlensing_light_curves=10000):
+def single_field_add_microlensing(indices, field, num_light_curves=100000):
     """ For all light curves in a single PTF field around Praesepe, produce a 5x5 plot for 
         all light curves and then a random sample of all objects with random microlensing
         event parameters added.
     """
-
+    
+    # Select any light curve with at least one observation on the given field 
     lightCurves = session.query(LightCurve).\
                           filter(LightCurve.objid < 100000).\
                           filter(LightCurve.ignore == False).\
                           filter(sqlalchemy.literal(field) == func.any(LightCurve.field)).\
+                          limit(num_light_curves).\
                           all()
     
     logging.info("Light curves loaded from database")
     
     var_indices = []
     var_indices_with_event = []
+    var_indices_with_event_colors = []
     
     for lightCurve in lightCurves:
         # Only select points where the error is less than 0.1 mag and only for the specified field
@@ -481,7 +615,7 @@ def single_field_add_microlensing(field, num_microlensing_light_curves=10000):
         logging.debug("Light curve selected")
 
         ptf_light_curve = simu.PTFLightCurve(lightCurve.amjd[idx], lightCurve.amag[idx], lightCurve.error[idx])
-        var_indices.append(simu.computeVariabilityIndices(ptf_light_curve, tuple=True))
+        var_indices.append(simu.compute_variability_indices(ptf_light_curve, indices=indices))
         
         # For 10% of the light curves, add 100 different microlensing events to their light curves
         #   and recompute the variability indices
@@ -489,14 +623,19 @@ def single_field_add_microlensing(field, num_microlensing_light_curves=10000):
             for ii in range(100):
                 lc = copy.copy(ptf_light_curve)
                 lc.addMicrolensingEvent()
-                var_indices_with_event.append(simu.computeVariabilityIndices(lc, tuple=True))
+                var_indices_with_event.append(simu.compute_variability_indices(lc, indices=indices))
+                var_indices_with_event_colors.append(hsv2rgb(lc.u0 * 255, 1., 1.))
     
-    var_indices_array = np.array(var_indices, dtype=zip(NAMES, [float]*len(NAMES))).view(np.recarray)
-    var_indices_with_event_array = np.array(var_indices_with_event, dtype=zip(NAMES, [float]*len(NAMES))).view(np.recarray)
+    if not lightCurves or not var_indices:
+        logging.info("No light curves selected.")
+        return
     
-    viFigure = VIFigure("plots/praesepe_field{0}.png".format(field))
-    for ii,yParameter in enumerate(NAMES):
-        for jj,xParameter in enumerate(NAMES):            
+    var_indices_array = np.array(var_indices, dtype=zip(indices, [float]*len(indices))).view(np.recarray)
+    var_indices_with_event_array = np.array(var_indices_with_event, dtype=zip(indices, [float]*len(indices))).view(np.recarray)
+    
+    viFigure = VIFigure("plots/praesepe_field{0}.png".format(field), indices)
+    for ii,yParameter in enumerate(indices):
+        for jj,xParameter in enumerate(indices):
             if ii > jj:
                 # Bottom triangular section of plots: Linear plots
                 viAxis = VIAxis(xParameter, yParameter, plot_function="plot")
@@ -506,10 +645,15 @@ def single_field_add_microlensing(field, num_microlensing_light_curves=10000):
             else:
                 viAxis = VIAxis(xParameter, yParameter, plot_function="hist")
             
-            viAxis.add_series(var_indices_with_event_array[xParameter], var_indices_with_event_array[yParameter], \
-                              color="r", marker=".", alpha=0.3, linestyle="none", label="1000 Random Light Curves\nw/ Artificial Microlensing Events")
+            #viAxis.add_series(var_indices_with_event_array[xParameter], var_indices_with_event_array[yParameter], \
+            #                  color=var_indices_with_event_colors, marker="o", alpha=0.3, linestyle="none", label="1000 Random Light Curves\nw/ Artificial Microlensing Events")
+                              
+            #if var_indices_with_event_colors:
+            #    viAxis.add_series(var_indices_with_event_array[xParameter], var_indices_with_event_array[yParameter], \
+            #                  color=var_indices_with_event_colors, alpha=0.25)
+            
             viAxis.add_series(var_indices_array[xParameter], var_indices_array[yParameter], \
-                              color="k", marker=".", alpha=0.3, linestyle="none", label="All Light Curves in Field {0}".format(field))
+                              color="k", alpha=0.25, label="All Light Curves in Field {0}".format(field))
             
             if ii == jj:
                 # Along diagonal
@@ -533,10 +677,28 @@ if __name__ == "__main__":
                     help="Be chatty (default = False)")
     parser.add_argument("--compute-indices", action="store_true", dest="compute_indices", default=False,
                     help="Run compute_indices()")
-    parser.add_argument("--plot-indices", nargs='+', type=str, dest="plot_indices", default=[],
-                    help="Run plot_indices() with the specified list of indices")
+    parser.add_argument("--indices", nargs='+', type=str, dest="indices", default=[],
+                    help="Store the specified list of indices")
+    parser.add_argument("--plot", action="store_true", dest="plot", default=False,
+                    help="Run plot_indices()")
+    parser.add_argument("--field", type=int, dest="field", default=0,
+                    help="Store the specified field and run single_field_add_microlensing()")    
+    parser.add_argument("--test", action="store_true", dest="test", default=False,
+                    help="Run in test mode")
+    parser.add_argument("--number", dest="number", default=1000000,
+                    help="Number of light curves to use")
+    
     
     args = parser.parse_args()
+    
+    if args.test:
+        #high_error_test()
+        correlated_noise_test()
+        
+        print
+        print "Test mode complete."
+        print "-"*30
+        sys.exit(0)
     
     if args.verbose:
         logging.basicConfig(level=logging.DEBUG)
@@ -546,9 +708,12 @@ if __name__ == "__main__":
     if args.compute_indices:
         compute_indices()
     
-    if len(args.plot_indices) > 0:
-        plot_indices(args.plot_indices)
+    if args.plot:
+        plot_indices(args.indices)
     
+    if args.field != 0:
+        single_field_add_microlensing(args.indices, args.field, args.number)
+        
     #plotIndices("plots/praesepe.png")
     #reComputeIndices()
     #plotInterestingVariables()

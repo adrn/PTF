@@ -118,7 +118,7 @@ def findClustersFainter(mag, continuumMag, continuumSigma, num_points_per_cluste
     
     return findClusters(w, mag, continuumMag, continuumSigma, num_points_per_cluster, num_sigma)
         
-def computeVariabilityIndices(lightCurve, tuple=False):
+def compute_variability_indices(lightCurve, indices=[]):
     """ Computes the 6 (5) variability indices as explained in M.-S. Shin et al. 2009
         
         Parameters
@@ -163,16 +163,22 @@ def computeVariabilityIndices(lightCurve, tuple=False):
     delta_n = np.sqrt(float(N)/(N-1.)) * (lightCurve.mag - mu) / lightCurve.error
     K = np.sum(np.fabs(delta_n)) / (float(N)*np.sqrt((1./N)*np.sum(delta_n**2)))
     
-    if tuple:
-        return (sigma_to_mu, Con, eta, J, K)
-    else:
-        return {"sigma_mu" : sigma_to_mu,\
+    idx_dict = {"sigma_mu" : sigma_to_mu,\
                 "con" : Con,\
                 "eta" : eta,\
                 "j" : J,\
                 "k" : K,\
                 "b" : B,\
                 "f" : F}
+    
+    if indices:
+        return_list = []
+        for idx in indices:
+            return_list.append(idx_dict[idx])
+        
+        return tuple(return_list)
+    else:
+        return idx_dict
 
 class PTFLightCurve:
     
@@ -201,9 +207,9 @@ class PTFLightCurve:
         # If u0 is not specified, draw from u0 distribution
         #   - see for example Popowski & Alcock 
         #   - u0 maximum defined by detection limit of survey, but in our
-        #       case assum the amplifcation should be >1.5. Using eq. 1 from
-        #       Popowski & Alcock, this corresponds to a maximum u0 of ~0.8
-        if u0 == None: self.u0 = np.random.uniform()*0.8
+        #       case assum the amplifcation should be >1.4. Using eq. 1 from
+        #       Popowski & Alcock, this corresponds to a maximum u0 of ~0.9261
+        if u0 == None: self.u0 = np.random.uniform()*0.9261
         else: self.u0 = float(u0)
         
         # If t0 is not specified, draw from uniform distribution between days
@@ -214,8 +220,9 @@ class PTFLightCurve:
             logging.warn("t0 is outside of the mjd range for this light curve!")
         
         # If tE is not specified, draw from tE distribution
-        #   I used Alcock's suggestion of a log uniform sampling from 1-2000 days
-        if tE == None: self.tE = 10**np.random.uniform(0., 3.3012)
+        #   I use an estimate of Wood's "observed" distribution for now:
+        #   http://onlinelibrary.wiley.com/store/10.1111/j.1365-2966.2005.09357.x/asset/j.1365-2966.2005.09357.x.pdf?v=1&t=h1whtf1h&s=7b4d93a69aa684387a49ece5fc33c32fa5037052
+        if tE == None: self.tE = 10**np.random.normal(1.3, 0.5)
         else: self.tE = float(tE)
         
         flux = fluxModel(self.mjd, u0=self.u0, t0=self.t0, tE=self.tE, F0=1.)#self.F0)
