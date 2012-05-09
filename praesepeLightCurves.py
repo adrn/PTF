@@ -40,6 +40,7 @@ import numpy as np
 import apwlib.geometry as g
 import apwlib.convert as c
 import matplotlib
+#matplotlib.use("WxAgg")
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
@@ -235,6 +236,10 @@ def variability_indices_to_recarray(vi_list, vi_names):
                    dtype=zip(vi_names, [float]*len(vi_names))).view(np.recarray)
     return arr
 
+def linear_rescale(x):
+    x = np.array(x)
+    return (x-x.min()) / (x.max() - x.min())
+
 # =====================================================================================
 #   These next functions will be my "pipeline" for downweighting or ignoring light
 #      curves with many bad points
@@ -376,11 +381,16 @@ class VIAxis:
         self.y_axis_parameter = y_axis_parameter
         self.plot_function = plot_function
         
-        self.series = []
+        self.series = dict()
+        self.series_plot_return = dict()
         
-    def add_series(self, x, y=None, **kwargs):
+    def add_series(self, x, y=None, name=None, **kwargs):
         viSeries = VISeries(x, y, **kwargs)
-        self.series.append(viSeries)
+        
+        if name:
+            self.series[name] = viSeries
+        else:
+            self.series[len(self.series)] = viSeries
         
 class VIFigure:
 
@@ -394,10 +404,13 @@ class VIFigure:
                                                        len(self._subplot_map.keys()), \
                                                        figsize=(25,25))
         self.figure.subplots_adjust(hspace=0, wspace=0)
+        self.scatter_dict = dict()
+        self.vi_axis_list = list()
+        
         plt.setp([a.get_xticklabels() for a in self.figure.axes], visible=False)
         plt.setp([a.get_yticklabels() for a in self.figure.axes], visible=False)
         
-    def addSubplot(self, vi_axis, legend=False):
+    def add_subplot(self, vi_axis, legend=False):
         rowIdx = self._subplot_map[vi_axis.x_axis_parameter]
         colIdx = self._subplot_map[vi_axis.y_axis_parameter]
         thisSubplot = self.subplot_array[colIdx, rowIdx]
@@ -407,7 +420,6 @@ class VIFigure:
             # Stole the below from http://matplotlib.sourceforge.net/api/axes_api.html
             h,l = self.subplot_array[0,1].get_legend_handles_labels()
             thisSubplot.legend(h,l)
-        
         
         if vi_axis.plot_function == "loglog":
             xlabel = "log({0})".format(vi_axis.x_axis_parameter)
@@ -436,24 +448,11 @@ class VIFigure:
             thisSubplot.set_ylabel(ylabel)
             thisSubplot.yaxis.set_label_position('right')
         
-        # We have negative and 0 values for some indices, so this figures
-        #   out how to offset that stuff based on the FIRST item in the
-        #   series array e.g. the one on the bottom layer
-        """viSeries = vi_axis.series[0]
-        xOffset = min(viSeries.x)
-        if xOffset == 0: xOffset = 1
-        elif xOffset > 0: xOffset = 0
-        elif xOffset < 0: xOffset = np.log(xOffset * -1)
+        if vi_axis.plot_function == "loglog":
+            thisSubplot.set_xscale("log")
+            thisSubplot.set_yscale("log")
         
-        yOffset = min(viSeries.y)
-        if yOffset == 0: yOffset = 1
-        elif yOffset > 0: yOffset = 0
-        elif yOffset < 0: yOffset = np.log(yOffset * -1)
-        
-        print vi_axis.x_axis_parameter, vi_axis.y_axis_parameter
-        print xOffset, yOffset"""
-        
-        for viSeries in vi_axis.series:
+        for name, viSeries in vi_axis.series.items():
             
             if vi_axis.plot_function == "hist":
                 thisSubplot.set_frame_on(False)
@@ -465,35 +464,20 @@ class VIFigure:
                 viSeries.kwargs["c"] = viSeries.kwargs["colors"]
                 del viSeries.kwargs["colors"]
             
+            # HACK / TODO: absolute value of loglog plot data...not the best thing to do
             if vi_axis.plot_function == "loglog":
-                print np.fabs(viSeries.x)
-                thisSubplot.scatter(np.fabs(viSeries.x), np.fabs(viSeries.y), **viSeries.kwargs)
+                vi_axis.series_plot_return[name] = thisSubplot.scatter(np.fabs(viSeries.x), np.fabs(viSeries.y), **viSeries.kwargs)
             else:
-                thisSubplot.scatter(viSeries.x, viSeries.y, **viSeries.kwargs)
-            
-            """if vi_axis.plot_function == "loglog":              
-                #thisSubplot.loglog(viSeries.x + xOffset, viSeries.y + yOffset, **viSeries.kwargs)
-                thisSubplot.loglog(np.fabs(viSeries.x), np.fabs(viSeries.y), **viSeries.kwargs)
-            
-            elif vi_axis.plot_function == "hist":
-                #bins = np.logspace(min(viSeries.x), max(viSeries.x), 100)
-                thisSubplot.set_frame_on(False)
-                #thisSubplot.set_xscale('log')
-                thisSubplot.get_yaxis().set_visible(False)
-                thisSubplot.get_xaxis().set_visible(False)
-                #thisSubplot.hist(viSeries.x, bins=50, **viSeries.kwargs)
-                
-            elif vi_axis.plot_function == "plot":
-                thisSubplot.plot(viSeries.x, viSeries.y, **viSeries.kwargs)
-            
-            else:
-                raise ValueError("Invalid plot_function! You specified: {}".format(vi_axis.plot_function))
-            """
+                vi_axis.series_plot_return[name] = thisSubplot.scatter(viSeries.x, viSeries.y, **viSeries.kwargs)
         
-        if vi_axis.plot_function == "loglog":
-            thisSubplot.set_xscale("log")
-            thisSubplot.set_yscale("log")
+        self.vi_axis_list.append(vi_axis)
     
+    def add_colorbar(self, name):
+        """ Add a colorbar to the figure for all subplots """
+        cax = self.figure.add_axes([0.235, 0.05, 0.6, 0.03])
+        ax = self.vi_axis_list[1].series_plot_return[name]
+        self.figure.colorbar(ax, cax, orientation="horizontal")
+        
     def save(self):
         self.figure.savefig(self.filename, facecolor="#efefef")
 
@@ -539,9 +523,9 @@ def plot_indices(indices, filename="plots/praesepe_var_indices.png"):
             # Add whatever other series here
             # viAxis.add_series(varIndices[xParameter], varIndices[yParameter], color="r", marker=".", alpha=0.3)
             if ii == jj == (len(indices)-1):
-                viFigure.addSubplot(viAxis, legend=True)
+                viFigure.add_subplot(viAxis, legend=True)
             else:
-                viFigure.addSubplot(viAxis)
+                viFigure.add_subplot(viAxis)
                 
     viFigure.save()
 
@@ -584,10 +568,12 @@ def plotInterestingVariables():
         lc.plot(ax, error_cut=0.05)
         fig.savefig("plots/praesepe/{}.png".format(lc.objid))
 
-def single_field_add_microlensing(indices, field, num_light_curves=100000):
+def single_field_add_microlensing(indices, field, num_light_curves=100000, color_by=None):
     """ For all light curves in a single PTF field around Praesepe, produce a 5x5 plot for 
         all light curves and then a random sample of all objects with random microlensing
         event parameters added.
+        
+        color_by controls which parameter to color the points on. 
     """
     
     # Select any light curve with at least one observation on the given field 
@@ -600,31 +586,36 @@ def single_field_add_microlensing(indices, field, num_light_curves=100000):
     
     logging.info("Light curves loaded from database")
     
+    # Now we loop through all light curves selected above and only select data points with 
+    #   nonzero error that were taken in the given PTF field
     var_indices = []
     var_indices_with_event = []
-    var_indices_with_event_colors = []
+    color_by_parameter = []
     
     for lightCurve in lightCurves:
         # Only select points where the error is less than 0.1 mag and only for the specified field
-        idx = (lightCurve.error < 0.1) & (lightCurve.afield == field) & (lightCurve.error != 0)
+        this_field_idx = (lightCurve.afield == field) & (lightCurve.error != 0)
 
-        if len(lightCurve.amjd[idx]) <= 10:
-            logging.debug("Light curve doesn't have enough data points for this field")
+        if len(lightCurve.amjd[this_field_idx]) <= 25:
+            logging.debug("Light curve doesn't have enough data points on this field")
             continue
         
         logging.debug("Light curve selected")
 
-        ptf_light_curve = simu.PTFLightCurve(lightCurve.amjd[idx], lightCurve.amag[idx], lightCurve.error[idx])
+        # Create a PTFLightCurve object so we can easily compute the variability indices
+        ptf_light_curve = simu.PTFLightCurve(lightCurve.amjd[this_field_idx], lightCurve.amag[this_field_idx], lightCurve.error[this_field_idx])
         var_indices.append(simu.compute_variability_indices(ptf_light_curve, indices=indices))
         
-        # For 10% of the light curves, add 100 different microlensing events to their light curves
-        #   and recompute the variability indices
+        # For a random sample of 10% of the light curves, add 100 different microlensing events to 
+        #   their light curves and recompute the variability indices. Then
         if np.random.uniform() <= 0.1:
             for ii in range(100):
+                # Copy the PTFLightCurve object, add a microlensing event, and recompute the variability indices
                 lc = copy.copy(ptf_light_curve)
                 lc.addMicrolensingEvent()
                 var_indices_with_event.append(simu.compute_variability_indices(lc, indices=indices))
-                var_indices_with_event_colors.append(hsv2rgb(lc.u0 * 255, 1., 1.))
+                
+                if color_by: color_by_parameter.append(getattr(lc, color_by))
     
     if not lightCurves or not var_indices:
         logging.info("No light curves selected.")
@@ -632,8 +623,13 @@ def single_field_add_microlensing(indices, field, num_light_curves=100000):
     
     var_indices_array = np.array(var_indices, dtype=zip(indices, [float]*len(indices))).view(np.recarray)
     var_indices_with_event_array = np.array(var_indices_with_event, dtype=zip(indices, [float]*len(indices))).view(np.recarray)
+    color_by_parameter_array = np.array(color_by_parameter)
     
-    viFigure = VIFigure("plots/praesepe_field{0}.png".format(field), indices)
+    if color_by: figure_name = "plots/praesepe_field{0}_coloredby{1}.png".format(field, color_by)
+    else: figure_name = "plots/praesepe_field{0}.png".format(field)
+        
+    viFigure = VIFigure(figure_name, indices)
+    cm = matplotlib.cm.get_cmap('Spectral')
     for ii,yParameter in enumerate(indices):
         for jj,xParameter in enumerate(indices):
             if ii > jj:
@@ -647,13 +643,19 @@ def single_field_add_microlensing(indices, field, num_light_curves=100000):
             
             #viAxis.add_series(var_indices_with_event_array[xParameter], var_indices_with_event_array[yParameter], \
             #                  color=var_indices_with_event_colors, marker="o", alpha=0.3, linestyle="none", label="1000 Random Light Curves\nw/ Artificial Microlensing Events")
-                              
-            #if var_indices_with_event_colors:
-            #    viAxis.add_series(var_indices_with_event_array[xParameter], var_indices_with_event_array[yParameter], \
-            #                  color=var_indices_with_event_colors, alpha=0.25)
             
-            viAxis.add_series(var_indices_array[xParameter], var_indices_array[yParameter], \
-                              color="k", alpha=0.25, label="All Light Curves in Field {0}".format(field))
+            if color_by:
+                # TODO: Change vmin and vmax to be scoreatpercentile?
+                vmin = min(color_by_parameter_array)
+                vmax = max(color_by_parameter_array)
+                viAxis.add_series(var_indices_with_event_array[xParameter], var_indices_with_event_array[yParameter], \
+                              name="to_color", c=color_by_parameter_array, alpha=0.2, vmin=vmin, vmax=vmax, cmap=cm, edgecolors='none')
+            else:
+                viAxis.add_series(var_indices_with_event_array[xParameter], var_indices_with_event_array[yParameter], \
+                              color='r', alpha=0.25, marker=".")
+            
+            #viAxis.add_series(var_indices_array[xParameter], var_indices_array[yParameter], \
+            #                  color="k", marker=".", alpha=0.25, label="All Light Curves in Field {0}".format(field))
             
             if ii == jj:
                 # Along diagonal
@@ -663,10 +665,11 @@ def single_field_add_microlensing(indices, field, num_light_curves=100000):
             # Add whatever other series here
             # viAxis.add_series(varIndices[xParameter], varIndices[yParameter], color="r", marker=".", alpha=0.3)
             if ii == jj == 4:
-                viFigure.addSubplot(viAxis, legend=True)
+                viFigure.add_subplot(viAxis, legend=True)
             else:
-                viFigure.addSubplot(viAxis)
-                
+                viFigure.add_subplot(viAxis)
+    
+    viFigure.add_colorbar(name="to_color")
     viFigure.save()
 
 if __name__ == "__main__":
@@ -687,7 +690,8 @@ if __name__ == "__main__":
                     help="Run in test mode")
     parser.add_argument("--number", dest="number", default=1000000,
                     help="Number of light curves to use")
-    
+    parser.add_argument("--color-by", dest="color_by", type=str, default=None,
+                    help="Color the plot by microlensing event parameter")
     
     args = parser.parse_args()
     
@@ -712,7 +716,7 @@ if __name__ == "__main__":
         plot_indices(args.indices)
     
     if args.field != 0:
-        single_field_add_microlensing(args.indices, args.field, args.number)
+        single_field_add_microlensing(args.indices, args.field, args.number, args.color_by)
         
     #plotIndices("plots/praesepe.png")
     #reComputeIndices()
