@@ -34,6 +34,7 @@ import copy
 import logging
 
 # Third-party
+from scipy.stats import scoreatpercentile
 import sqlalchemy
 from sqlalchemy import func
 import numpy as np
@@ -403,17 +404,18 @@ class VIFigure:
         self.figure, self.subplot_array = plt.subplots(len(self._subplot_map.keys()), \
                                                        len(self._subplot_map.keys()), \
                                                        figsize=(25,25))
-        self.figure.subplots_adjust(hspace=0, wspace=0)
+        
+        self.figure.subplots_adjust(hspace=0.1, wspace=0.1)
         self.scatter_dict = dict()
         self.vi_axis_list = list()
         
-        plt.setp([a.get_xticklabels() for a in self.figure.axes], visible=False)
-        plt.setp([a.get_yticklabels() for a in self.figure.axes], visible=False)
+        #plt.setp([a.get_xticklabels() for a in self.figure.axes], visible=False)
+        #plt.setp([a.get_yticklabels() for a in self.figure.axes], visible=False)
         
     def add_subplot(self, vi_axis, legend=False):
-        rowIdx = self._subplot_map[vi_axis.x_axis_parameter]
-        colIdx = self._subplot_map[vi_axis.y_axis_parameter]
-        thisSubplot = self.subplot_array[colIdx, rowIdx]
+        colIdx = self._subplot_map[vi_axis.x_axis_parameter]
+        rowIdx = self._subplot_map[vi_axis.y_axis_parameter]
+        thisSubplot = self.subplot_array[rowIdx, colIdx]
         
         # HACK
         if legend:
@@ -431,22 +433,37 @@ class VIFigure:
             xlabel = ""
             ylabel = ""
         
+        plt.setp([thisSubplot.get_xticklabels()], visible=False)
+        plt.setp([thisSubplot.get_yticklabels()], visible=False)
+        
         if colIdx == 0:
-            # Put xlabel above axis
-            thisSubplot.set_xlabel(xlabel)
-            thisSubplot.xaxis.set_label_position('top')
+            # Put ylabel to left of axis (default)
+            thisSubplot.set_ylabel(ylabel, size="xx-large")
+            thisSubplot.yaxis.set_ticks_position('left')
+            plt.setp([thisSubplot.get_yticklabels()], visible=True)
+            
         elif colIdx == (len(self._subplot_map.keys())-1):
-            # Put xlabel below axis (default)
-            thisSubplot.set_xlabel(xlabel)
+            # Put ylabel to right of axis
+            thisSubplot.set_ylabel(ylabel, size="xx-large")
+            thisSubplot.yaxis.set_label_position('right')
+            
+            thisSubplot.yaxis.set_ticks_position('right') 
+            plt.setp([thisSubplot.get_yticklabels()], visible=True)
         
         if rowIdx == 0:
-            # Put ylabel to left of axis (default)
-            thisSubplot.set_ylabel(ylabel)
-            pass
+            # Put xlabel above axis
+            thisSubplot.set_xlabel(xlabel, size="xx-large")
+            thisSubplot.xaxis.set_label_position('top')
+            thisSubplot.xaxis.set_ticks_position('top')
+            plt.setp([thisSubplot.get_xticklabels()], visible=True)
+            plt.setp([thisSubplot.get_yticklabels()], visible=False)
+            
         elif rowIdx == (len(self._subplot_map.keys())-1):
-            # Put ylabel to right of axis
-            thisSubplot.set_ylabel(ylabel)
-            thisSubplot.yaxis.set_label_position('right')
+            # Put xlabel below axis (default)
+            thisSubplot.set_xlabel(xlabel, size="xx-large")
+            
+            thisSubplot.xaxis.set_ticks_position('bottom')
+            plt.setp([thisSubplot.get_xticklabels()], visible=True)
         
         if vi_axis.plot_function == "loglog":
             thisSubplot.set_xscale("log")
@@ -455,10 +472,13 @@ class VIFigure:
         for name, viSeries in vi_axis.series.items():
             
             if vi_axis.plot_function == "hist":
+                #plt.setp([thisSubplot.get_xticklabels()], visible=True)
+                #thisSubplot.hist(viSeries.x, log=True, bins=np.linspace(scoreatpercentile(viSeries.x, 5), scoreatpercentile(viSeries.x, 95), 1000))
+                #thisSubplot.set_xscale("log")
                 thisSubplot.set_frame_on(False)
                 thisSubplot.get_yaxis().set_visible(False)
                 thisSubplot.get_xaxis().set_visible(False)
-                continue
+                break
             
             if viSeries.kwargs.has_key("colors"):
                 viSeries.kwargs["c"] = viSeries.kwargs["colors"]
@@ -470,6 +490,15 @@ class VIFigure:
             else:
                 vi_axis.series_plot_return[name] = thisSubplot.scatter(viSeries.x, viSeries.y, **viSeries.kwargs)
         
+        """
+        if vi_axis.plot_function == "hist":
+            try:
+                print self.subplot_array[rowIdx+1,colIdx].get_xlim()
+            except:
+                pass
+            thisSubplot.set_xlim(self.subplot_array[rowIdx-1,colIdx].get_xlim())
+        """
+        
         self.vi_axis_list.append(vi_axis)
     
     def add_colorbar(self, name):
@@ -479,14 +508,22 @@ class VIFigure:
         self.figure.colorbar(ax, cax, orientation="horizontal")
         
     def save(self):
-        self.figure.savefig(self.filename, facecolor="#efefef")
+        self.subplot_array[0,0].set_xlim(self.subplot_array[1,0].get_xlim())
+        self.subplot_array[1,1].set_xlim(self.subplot_array[2,0].get_xlim())
+        self.subplot_array[2,2].set_xlim(self.subplot_array[3,0].get_xlim())
+        self.subplot_array[3,3].set_xlim(self.subplot_array[0,3].get_ylim())
+        self.figure.savefig(self.filename)
 
-def plot_indices(indices, filename="plots/praesepe_var_indices.png"):    
+def plot_indices(indices, filename=None, number=1E6):    
     varIndices = session.query(VariabilityIndices)\
                         .join(LightCurve)\
                         .filter(LightCurve.ignore == False)\
-                        .filter(LightCurve.objid < 100000).all()
-
+                        .filter(LightCurve.objid < 100000)\
+                        .limit(number).all()
+    
+    if not filename:
+        filename = "plots/praesepe_{}.png".format("".join(indices))
+    
     varIndicesArray = variability_indices_to_recarray(varIndices, indices)
     
     # This code finds any known rotators from Agueros et al.
@@ -508,17 +545,16 @@ def plot_indices(indices, filename="plots/praesepe_var_indices.png"):
             else:
                 viAxis = VIAxis(xParameter, yParameter, plot_function="hist")
             
-            viAxis.add_series(varIndicesArray[xParameter], varIndicesArray[yParameter], color="k", marker=".", alpha=0.3, linestyle="none", label="All Praesepe Field Stars")
-            viAxis.add_series(kraus2007Members[xParameter], kraus2007Members[yParameter], color="g", marker="v", alpha=0.8, markersize=8, linestyle="none", label=u"Kraus 2007 Member Catalog")
-            viAxis.add_series(knownRotators[xParameter], knownRotators[yParameter], color="r", marker="*", alpha=0.8, markersize=10, linestyle="none", label=u"Agüeros et al. 2011 rotators")
-            viAxis.add_series(rrLyrae[xParameter], rrLyrae[yParameter], color="c", marker="^", markersize=10, alpha=0.8, linestyle="none", label=u"Agüeros et al. 2011 RR Lyrae")
-            viAxis.add_series(eclipsing[xParameter], eclipsing[yParameter], color="m", marker="^", markersize=10, alpha=0.8, linestyle="none", label=u"Agüeros et al. 2011 Eclipsing Binary")
-            viAxis.add_series(wUma[xParameter], wUma[yParameter], color="y", marker="^", markersize=10, alpha=0.8, linestyle="none", label=u"Agüeros et al. 2011 W Uma")
+            viAxis.add_series(varIndicesArray[xParameter], varIndicesArray[yParameter], color="k", marker=".", alpha=0.3, label="All Praesepe Field Stars")
+            viAxis.add_series(kraus2007Members[xParameter], kraus2007Members[yParameter], color="g", marker="v", alpha=0.8, s=20, label=u"Kraus 2007 Member Catalog")
+            viAxis.add_series(knownRotators[xParameter], knownRotators[yParameter], color="r", marker="*", alpha=0.8, s=20, label=u"Agüeros et al. 2011 rotators")
+            viAxis.add_series(rrLyrae[xParameter], rrLyrae[yParameter], color="c", marker="^", s=20, alpha=0.8, label=u"Agüeros et al. 2011 RR Lyrae")
+            viAxis.add_series(eclipsing[xParameter], eclipsing[yParameter], color="m", marker="^", s=20, alpha=0.8, label=u"Agüeros et al. 2011 Eclipsing Binary")
+            #viAxis.add_series(wUma[xParameter], wUma[yParameter], color="y", marker="^", s=20, alpha=0.8, label=u"Agüeros et al. 2011 W Uma")
             
             if ii == jj:
                 # Along diagonal
-                # Skip histograms for now..
-                viAxis.add_series(varIndicesArray[xParameter], color="k", alpha=0.3)
+                viAxis.add_series(varIndicesArray[xParameter], varIndicesArray[xParameter], color="k", alpha=0.5)
             
             # Add whatever other series here
             # viAxis.add_series(varIndices[xParameter], varIndices[yParameter], color="r", marker=".", alpha=0.3)
@@ -528,6 +564,34 @@ def plot_indices(indices, filename="plots/praesepe_var_indices.png"):
                 viFigure.add_subplot(viAxis)
                 
     viFigure.save()
+
+def plot_indices_3d(indices, filename="plots/praesepe_var_indices_3d.png"):
+    varIndices = session.query(VariabilityIndices)\
+                        .join(LightCurve)\
+                        .filter(LightCurve.ignore == False)\
+                        .filter(LightCurve.objid < 100000)\
+                        .limit(10000)\
+                        .all()    
+    
+    cm = matplotlib.cm.get_cmap('Spectral')
+    vi_array = variability_indices_to_recarray(varIndices, indices)
+    
+    fig = plt.figure()
+    #ax = fig.add_subplot(111, projection='3d')
+    ax = fig.add_subplot(111)
+    
+    j = vi_array.j + abs(vi_array.j.min()) + 1
+    k = vi_array.k
+    
+    hist, xedges, yedges = np.histogram2d(np.log10(j), np.log10(k), bins=1000)
+    xbins = 0.5 * (xedges[:-1] + xedges[1:])
+    ybins = 0.5 * (yedges[:-1] + yedges[1:])
+    
+    ax.contour(xbins, ybins, hist.T, 4, colors='k')
+    
+    #plt.hexbin(, vi_array.k, gridsize=200, cmap=cm, xscale="log", yscale="log")
+    plt.show()
+    #plt.savefig(filename)
 
 def plotInterestingVariables():
     lightCurves = session.query(LightCurve).join(VariabilityIndices).\
@@ -652,10 +716,10 @@ def single_field_add_microlensing(indices, field, num_light_curves=100000, color
                               name="to_color", c=color_by_parameter_array, alpha=0.2, vmin=vmin, vmax=vmax, cmap=cm, edgecolors='none')
             else:
                 viAxis.add_series(var_indices_with_event_array[xParameter], var_indices_with_event_array[yParameter], \
-                              color='r', alpha=0.25, marker=".")
+                              color='k', alpha=0.25, marker=".")
             
-            #viAxis.add_series(var_indices_array[xParameter], var_indices_array[yParameter], \
-            #                  color="k", marker=".", alpha=0.25, label="All Light Curves in Field {0}".format(field))
+            viAxis.add_series(var_indices_array[xParameter], var_indices_array[yParameter], \
+                              color="k", marker=".", alpha=0.25, label="All Light Curves in Field {0}".format(field))
             
             if ii == jj:
                 # Along diagonal
@@ -671,6 +735,7 @@ def single_field_add_microlensing(indices, field, num_light_curves=100000, color
     
     viFigure.add_colorbar(name="to_color")
     viFigure.save()
+    
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
@@ -692,8 +757,13 @@ if __name__ == "__main__":
                     help="Number of light curves to use")
     parser.add_argument("--color-by", dest="color_by", type=str, default=None,
                     help="Color the plot by microlensing event parameter")
+    parser.add_argument("--seed", dest="seed", type=int, default=None,
+                    help="Seed the random number generator.")
     
     args = parser.parse_args()
+    
+    if args.seed:
+        np.random.seed(args.seed)
     
     if args.test:
         #high_error_test()
@@ -713,7 +783,7 @@ if __name__ == "__main__":
         compute_indices()
     
     if args.plot:
-        plot_indices(args.indices)
+        plot_indices(args.indices, number=args.number)
     
     if args.field != 0:
         single_field_add_microlensing(args.indices, args.field, args.number, args.color_by)
