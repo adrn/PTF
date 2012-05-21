@@ -21,6 +21,7 @@ import logging
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.optimize import curve_fit
+import scipy.optimize as so
 
 def straight(t, b):
     return np.ones((len(t),), dtype=float)*b
@@ -45,6 +46,12 @@ def A_u(u):
 
 def fluxModel(t, **p):
     return p["F0"]*A_u(u_t(t, p["u0"], p["t0"], p["tE"]))
+
+# These models are for computing delta_chi_squared
+linear_model = lambda a, t: a[0] + a[1]*t
+linear_error_function = lambda p, t, mag, err: ((mag - linear_model(p, t)) / err)**2
+microlensing_model = lambda b, t: b[0] + 1./(b[2]*2*np.pi) * np.exp(-(t-b[1])**2 / (2*b[2]**2))*b[3]
+microlensing_error_function = lambda p, t, mag, err: ((mag - microlensing_model(p, t)) / err)**2
 
 def estimateContinuum(mjd, mag, error, clipSigma=2.5):
     """ Estimate the continuum of the light curve using sigma clipping """
@@ -117,7 +124,23 @@ def findClustersFainter(mag, continuumMag, continuumSigma, num_points_per_cluste
     w = (mag < (continuumMag - num_sigma*continuumSigma))
     
     return findClusters(w, mag, continuumMag, continuumSigma, num_points_per_cluster, num_sigma)
-        
+
+def compute_delta_chi_squared(light_curve):
+    linear_fit_params, num = so.leastsq(linear_error_function, x0=(np.median(light_curve.mag), 0.), args=(light_curve.mjd, light_curve.mag, light_curve.error))
+    microlensing_fit_params, num = so.leastsq(microlensing_error_function, x0=(np.median(light_curve.mag), np.median(light_curve.mjd), 10., 1.), args=(light_curve.mjd, light_curve.mag, light_curve.error), maxfev=500*len(light_curve.mag))
+    
+    linear_chisq = np.sum(linear_error_function(linear_fit_params, \
+                                                light_curve.mjd, \
+                                                light_curve.mag, \
+                                                light_curve.error))# / len(linear_fit_params)
+    
+    microlensing_chisq = np.sum(microlensing_error_function(microlensing_fit_params, \
+                                                            light_curve.mjd, \
+                                                            light_curve.mag, \
+                                                            light_curve.error))# / len(microlensing_fit_params)
+    
+    return linear_chisq-microlensing_chisq
+
 def compute_variability_indices(lightCurve, indices=[]):
     """ Computes the 6 (5) variability indices as explained in M.-S. Shin et al. 2009
         
@@ -135,7 +158,8 @@ def compute_variability_indices(lightCurve, indices=[]):
     
     # sigma/mu : root-variance / mean
     mu = contMag #np.mean(lightCurve.mag)
-    sigma = np.sqrt(np.sum(lightCurve.mag - mu)**2 / (N-1.))
+    #sigma = np.sqrt(np.sum(lightCurve.mag - mu)**2 / (N-1.))
+    sigma = np.sqrt(np.var(lightCurve.mag))
     sigma_to_mu = sigma / mu
 
     # Con : number of consecutive series of 3 points BRIGHTER than the light curve
@@ -143,11 +167,11 @@ def compute_variability_indices(lightCurve, indices=[]):
     clusters = findClustersBrighter(lightCurve.mag, contMag, contSig, 3, num_sigma=num_sigma)
     Con = len(clusters) / (N - 2.)
     
-    clusters = findClustersBrighter(lightCurve.mag, contMag, contSig, 3, num_sigma=2.5)
-    B = len(clusters) # Number of clusters of >3 points BRIGHTER than 2.5-sigma over the baseline
+    clusters = findClustersBrighter(lightCurve.mag, contMag, contSig, 3, num_sigma=3)
+    B = len(clusters) # Number of clusters of >3 points BRIGHTER than 3-sigma over the baseline
     
-    clusters = findClustersFainter(lightCurve.mag, contMag, contSig, 3, num_sigma=2.5)
-    F = len(clusters) # Number of clusters of >3 points FAINTER than 2.5-sigma over the baseline
+    clusters = findClustersFainter(lightCurve.mag, contMag, contSig, 3, num_sigma=3)
+    F = len(clusters) # Number of clusters of >3 points FAINTER than 3-sigma over the baseline
     
     # eta : ratio of mean square successive difference to the sample variance
     delta_squared = np.sum((lightCurve.mag[1:] - lightCurve.mag[:-1])**2 / (N - 1.))
@@ -163,13 +187,17 @@ def compute_variability_indices(lightCurve, indices=[]):
     delta_n = np.sqrt(float(N)/(N-1.)) * (lightCurve.mag - mu) / lightCurve.error
     K = np.sum(np.fabs(delta_n)) / (float(N)*np.sqrt((1./N)*np.sum(delta_n**2)))
     
+    # delta_chi_squared : matched filter approach, fit a line, then a gaussian; compare.
+    delta_chi_squared = compute_delta_chi_squared(lightCurve)
+    
     idx_dict = {"sigma_mu" : sigma_to_mu,\
                 "con" : Con,\
                 "eta" : eta,\
                 "j" : J,\
                 "k" : K,\
                 "b" : B,\
-                "f" : F}
+                "f" : F,\
+                "delta_chi_squared" : delta_chi_squared}
     
     if indices:
         return_list = []

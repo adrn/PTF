@@ -41,8 +41,8 @@ import numpy as np
 import apwlib.geometry as g
 import apwlib.convert as c
 import matplotlib
-#matplotlib.use("WxAgg")
-matplotlib.use("Agg")
+matplotlib.use("WxAgg")
+#matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 # Project
@@ -197,9 +197,10 @@ def compute_indices():
             logging.debug("Good light curve -- ignore=False")
             lightCurve.ignore = False
             variabilityIndices = VariabilityIndices()
+            
             for key in var_indices.keys():
                 setattr(variabilityIndices, key, var_indices[key])
-                
+
             variabilityIndices.light_curve = lightCurve
             session.add(variabilityIndices)
             
@@ -736,6 +737,65 @@ def single_field_add_microlensing(indices, field, num_light_curves=100000, color
     viFigure.add_colorbar(name="to_color")
     viFigure.save()
     
+def plot_delta_chi_squared_vs_median_mag(number=1E5):
+    avg_mag = [x[0] for x in session.query(func.array_avg(LightCurve.mag)).filter(LightCurve.objid < 100000).order_by(LightCurve.objid).limit(number).all()]
+    delta_chi_squared = [x[0] for x in session.query(VariabilityIndices.delta_chi_squared).join(LightCurve).filter(LightCurve.objid < 100000).order_by(LightCurve.objid).limit(number).all()]
+    
+    plt.scatter(avg_mag, delta_chi_squared, alpha=0.2, facecolor="k", edgecolor="none")
+    plt.xlabel("Average Magnitude", size="xx-large")
+    plt.ylabel(r"$\chi_{linear}^2-\chi_{ML}^2$", size="xx-large")
+    plt.axhline(2.*np.std(delta_chi_squared), label=r"$2\sigma$", color="r", ls="--")
+    plt.axhline(-2.*np.std(delta_chi_squared), color="r", ls="--")
+    plt.axhline(3.*np.std(delta_chi_squared), label=r"$3\sigma$", color="g", ls="--")
+    plt.axhline(-3.*np.std(delta_chi_squared), color="g", ls="--")
+    plt.legend()
+    plt.savefig("plots/meanmag_vs_deltachisquared.png")
+
+def test_delta_chi_squared(number=1E5):
+    import scipy.optimize as so
+    
+    light_curves = session.query(LightCurve).filter(LightCurve.objid < 100000).limit(number).all()
+    
+    for light_curve in light_curves:
+        linear_fit_params, lin_num = so.leastsq(simu.linear_error_function, x0=(np.median(light_curve.amag), 0.), args=(light_curve.amjd, light_curve.amag, light_curve.error))
+        microlensing_fit_params, ml_num = so.leastsq(simu.microlensing_error_function, x0=(np.median(light_curve.amag), np.median(light_curve.amjd), 10., 1.), args=(light_curve.amjd, light_curve.amag, light_curve.error), maxfev=1000*len(light_curve.amag))
+        
+        linear_chisq = np.sum(simu.linear_error_function(linear_fit_params, \
+                                                    light_curve.amjd, \
+                                                    light_curve.amag, \
+                                                    light_curve.error))# / len(linear_fit_params)
+        
+        microlensing_chisq = np.sum(simu.microlensing_error_function(microlensing_fit_params, \
+                                                                light_curve.amjd, \
+                                                                light_curve.amag, \
+                                                                light_curve.error))# / len(microlensing_fit_params)
+        
+        if (linear_chisq - microlensing_chisq) < -20:
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
+            light_curve.plot(ax)
+            
+            t = light_curve.amjd
+            ax.plot(t, simu.linear_model(linear_fit_params, t), "r-", label="linear fit")
+            ax.plot(t, simu.microlensing_model(microlensing_fit_params, t), "b--", label="microlensing fit")
+            ax.legend()
+            ax.set_title("ML: {}_{}, Linear: {}_{}".format(microlensing_chisq, ml_num, linear_chisq, lin_num))
+            plt.show()
+
+def plot_delta_chi_squared_outliers(num_sigma=2.5):
+    delta_chi_squared = [x[0] for x in session.query(VariabilityIndices.delta_chi_squared).join(LightCurve).filter(LightCurve.objid < 100000).all()]
+    light_curves = session.query(LightCurve).join(VariabilityIndices)\
+                                            .filter(VariabilityIndices.delta_chi_squared > num_sigma*np.std(delta_chi_squared))\
+                                            .filter(func.array_avg(LightCurve.mag) < 19)\
+                                            .filter(LightCurve.objid < 100000).all()
+    
+    for light_curve in light_curves:
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        light_curve.plot(ax)
+        plt.savefig("plots/praesepe_interesting/{}.png".format(light_curve.objid))
+        del fig, ax
+        
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
@@ -753,12 +813,14 @@ if __name__ == "__main__":
                     help="Store the specified field and run single_field_add_microlensing()")    
     parser.add_argument("--test", action="store_true", dest="test", default=False,
                     help="Run in test mode")
-    parser.add_argument("--number", dest="number", default=1000000,
+    parser.add_argument("--number", dest="number", default=1E5,
                     help="Number of light curves to use")
     parser.add_argument("--color-by", dest="color_by", type=str, default=None,
                     help="Color the plot by microlensing event parameter")
     parser.add_argument("--seed", dest="seed", type=int, default=None,
                     help="Seed the random number generator.")
+    parser.add_argument("--plot-delta-chisquared", dest="plot_deltachisq", default=False, action="store_true",
+                    help="Run plot_delta_chi_squared_vs_median_mag()")
     
     args = parser.parse_args()
     
@@ -767,7 +829,8 @@ if __name__ == "__main__":
     
     if args.test:
         #high_error_test()
-        correlated_noise_test()
+        #correlated_noise_test()
+        test_delta_chi_squared(args.number)
         
         print
         print "Test mode complete."
@@ -787,7 +850,10 @@ if __name__ == "__main__":
     
     if args.field != 0:
         single_field_add_microlensing(args.indices, args.field, args.number, args.color_by)
-        
+    
+    if args.plot_deltachisq:
+        plot_delta_chi_squared_vs_median_mag(args.number)
+    
     #plotIndices("plots/praesepe.png")
     #reComputeIndices()
     #plotInterestingVariables()
