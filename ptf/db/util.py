@@ -169,3 +169,34 @@ def getCCDLightCurves(fieldid, ccdid):
     hdu.writeto("data/lightcurves/101001_11.fits")
     
     return resultsArray
+
+def get_exposure_data(filename="data/exposureData.fits", overwrite=False):
+    """ Queries LSD and saves the information to be loaded into
+        the ccd_exposure table of ptf_microlensing.
+    """
+    
+    if os.path.exists(filename) and overwrite: os.remove(filename)
+    
+    if not os.path.exists(filename):
+        results = db.query("mjd, ptf_field, ccdid, fid, ra, dec, l, b FROM ptf_exp").fetch()
+        exposureData = [tuple(row) for row in results]
+        logging.debug("saveExposureData: {0} rows returned from ptf_exp".format(len(exposureData)))
+        
+        exposureDataArray = np.array(exposureData, dtype=[("mjd", np.float64),\
+                                                          ("field_id", int), \
+                                                          ("ccd_id", np.uint8), \
+                                                          ("filter_id", np.uint8), \
+                                                          ("ra", np.float64), \
+                                                          ("dec", np.float64), \
+                                                          ("l", np.float64), \
+                                                          ("b", np.float64)]).view(np.recarray)
+        
+        logging.debug("saveExposureData: writing file {0}".format(filename))
+        
+        hdu = pf.BinTableHDU(exposureDataArray)
+        hdu.writeto(filename)
+        
+        logging.debug("saveExposureData: done!")
+    
+    f = pf.open(filename)
+    return np.array(f[1].data).view(np.recarray)

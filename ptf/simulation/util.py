@@ -48,10 +48,10 @@ def fluxModel(t, **p):
     return p["F0"]*A_u(u_t(t, p["u0"], p["t0"], p["tE"]))
 
 # These models are for computing delta_chi_squared
-linear_model = lambda a, t: a[0] + a[1]*t
-linear_error_function = lambda p, t, mag, err: ((mag - linear_model(p, t)) / err)**2
-microlensing_model = lambda b, t: b[0] + 1./(b[2]*2*np.pi) * np.exp(-(t-b[1])**2 / (2*b[2]**2))*b[3]
-microlensing_error_function = lambda p, t, mag, err: ((mag - microlensing_model(p, t)) / err)**2
+def linear_model(a, t): return a[0] + a[1]*t
+def linear_error_function(p, t, mag, err): return (mag - linear_model(p, t)) / err
+def microlensing_model(b, t): return b[0] + 1./(b[2]*2*np.pi) * np.exp(-(t-b[1])**2 / (2*b[2]**2))*b[3]
+def microlensing_error_function(p, t, mag, err): return (mag - microlensing_model(p, t)) / err
 
 def estimateContinuum(mjd, mag, error, clipSigma=2.5):
     """ Estimate the continuum of the light curve using sigma clipping """
@@ -126,20 +126,28 @@ def findClustersFainter(mag, continuumMag, continuumSigma, num_points_per_cluste
     return findClusters(w, mag, continuumMag, continuumSigma, num_points_per_cluster, num_sigma)
 
 def compute_delta_chi_squared(light_curve):
-    linear_fit_params, num = so.leastsq(linear_error_function, x0=(np.median(light_curve.mag), 0.), args=(light_curve.mjd, light_curve.mag, light_curve.error))
-    microlensing_fit_params, num = so.leastsq(microlensing_error_function, x0=(np.median(light_curve.mag), np.median(light_curve.mjd), 10., 1.), args=(light_curve.mjd, light_curve.mag, light_curve.error), maxfev=500*len(light_curve.mag))
+    """ """
+    if isinstance(light_curve, tuple):
+        mjd, mag, error = light_curve
+    else:
+        mjd = light_curve.amjd
+        mag = light_curve.amag
+        error = light_curve.error
+        
+    linear_fit_params, lin_num = so.leastsq(linear_error_function, x0=(np.median(mag), 0.), args=(mjd, mag, error))
+    microlensing_fit_params, ml_num = so.leastsq(microlensing_error_function, x0=(np.median(mag), mjd[mag.argmin()], 10., -25.), args=(mjd, mag, error), maxfev=1000)
     
     linear_chisq = np.sum(linear_error_function(linear_fit_params, \
-                                                light_curve.mjd, \
-                                                light_curve.mag, \
-                                                light_curve.error))# / len(linear_fit_params)
+                                                mjd, \
+                                                mag, \
+                                                error)**2)# / len(linear_fit_params)
     
     microlensing_chisq = np.sum(microlensing_error_function(microlensing_fit_params, \
-                                                            light_curve.mjd, \
-                                                            light_curve.mag, \
-                                                            light_curve.error))# / len(microlensing_fit_params)
+                                                            mjd, \
+                                                            mag, \
+                                                            error)**2)# / len(microlensing_fit_params)
     
-    return linear_chisq-microlensing_chisq
+    return linear_chisq - microlensing_chisq
 
 def compute_variability_indices(lightCurve, indices=[]):
     """ Computes the 6 (5) variability indices as explained in M.-S. Shin et al. 2009
@@ -211,9 +219,13 @@ def compute_variability_indices(lightCurve, indices=[]):
 class PTFLightCurve:
     
     def __init__(self, mjd, mag, error):
-        self.mjd = np.array(mjd)
-        self.mag = np.array(mag)
+        self.amjd = self.mjd = np.array(mjd)
+        self.amag = self.mag = np.array(mag)
         self.error = np.array(error)
+    
+    @classmethod
+    def fromDBLightCurve(cls, db_light_curve):
+        return cls(db_light_curve.amjd, db_light_curve.amag, db_light_curve.error)
     
     def addMicrolensingEvent(self, u0=None, t0=None, tE=None):
         """ Adds a simulated microlensing event to the light curve
@@ -255,7 +267,9 @@ class PTFLightCurve:
         
         flux = fluxModel(self.mjd, u0=self.u0, t0=self.t0, tE=self.tE, F0=1.)#self.F0)
         self.mag = FluxToRMag(flux*RMagToFlux(self.mag))
-    
+        
+        self.amag = self.mag
+        
     def addNoise(self):
         """ Add scatter to the light curve """
         self.mag += np.random.normal(0.0, self.error)

@@ -22,57 +22,33 @@
     of our variability indices down to one number. We could similarly define such a factor
     for eclipses, or periodic stars down the road, but the idea is to be able to select out
     light curves on one number. 
-    
-    TODO : Make 3D version of 5 by 5 plot in case there are multiple peaks that are getting washed out
-            when plotting all the distributions as 2-d w/ opacity.
         
 """
 
 # Standard library
-import os, sys, glob
 import copy
+import glob
 import logging
+import math
+import os
+import sys
 
 # Third-party
+import apwlib.geometry as g
+import apwlib.convert as c
+import apwlib.plot as p
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
+import pprocess
 from scipy.stats import scoreatpercentile
 import sqlalchemy
 from sqlalchemy import func
-import numpy as np
-import apwlib.geometry as g
-import apwlib.convert as c
-import matplotlib
-matplotlib.use("WxAgg")
-#matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 
 # Project
 from ptf.db.DatabaseConnection import *
 import ptf.simulation.util as simu
-
-ALL_INDICES = ["j", "k", "con", "sigma_mu", "eta", "b", "f"]
-
-import math
-
-def hsv2rgb(h, s, v):
-    h = float(h)
-    s = float(s)
-    v = float(v)
-    h60 = h / 60.0
-    h60f = math.floor(h60)
-    hi = int(h60f) % 6
-    f = h60 - h60f
-    p = v * (1 - s)
-    q = v * (1 - f * s)
-    t = v * (1 - (1 - f) * s)
-    r, g, b = 0, 0, 0
-    if hi == 0: r, g, b = v, t, p
-    elif hi == 1: r, g, b = q, v, p
-    elif hi == 2: r, g, b = p, v, t
-    elif hi == 3: r, g, b = p, q, v
-    elif hi == 4: r, g, b = t, p, v
-    elif hi == 5: r, g, b = v, p, q
-    #r, g, b = int(r * 255), int(g * 255), int(b * 255)
-    return (r, g, b)
 
 def txt_file_light_curve_to_recarray(filename):
     """ All columns in this file are:
@@ -147,8 +123,8 @@ def compute_indices():
         50% of the data points in a given light curve are good. If not, ignore that
         light curve.
         
-        TODO: When Nick emails me back, implement his suggestion for how to select out "good" 
-                data points.
+        2012-05-21 TODO: Implement Nick's suggestions for how to select out "good" data points!
+        
     """
     
     # Select out 1000 light curves at a time
@@ -172,13 +148,6 @@ def compute_indices():
                 percent_acceptable = 0.5
             
             idx = (lightCurve.error / lightCurve.amag) < percent_acceptable
-            
-            """if float(sum(idx)) < len(lightCurve.error):
-                print "{0} points rejected".format(len(lightCurve.error)-float(sum(idx)))
-                print percent_acceptable, np.median(lightCurve.amag), max(lightCurve.error)
-                print lightCurve.error / lightCurve.amag
-                print 
-            """
             
             # Check that less than half of the data points are bad
             if float(sum(idx)) / len(lightCurve.error) <= 0.5:
@@ -240,7 +209,7 @@ def variability_indices_to_recarray(vi_list, vi_names):
 
 def linear_rescale(x):
     x = np.array(x)
-    return (x-x.min()) / (x.max() - x.min())
+    return (x - x.min()) / (x.max() - x.min())
 
 # =====================================================================================
 #   These next functions will be my "pipeline" for downweighting or ignoring light
@@ -738,6 +707,9 @@ def single_field_add_microlensing(indices, field, num_light_curves=100000, color
     viFigure.save()
     
 def plot_delta_chi_squared_vs_median_mag(number=1E5):
+    """ Plot the variability index Delta Chi-squared vs. the mean magnitude of it's
+        associated light curve.
+    """
     avg_mag = [x[0] for x in session.query(func.array_avg(LightCurve.mag)).filter(LightCurve.objid < 100000).order_by(LightCurve.objid).limit(number).all()]
     delta_chi_squared = [x[0] for x in session.query(VariabilityIndices.delta_chi_squared).join(LightCurve).filter(LightCurve.objid < 100000).order_by(LightCurve.objid).limit(number).all()]
     
@@ -756,28 +728,33 @@ def test_delta_chi_squared(number=1E5):
     
     light_curves = session.query(LightCurve).filter(LightCurve.objid < 100000).limit(number).all()
     
-    for light_curve in light_curves:
+    for lc in light_curves:
+        light_curve = simu.PTFLightCurve.fromDBLightCurve(lc)
+        light_curve.addMicrolensingEvent()
+        
         linear_fit_params, lin_num = so.leastsq(simu.linear_error_function, x0=(np.median(light_curve.amag), 0.), args=(light_curve.amjd, light_curve.amag, light_curve.error))
-        microlensing_fit_params, ml_num = so.leastsq(simu.microlensing_error_function, x0=(np.median(light_curve.amag), np.median(light_curve.amjd), 10., 1.), args=(light_curve.amjd, light_curve.amag, light_curve.error), maxfev=1000*len(light_curve.amag))
+        microlensing_fit_params, ml_num = so.leastsq(simu.microlensing_error_function, x0=(np.median(light_curve.amag), light_curve.amjd[light_curve.amag.argmin()], 10., -25.), args=(light_curve.amjd, light_curve.amag, light_curve.error), maxfev=10000)
         
         linear_chisq = np.sum(simu.linear_error_function(linear_fit_params, \
                                                     light_curve.amjd, \
                                                     light_curve.amag, \
-                                                    light_curve.error))# / len(linear_fit_params)
+                                                    light_curve.error)**2)# / len(linear_fit_params)
         
         microlensing_chisq = np.sum(simu.microlensing_error_function(microlensing_fit_params, \
                                                                 light_curve.amjd, \
                                                                 light_curve.amag, \
-                                                                light_curve.error))# / len(microlensing_fit_params)
-        
-        if (linear_chisq - microlensing_chisq) < -20:
+                                                                light_curve.error)**2)# / len(microlensing_fit_params)
+        #if (linear_chisq - microlensing_chisq) > 100:
+        if True:
             fig = plt.figure()
             ax = fig.add_subplot(111)
             light_curve.plot(ax)
             
+            x0=(np.median(light_curve.amag), light_curve.amjd[light_curve.amag.argmin()], 10., -25.)
             t = light_curve.amjd
             ax.plot(t, simu.linear_model(linear_fit_params, t), "r-", label="linear fit")
             ax.plot(t, simu.microlensing_model(microlensing_fit_params, t), "b--", label="microlensing fit")
+            ax.plot(t, simu.microlensing_model(x0, t), "g--", label="initial guess")
             ax.legend()
             ax.set_title("ML: {}_{}, Linear: {}_{}".format(microlensing_chisq, ml_num, linear_chisq, lin_num))
             plt.show()
@@ -795,14 +772,92 @@ def plot_delta_chi_squared_outliers(num_sigma=2.5):
         light_curve.plot(ax)
         plt.savefig("plots/praesepe_interesting/{}.png".format(light_curve.objid))
         del fig, ax
-        
 
+def coadd_light_curves(num=1000):
+    """ -> Create an MJD vector for ALL mjd values in DB
+    	-> Every time there is a data point for a given MJD, increment weight
+	    -> Sum and divide!
+    """
+    for field in [110001]:
+        all_mjds = set([])
+        lcs = session.query(LightCurve).filter(LightCurve.objid < 100000).filter(sqlalchemy.literal(field) == func.any(LightCurve.field)).all()
+        
+        for lc in lcs:
+            all_mjds = set(lc.amjd[lc.afield == field]).union(all_mjds)
+        
+        f = open("data/praesepe_110001_all_mjds.txt", "w")
+        f.write("\n".join(all_mjds))
+
+# ===========================================================================================
+# ===========================================================================================
+
+def detection_efficiency_worker(lc_tuple):
+    mjd, mag, error = lc_tuple
+    return (np.mean(mag), simu.compute_delta_chi_squared(lc_tuple))
+
+def delta_chi_squared_detection_efficiency(num_light_curves=1E5, num_events=1000):
+    """ I used these queries to get the minimum and maximum mjd values for all of
+        the Praesepe observations:
+            
+            SELECT min(min_mjds) FROM (
+                    SELECT min(unnested_mjd) AS min_mjds FROM (
+                            SELECT unnest(mjd) AS unnested_mjd FROM light_curve WHERE objid < 100000
+                    ) foo
+            ) bar;
+            
+            SELECT max(max_mjds) FROM (
+                    SELECT max(unnested_mjd) AS max_mjds FROM (
+                            SELECT unnest(mjd) AS unnested_mjd FROM light_curve WHERE objid < 100000
+                    ) foo
+            ) bar;
+        
+        Min = 397.223
+        Max = 501.212
+        Baseline = 103.989 days
+       
+        I'm going to use the actual Praesepe light curves here, add a microlensing event
+        some time between the min and max mjd, and see how we do detecting it using the
+        delta chi-squared matched filter approach.
+        
+        Parameters
+        ----------
+        num_events : int
+            The number of events to add to each light curve.
+    """
+    num_light_curves = 100000
+    num_events = 100
+    
+    import time
+    a = time.time()
+    
+    data = []    
+    for xx in range(num_light_curves/1000):
+        light_curves = session.query(LightCurve).filter(LightCurve.objid < 100000).order_by(LightCurve.objid).offset(xx*1000).limit(1000).all()
+        
+        for light_curve in light_curves:
+            ptf_light_curve = simu.PTFLightCurve.fromDBLightCurve(light_curve)
+            
+            for ii in range(num_events):
+                sim_light_curve = copy.copy(ptf_light_curve)
+                
+                t0 = np.random.uniform(397.223, 501.212)
+                sim_light_curve.addMicrolensingEvent(t0=t0)
+                data.append(detection_efficiency_worker((sim_light_curve.mjd, sim_light_curve.mag, sim_light_curve.error)))
+
+    print "took {} seconds for {} events added to {} light curves".format(time.time()-a, num_events, len(light_curves))
+    data = np.array(data, dtype=[("mean_mag", float), ("delta_chisquared", float)]).view(np.recarray)
+    np.savetxt("data/mean_mag_delta_chisquared.txt", data, delimiter=",", fmt="%.3f")
+    #plt.plot(data.mean_mag, data.delta_chisquared, 'k.', alpha=0.5)
+    #plt.show()
+    
 if __name__ == "__main__":
     from argparse import ArgumentParser
 
     parser = ArgumentParser(description="")
     parser.add_argument("-v", "--verbose", action="store_true", dest="verbose", default=False,
-                    help="Be chatty (default = False)")
+                    help="Be chatty! (default = False)")
+    parser.add_argument("-q", "--quiet", action="store_true", dest="quiet", default=False,
+                    help="Be quiet! (default = False)")
     parser.add_argument("--compute-indices", action="store_true", dest="compute_indices", default=False,
                     help="Run compute_indices()")
     parser.add_argument("--indices", nargs='+', type=str, dest="indices", default=[],
@@ -821,6 +876,8 @@ if __name__ == "__main__":
                     help="Seed the random number generator.")
     parser.add_argument("--plot-delta-chisquared", dest="plot_deltachisq", default=False, action="store_true",
                     help="Run plot_delta_chi_squared_vs_median_mag()")
+    parser.add_argument("--detection-efficiency", dest="simulate_detection_efficiency", default=False, action="store_true",
+                    help="Run a detection efficiency simulation.")
     
     args = parser.parse_args()
     
@@ -839,6 +896,8 @@ if __name__ == "__main__":
     
     if args.verbose:
         logging.basicConfig(level=logging.DEBUG)
+    elif args.quiet:
+        logging.basicConfig(level=logging.ERROR)
     else:
         logging.basicConfig(level=logging.INFO)
     
@@ -854,8 +913,5 @@ if __name__ == "__main__":
     if args.plot_deltachisq:
         plot_delta_chi_squared_vs_median_mag(args.number)
     
-    #plotIndices("plots/praesepe.png")
-    #reComputeIndices()
-    #plotInterestingVariables()
-    
-    #single_field_add_microlensing(110004)
+    if args.simulate_detection_efficiency:
+        delta_chi_squared_detection_efficiency()
