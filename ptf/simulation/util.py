@@ -189,6 +189,9 @@ def compute_variability_indices(lightCurve, indices=[]):
     delta_n = np.sqrt(float(N)/(N-1.)) * (lightCurve.mag[:-1] - mu) / lightCurve.error[:-1] 
     delta_n_plus_1 = np.sqrt(float(N)/(N-1.)) * (lightCurve.mag[1:] - mu) / lightCurve.error[1:]
     # J : eqn. 3 in M.-S. Shin et al. 2009
+    #   Modified 2012-05-24 to use eq. 1 in Fruth et al.
+    #weight = np.exp(-(lightCurve.mjd[1:]-lightCurve.mjd[:-1]) / np.mean(lightCurve.mjd[1:]-lightCurve.mjd[:-1]))
+    #J = np.sum(np.sign(delta_n*delta_n_plus_1)*np.sqrt(np.fabs(delta_n*delta_n_plus_1)) / weight)
     J = np.sum(np.sign(delta_n*delta_n_plus_1)*np.sqrt(np.fabs(delta_n*delta_n_plus_1)))
     
     # K : eqn. 3 in M.-S. Shin et al. 2009
@@ -205,7 +208,8 @@ def compute_variability_indices(lightCurve, indices=[]):
                 "k" : K,\
                 "b" : B,\
                 "f" : F,\
-                "delta_chi_squared" : delta_chi_squared}
+                "delta_chi_squared" : delta_chi_squared,
+                "mu" : mu}
     
     if indices:
         return_list = []
