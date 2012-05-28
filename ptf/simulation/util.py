@@ -15,9 +15,11 @@
 
 __author__ = "adrn <adrn@astro.columbia.edu>"
 
+# Standard Library
 import sys, os
 import logging
 
+# Third-party dependencies
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.optimize import curve_fit
@@ -219,17 +221,47 @@ def compute_variability_indices(lightCurve, indices=[]):
         return tuple(return_list)
     else:
         return idx_dict
-
-class PTFLightCurve:
     
-    def __init__(self, mjd, mag, error):
-        self.amjd = self.mjd = np.array(mjd)
-        self.amag = self.mag = np.array(mag)
-        self.error = np.array(error)
+class SimulatedLightCurve(PTFLightCurve):
     
-    @classmethod
-    def fromDBLightCurve(cls, db_light_curve):
-        return cls(db_light_curve.amjd, db_light_curve.amag, db_light_curve.error)
+    def __init__(self, mjd, mag=None, error=None, outliers=False):
+        """ Creates a simulated PTF light curve
+        
+            Parameters
+            ----------
+            mjd : numpy.array
+                An array of mjd values. If none, creates one internally.
+            error : numpy.array
+                An array of error values (sigmas). If none, creates one internally.
+            mag : numpy.array
+                An optional array of magnitude values
+            outliers : bool, optional
+                This controls whether to sample from an outlier distribution
+                when creating magnitude values for the light curve
+            
+        """
+        
+        self.mjd = np.array(mjd)
+        
+        if error:
+            self.error = np.array(error)
+        else:
+            # TODO: Implement this
+            raise NotImplementedError("TODO!")
+        
+        if mag:
+            self.mag = np.array(mag)
+        else:
+            if outliers:
+                # Add ~1% outliers
+                outlier_points = (np.random.uniform(0.0, 1.0, size=len(self.mjd)) < 0.01).astype(float) * np.random.normal(0.0, 2.0, size=len(self.mjd))
+            else:
+                outlier_points = np.zeros(len(self.mjd))
+            
+            self.F0 = np.random.uniform(0.1, 1.) / 100.
+            self.mag = np.ones(len(self.mjd), dtype=float)*FluxToRMag(self.F0) + outlier_points
+    
+            self._addNoise()
     
     def addMicrolensingEvent(self, u0=None, t0=None, tE=None):
         """ Adds a simulated microlensing event to the light curve
@@ -273,61 +305,7 @@ class PTFLightCurve:
         self.mag = FluxToRMag(flux*RMagToFlux(self.mag))
         
         self.amag = self.mag
-        
-    def addNoise(self):
+    
+    def _addNoise(self):
         """ Add scatter to the light curve """
         self.mag += np.random.normal(0.0, self.error)
-    
-    def plot(self, ax=None):
-        if ax == None:
-            fig = plt.figure()
-            ax = fig.add_subplot(111)
-            ax.errorbar(self.mjd, self.mag, self.error, ls='none', marker='o', c='k', ecolor='0.7', capsize=0)
-            ax.set_ylim(ax.get_ylim()[::-1])
-            ax.set_xlim(min(self.mjd), max(self.mjd))
-            plt.show()
-        
-        ax.errorbar(self.mjd, self.mag, self.error, ls='none', marker='o', c='k', ecolor='0.7', capsize=0)
-        ax.set_ylim(ax.get_ylim()[::-1])
-    
-    def lomb_scargle(self, ws):
-        try:
-            from scipy.signal import lombscargle
-        except ImportError:
-            raise ImportError("You must have Scipy >0.11dev installed for the Lomb-Scargle algorithm!")
-        
-        return lombscargle(self.mjd, self.mag, ws)
-    
-class SimulatedLightCurve(PTFLightCurve):
-    
-    def __init__(self, mjd, error, outliers=False):
-        """ Creates a simulated PTF light curve
-        
-            Parameters
-            ----------
-            mjd : numpy.array
-                An array of mjd values. If none, creates one internally.
-            error : numpy.array
-                An array of error values (sigmas). If none, creates one internally.
-            outliers : bool, optional
-                This controls whether to sample from an outlier distribution
-                when creating magnitude values for the light curve
-            
-            Notes
-            -----
-            
-        """
-        
-        self.mjd = np.array(mjd)
-        self.error = np.array(error)
-        
-        if outliers:
-            # Add ~1% outliers
-            outlier_points = (np.random.uniform(0.0, 1.0, size=len(self.mjd)) < 0.01).astype(float) * np.random.normal(0.0, 2.0, size=len(self.mjd))
-        else:
-            outlier_points = np.zeros(len(self.mjd))
-        
-        self.F0 = np.random.uniform(0.1, 1.) / 100.
-        self.mag = np.ones(len(self.mjd), dtype=float)*FluxToRMag(self.F0) + outlier_points
-
-        self.addNoise()
