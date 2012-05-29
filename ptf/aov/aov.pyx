@@ -2,10 +2,13 @@
 cython -a aov.pyx
 gcc -shared -pthread -fPIC -fwrapv -O2 -Wall -fno-strict-aliasing -I/usr/include/python2.7 -L/usr/include/python2.7 -o aov.so aov.c
 
-cython -a aov.pyx; gcc -shared -pthread -fPIC -fwrapv -O2 -Wall -fno-strict-aliasing -I/usr/include/python2.7 -L/usr/include/python2.7 -o aov.so aov.c; python aov_tester.py
+cython -a aov.pyx; gcc -shared -pthread -fPIC -fwrapv -O2 -Wall -fno-strict-aliasing -I/usr/include/python2.7 -L/usr/include/python2.7 -o aov.so aov.c;
+python aov_tester.py
 """
-
 from __future__ import division
+
+import sys
+import numpy as np
 cimport numpy as np
 cimport cython
 
@@ -145,7 +148,7 @@ def isDifferentPeriods(double period1, double period2, double T):
     
     for a in range(1, MAX_PERIOD_DIFF_MULTIPLE):
         for b in range(a+1, MAX_PERIOD_DIFF_MULTIPLE+1):
-            period1mul = period1 * float(b) / float(a)
+            period1mul = period1 * b / a
     
             if (T * fabs(period2 - period1mul)) < (period2 * period1mul):
                 return 0
@@ -271,7 +274,7 @@ def aov_periodogram_asczerny(np.ndarray[double, ndim=1] time, np.ndarray[double,
     
     return periodogram
 
-def testperiod_asz(np.ndarray[double, ndim=1] time, np.ndarray[double, ndim=1] mag, double period, long nbins):
+def testperiod_asczerny(np.ndarray[double, ndim=1] time, np.ndarray[double, ndim=1] mag, double period, long nbins):
     cdef long ii, ibin, ip, nbc, ncov
     cdef long ifr, iflex
     cdef double af, vf, sav,
@@ -323,7 +326,7 @@ def testperiod_asz(np.ndarray[double, ndim=1] time, np.ndarray[double, ndim=1] m
     
     # up to two passes over all frequencies
     for ip in range(2):
-        for i in range(nbc):
+        for ii in range(nbc):
             ave[ii] = 0.
             ncnt[ii] = 0
         
@@ -390,7 +393,7 @@ def testperiod_asz(np.ndarray[double, ndim=1] time, np.ndarray[double, ndim=1] m
     
     return periodogram
 
-def findPeaks_aov(np.ndarray[double, ndim=1] time, np.ndarray[double, ndim=1] mag, np.ndarray[double, ndim=1] sig, long Npeaks, double minp, double maxp, double subsample, double finetune, long operiodogram, long Nbin):
+def findPeaks_aov(np.ndarray[double, ndim=1] time, np.ndarray[double, ndim=1] mag, np.ndarray[double, ndim=1] sig, long Npeaks, double minp, double maxp, double subsample, double finetune, long Nbin):
     # Return peakperiods, peakvalues, peakSNR
     
     cdef double T, freq, minfreq, freqstep, Sum, Sumsqr, aveper, stdper, aveaov, stddevaov, testperiod, a_, b_
@@ -510,7 +513,7 @@ def findPeaks_aov(np.ndarray[double, ndim=1] time, np.ndarray[double, ndim=1] ma
         if (periodogram[i] < ERROR_SCORE) and (periodogram[i]*0.0 == 0.0):
             test = 1
             for j in range(foundsofar):
-                if not isDifferentPeriods(perpeaks[j], periods[i], T):
+                if not isDifferentPeriods(periods[i], perpeaks[j], T):
                     if periodogram[i] < aovpeaks[j]:
                         perpeaks[j] = periods[i]
                         aovpeaks[j] = periodogram[i]
@@ -542,6 +545,7 @@ def findPeaks_aov(np.ndarray[double, ndim=1] time, np.ndarray[double, ndim=1] ma
                 
                 for j in range(Npeaks):
                     if not isDifferentPeriods(periods[i], perpeaks[j],T):
+                        
                         if periodogram[i] < aovpeaks[j]:
                             aovpeaks[j] = periodogram[i]
                             perpeaks[j] = periods[i]
@@ -571,7 +575,7 @@ def findPeaks_aov(np.ndarray[double, ndim=1] time, np.ndarray[double, ndim=1] ma
         while freq >= minfreq:
             testperiod = 1./freq
             # TODO APW: Shiii... gotta implement this
-            score = testperiod_asz(time, mag, testperiod, Nbin)
+            score = testperiod_asczerny(time, mag, testperiod, Nbin)
             
             if (score < ERROR_SCORE) and (score*0.0 == 0.0):
                 if score < aovpeaks[j]:
@@ -589,7 +593,7 @@ def findPeaks_aov(np.ndarray[double, ndim=1] time, np.ndarray[double, ndim=1] ma
                     testperiod = perpeaks[j] * a / b
                     if (testperiod > minp) and (testperiod < maxp):
                         # TODO APW: Shiii... gotta implement this
-                        score = testperiod_asz(time, mag, testperiod, Nbin)
+                        score = testperiod_asczerny(time, mag, testperiod, Nbin)
                         
                         if (score < ERROR_SCORE) and (score*0.0 == 0.0):
                             if score < bestscore:

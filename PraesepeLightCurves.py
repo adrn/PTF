@@ -31,9 +31,11 @@ import glob
 import logging
 import math
 import os
+import re
 import sys
 
 # Third-party
+import apwlib.astrodatetime as astrodatetime
 import apwlib.geometry as g
 import apwlib.convert as c
 import apwlib.plot as p
@@ -41,7 +43,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-import pprocess
+import pyfits as pf
 from scipy.stats import scoreatpercentile
 import sqlalchemy
 from sqlalchemy import func
@@ -477,12 +479,16 @@ class VIFigure:
         ax = self.vi_axis_list[1].series_plot_return[name]
         self.figure.colorbar(ax, cax, orientation="horizontal")
         
-    def save(self):
+    def save(self, file=None):
         self.subplot_array[0,0].set_xlim(self.subplot_array[1,0].get_xlim())
         self.subplot_array[1,1].set_xlim(self.subplot_array[2,0].get_xlim())
         self.subplot_array[2,2].set_xlim(self.subplot_array[3,0].get_xlim())
         self.subplot_array[3,3].set_xlim(self.subplot_array[0,3].get_ylim())
-        self.figure.savefig(self.filename)
+        
+        if file:
+            self.figure.savefig(file)
+        else:
+            self.figure.savefig(self.filename)
 
 def plot_indices(indices, filename=None, number=1E6):    
     varIndices = session.query(VariabilityIndices)\
@@ -534,34 +540,6 @@ def plot_indices(indices, filename=None, number=1E6):
                 viFigure.add_subplot(viAxis)
                 
     viFigure.save()
-
-def plot_indices_3d(indices, filename="plots/praesepe_var_indices_3d.png"):
-    varIndices = session.query(VariabilityIndices)\
-                        .join(LightCurve)\
-                        .filter(LightCurve.ignore == False)\
-                        .filter(LightCurve.objid < 100000)\
-                        .limit(10000)\
-                        .all()    
-    
-    cm = matplotlib.cm.get_cmap('Spectral')
-    vi_array = variability_indices_to_recarray(varIndices, indices)
-    
-    fig = plt.figure()
-    #ax = fig.add_subplot(111, projection='3d')
-    ax = fig.add_subplot(111)
-    
-    j = vi_array.j + abs(vi_array.j.min()) + 1
-    k = vi_array.k
-    
-    hist, xedges, yedges = np.histogram2d(np.log10(j), np.log10(k), bins=1000)
-    xbins = 0.5 * (xedges[:-1] + xedges[1:])
-    ybins = 0.5 * (yedges[:-1] + yedges[1:])
-    
-    ax.contour(xbins, ybins, hist.T, 4, colors='k')
-    
-    #plt.hexbin(, vi_array.k, gridsize=200, cmap=cm, xscale="log", yscale="log")
-    plt.show()
-    #plt.savefig(filename)
 
 def plotInterestingVariables():
     lightCurves = session.query(LightCurve).join(VariabilityIndices).\
@@ -637,7 +615,7 @@ def single_field_add_microlensing(indices, field, num_light_curves=100000, color
         logging.debug("Light curve selected")
 
         # Create a PTFLightCurve object so we can easily compute the variability indices
-        ptf_light_curve = simu.PTFLightCurve(lightCurve.amjd[this_field_idx], lightCurve.amag[this_field_idx], lightCurve.error[this_field_idx])
+        ptf_light_curve = simu.SimulatedLightCurve(lightCurve.amjd[this_field_idx], mag=lightCurve.amag[this_field_idx], error=lightCurve.error[this_field_idx])
         var_indices.append(simu.compute_variability_indices(ptf_light_curve, indices=indices))
         
         # For a random sample of 10% of the light curves, add 100 different microlensing events to 
@@ -678,6 +656,7 @@ def single_field_add_microlensing(indices, field, num_light_curves=100000, color
             #viAxis.add_series(var_indices_with_event_array[xParameter], var_indices_with_event_array[yParameter], \
             #                  color=var_indices_with_event_colors, marker="o", alpha=0.3, linestyle="none", label="1000 Random Light Curves\nw/ Artificial Microlensing Events")
             
+
             if color_by:
                 # TODO: Change vmin and vmax to be scoreatpercentile?
                 vmin = min(color_by_parameter_array)
@@ -686,8 +665,8 @@ def single_field_add_microlensing(indices, field, num_light_curves=100000, color
                               name="to_color", c=color_by_parameter_array, alpha=0.2, vmin=vmin, vmax=vmax, cmap=cm, edgecolors='none')
             else:
                 viAxis.add_series(var_indices_with_event_array[xParameter], var_indices_with_event_array[yParameter], \
-                              color='k', alpha=0.25, marker=".")
-            
+                              color='k', alpha=0.2, marker=".")
+                              
             viAxis.add_series(var_indices_array[xParameter], var_indices_array[yParameter], \
                               color="k", marker=".", alpha=0.25, label="All Light Curves in Field {0}".format(field))
             
@@ -704,16 +683,30 @@ def single_field_add_microlensing(indices, field, num_light_curves=100000, color
                 viFigure.add_subplot(viAxis)
     
     viFigure.add_colorbar(name="to_color")
+    viFigure2 = copy.copy(viFigure)
     viFigure.save()
     
-def plot_delta_chi_squared_vs_median_mag(number=1E5):
+    if color_by:
+        for ax in viFigure.vi_axis_list:
+            try:
+                ax.series_plot_return["to_color"].set_alpha(0.0)
+            except KeyError:
+                pass
+        
+        viFigure2.save("plots/praesepe_field{0}.png".format(field))
+    
+# NEEDS CLEANING
+def plot_delta_chi_squared_vs_mean_mag(number=1E5):
     """ Plot the variability index Delta Chi-squared vs. the mean magnitude of it's
         associated light curve.
     """
     avg_mag = [x[0] for x in session.query(func.array_avg(LightCurve.mag)).filter(LightCurve.objid < 100000).order_by(LightCurve.objid).limit(number).all()]
     delta_chi_squared = [x[0] for x in session.query(VariabilityIndices.delta_chi_squared).join(LightCurve).filter(LightCurve.objid < 100000).order_by(LightCurve.objid).limit(number).all()]
     
+    data = np.loadtxt("data/mean_mag_delta_chisquared.txt", delimiter=",")
+    plt.scatter(data[:,0], data[:,1], alpha=0.4, facecolor="r", edgecolor="none")
     plt.scatter(avg_mag, delta_chi_squared, alpha=0.2, facecolor="k", edgecolor="none")
+    plt.yscale("log")
     plt.xlabel("Average Magnitude", size="xx-large")
     plt.ylabel(r"$\chi_{linear}^2-\chi_{ML}^2$", size="xx-large")
     plt.axhline(2.*np.std(delta_chi_squared), label=r"$2\sigma$", color="r", ls="--")
@@ -759,6 +752,7 @@ def test_delta_chi_squared(number=1E5):
             ax.set_title("ML: {}_{}, Linear: {}_{}".format(microlensing_chisq, ml_num, linear_chisq, lin_num))
             plt.show()
 
+# NEEDS CLEANING
 def plot_delta_chi_squared_outliers(num_sigma=2.5):
     delta_chi_squared = [x[0] for x in session.query(VariabilityIndices.delta_chi_squared).join(LightCurve).filter(LightCurve.objid < 100000).all()]
     light_curves = session.query(LightCurve).join(VariabilityIndices)\
@@ -773,27 +767,143 @@ def plot_delta_chi_squared_outliers(num_sigma=2.5):
         plt.savefig("plots/praesepe_interesting/{}.png".format(light_curve.objid))
         del fig, ax
 
+
+def parse_logs(filename):
+    """ Parse a PTF observation log to grab mjd and seeing """
+    f = open(filename)
+    text = f.readlines()
+    
+    mjd_epoch = astrodatetime.astrodatetime(2009, 1, 1,0,0,0, tzinfo=astrodatetime.gmt).mjd
+    
+    pattr = re.compile("^\s*11000\d\s+([0-9\:]+)\s+object\s+[A-Za-z]\s+[0-9\.]+\s+([0-9\.]+).*PTF(2010\d\d\d\d)")
+    
+    marcel_jds = []
+    seeings = []
+    for line in text:
+        try:
+            time, seeing, date = pattr.search(line).groups()
+        except AttributeError:
+            continue
+        
+        year = int(date[:4])
+        month = int(date[4:6])
+        day = int(date[6:])
+        
+        hour = g.Angle.fromHours(time).hours
+        MarcelJD = astrodatetime.astrodatetime(year, month, day, *map(int,c.hoursToHMS(hour)), tzinfo=astrodatetime.gmt).mjd - mjd_epoch
+        
+        marcel_jds.append(round(MarcelJD, 3))
+        seeings.append(float(seeing)/2.35)
+    
+    return np.array(zip(marcel_jds, seeings), dtype=[("mjd", float), ("seeing", float)]).view(np.recarray)
+        
+# NEEDS CLEANING
 def coadd_light_curves(num=1000):
     """ -> Create an MJD vector for ALL mjd values in DB
     	-> Every time there is a data point for a given MJD, increment weight
 	    -> Sum and divide!
     """
-    for field in [110001]:
+    
+    #filter(func.array_avg(LightCurve.mag) <= 17).\
+    
+    plt.clf()
+    fields = [110001, 110002, 110003, 110004]
+    
+    for ii, field in enumerate(fields):
+        lcs = session.query(LightCurve).\
+                       filter(LightCurve.objid < 100000).\
+                       filter(sqlalchemy.literal(field) == func.all(LightCurve.field)).\
+                       order_by(LightCurve.objid).limit(num).all()
+        
         all_mjds = set([])
-        lcs = session.query(LightCurve).filter(LightCurve.objid < 100000).filter(sqlalchemy.literal(field) == func.any(LightCurve.field)).all()
+        for lc in lcs:
+            all_mjds = set(lc.mjd).union(all_mjds)
+        
+        all_mjds = [str(x) for x in all_mjds]
+        coadd_dict = dict(zip(all_mjds, [0.]*len(all_mjds)))
+        scatter_dict = dict(zip(all_mjds, []*len(all_mjds)))
+        weight_dict = dict(zip(all_mjds, [0.]*len(all_mjds)))
         
         for lc in lcs:
-            all_mjds = set(lc.amjd[lc.afield == field]).union(all_mjds)
+            med_mag = np.median(lc.mag)
+            mjd_to_mag = dict(zip([str(x) for x in lc.mjd], lc.mag))
+            
+            for mjd in all_mjds:
+                if mjd not in mjd_to_mag.keys(): continue
+                #coadd_dict[mjd] += (mjd_to_mag[mjd] - med_mag)**2 / med_mag**2
+                coadd_dict[mjd] += (mjd_to_mag[mjd] / med_mag)
+                try:
+                    scatter_dict[mjd].append(mjd_to_mag[mjd] / med_mag)
+                except:
+                    scatter_dict[mjd] = [mjd_to_mag[mjd] / med_mag]
+                    
+                weight_dict[mjd] += 1.
         
-        f = open("data/praesepe_110001_all_mjds.txt", "w")
-        f.write("\n".join(all_mjds))
-
+        mjds = []
+        mags = []
+        variances = []
+        
+        for mjd, mag in coadd_dict.items():
+            mjds.append(float(mjd))
+            mags.append(mag / weight_dict[mjd])
+            variances.append(np.var(scatter_dict[mjd]))
+        
+        plt.clf()
+        plt.figure(figsize=(15,15))
+        plt.subplot(311)
+        plt.title("Field: {}".format(field))
+        plt.plot(mjds, np.array(mags)-1.0, 'ko', alpha=0.6)
+        plt.ylabel("Normalized coadd")
+        plt.xlim(390, 510)
+        plt.ylim(-0.0031, 0.0031)
+        plt.gca().xaxis.set_ticks([])
+        
+        plt.subplot(312)
+        plt.plot(mjds, variances, 'bo', alpha=0.6)
+        plt.xlim(390, 510)
+        plt.ylim(0.00002, 0.00016)
+        plt.gca().xaxis.set_ticks([])
+        plt.ylabel("Variance per obs.")
+        
+        plt.subplot(313)
+        obs_log = parse_logs("data/all_{}.txt".format(field))
+        plt.plot(obs_log.mjd, obs_log.seeing, "r+")
+        plt.xlabel("MJD - Epoch [Days]")
+        plt.ylabel("Seeing")
+        plt.xlim(390, 510)
+        
+        plt.subplots_adjust(hspace=0.1, wspace=0.0)
+        plt.savefig("plots/praesepe_coadd_{}.png".format(field))
+        
+        """
+        plt.subplot(2,2,ii+1)
+        plt.title("Field: {}".format(field))
+        plt.plot(mjds, mags, 'ko', alpha=0.75)
+        plt.xlim(390, 510)
+        #plt.ylim(0., 0.0025)
+        
+        obs_log = parse_logs("data/all_{}.txt".format(field))
+        plt.plot(obs_log.mjd, obs_log.seeing, "r+")
+        
+        if ii == 2 or ii == 3:
+            plt.xlabel("MJD - Epoch [Days]")
+        else:
+            plt.gca().xaxis.set_ticks([])
+            
+        if ii == 0 or ii == 2:
+            plt.ylabel("RMS Error per source per exposure")
+        else:
+            plt.gca().yaxis.set_ticks([])
+        
+    plt.subplots_adjust(hspace=0.1, wspace=0.0)
+        """
+    
 # ===========================================================================================
 # ===========================================================================================
 
 def detection_efficiency_worker(lc_tuple):
     mjd, mag, error = lc_tuple
-    return (np.mean(mag), simu.compute_delta_chi_squared(lc_tuple))
+    return simu.compute_delta_chi_squared(lc_tuple)
 
 def delta_chi_squared_detection_efficiency(num_light_curves=1E5, num_events=1000):
     """ I used these queries to get the minimum and maximum mjd values for all of
@@ -824,7 +934,7 @@ def delta_chi_squared_detection_efficiency(num_light_curves=1E5, num_events=1000
         num_events : int
             The number of events to add to each light curve.
     """
-    num_light_curves = 100000
+    num_light_curves = 10000
     num_events = 100
     
     import time
@@ -832,6 +942,7 @@ def delta_chi_squared_detection_efficiency(num_light_curves=1E5, num_events=1000
     
     data = []    
     for xx in range(num_light_curves/1000):
+        print xx
         light_curves = session.query(LightCurve).filter(LightCurve.objid < 100000).order_by(LightCurve.objid).offset(xx*1000).limit(1000).all()
         
         for light_curve in light_curves:
@@ -842,14 +953,12 @@ def delta_chi_squared_detection_efficiency(num_light_curves=1E5, num_events=1000
                 
                 t0 = np.random.uniform(397.223, 501.212)
                 sim_light_curve.addMicrolensingEvent(t0=t0)
-                data.append(detection_efficiency_worker((sim_light_curve.mjd, sim_light_curve.mag, sim_light_curve.error)))
+                data.append((np.mean(ptf_light_curve.mjd), detection_efficiency_worker((sim_light_curve.mjd, sim_light_curve.mag, sim_light_curve.error))))
 
-    print "took {} seconds for {} events added to {} light curves".format(time.time()-a, num_events, len(light_curves))
+    print "took {} seconds for {} events added to {} light curves".format(time.time()-a, num_events, num_light_curves)
     data = np.array(data, dtype=[("mean_mag", float), ("delta_chisquared", float)]).view(np.recarray)
     np.savetxt("data/mean_mag_delta_chisquared.txt", data, delimiter=",", fmt="%.3f")
-    #plt.plot(data.mean_mag, data.delta_chisquared, 'k.', alpha=0.5)
-    #plt.show()
-    
+
 if __name__ == "__main__":
     from argparse import ArgumentParser
 

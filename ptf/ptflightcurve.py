@@ -69,9 +69,9 @@ class PTFLightCurve:
                 
         """
         if not periods:
-            T = self.mjd[-1] - self.mjd[0]
+            T = 2.*(self.mjd[-1] - self.mjd[0])
             min_period = 0.1 #days
-            max_period = 50 #days
+            max_period = 200 #days
             subsample = 0.1
             
             freqstep = subsample / T
@@ -88,7 +88,58 @@ class PTFLightCurve:
         if not nbins:
             nbins = 20
             
-        return aov_periodogram_asczerny(self.mjd, self.mag, len(periods), periods, nbins)
+        return (periods, aov.aov_periodogram_asczerny(self.mjd, self.mag, len(periods), periods, nbins))
+    
+    def aovFindPeaks(self, Npeaks=5):
+        raise NotImplementedError("TODO!")
+        """
+        T = 2.*(self.mjd[-1] - self.mjd[0])
+        min_period = 0.1 #days
+        max_period = 200 #days
+        subsample = 0.1
+        
+        freqstep = subsample / T
+        freq = 1. / min_period
+        min_freq = 1. / max_period
+        
+        periods = []
+        while freq >= min_freq:
+            periods.append(1./freq)
+            freq -= freqstep
+        
+        periods = np.array(periods)
+        nbins = 20
+        
+        aov.findPeaks_aov(self.mjd, self.mag, self.error, Npeaks, min_period, max_period, subsample, subsample/10., nbins)
+        """
     
     def aovBestPeriod(self):
         raise NotImplementedError("TODO!")
+
+if __name__ == "__main__":
+    import matplotlib.pyplot as plt
+    from ptf.db.DatabaseConnection import *
+    
+    #lc = session.query(LightCurve).filter(LightCurve.objid < 100000).limit(1).one()
+    #lc = session.query(LightCurve).filter(LightCurve.objid == 71725).one()
+    #lcs = session.query(LightCurve).filter(LightCurve.objid < 100000).limit(10).all()
+    #lcs = session.query(LightCurve).filter(LightCurve.objid == 67538).limit(1).all()
+    lcs = session.query(LightCurve).filter(LightCurve.objid == 70366).limit(1).all()
+    
+    ptf_lc = PTFLightCurve.fromDBLightCurve(lcs[0])
+    ptf_lc.aovFindPeaks()
+    sys.exit(0)
+    for lc in lcs:
+        ptf_lc = PTFLightCurve.fromDBLightCurve(lc)
+        import time
+        a = time.time()
+        periods, periodogram = ptf_lc.aovPeriodogram()
+        print time.time() - a 
+        
+        plt.clf()
+        ax = plt.subplot(211)
+        lc.plot(ax)
+        
+        plt.subplot(212)
+        plt.plot(periods, -periodogram, 'k-')
+        plt.show()

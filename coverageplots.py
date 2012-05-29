@@ -1,109 +1,173 @@
-#!/usr/bin/env python
+# coding: utf-8
+"""
+    Various functions for plotting PTF's sky coverage and number of observations.
+    
+    TODO: Implement PTFField.fromCCDList()
+    
+    TODO: Make a 2D plot on a grid (with arbitrary units) -- size of the squares correspond
+            to the baseline, color corresponds to the number of observations
+            
+"""
+
+# Standard library
 import sys
-import cPickle as pickle
-import numpy as np
+
+# Third-party
 import apwlib.convert as c
 import apwlib.geometry as g
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
+import numpy as np
+import pyfits as pf
+from scipy.stats import scoreatpercentile
 
-ra = 1.225
-dec = 0.9
+# OGLE IV field sizes
+ogle_camera_size = (1.225,0.9) #degrees
 
-OGLE = False
+# PTF Stats
+pix_scale = 1.01 #arcsec / pixel
+camera_size = (12000., 8000.) #pixels
+camera_size_degrees = (camera_size[0]*pix_scale/3600., camera_size[1]*pix_scale/3600.)
 
-from numpy import cos, sin, arcsin, arccos, radians, degrees
+# =~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~
 
-def raDecToGalactic(ra, dec):
-    b = degrees(arcsin(sin(dec.radians)*cos(radians(62.6)) - cos(dec.radians)*sin(radians(ra.degrees - 282.25))*sin(radians(62.6))))
-    l = degrees(arcsin((1. / cos(b)) * ( sin(dec.radians)*sin(radians(62.6)) + cos(dec.radians)*sin(radians(ra.degrees - 282.25))*cos(radians(62.6)) ))) + 33.
+class Field(object):
+    """ Abstract Field class """
     
-    return l, b
-
-f = open("fieldDict.pickle")
-fieldDict = pickle.load(f)
-f.close()
-
-cadences = []
-baselineLengths = []
-numObservations = []
-
-fields = fieldDict.keys()
-for fieldid in fields:
-    w = (fieldDict[fieldid].ccdid == 1)
-    numMJDs = len(fieldDict[fieldid][w].mjd)
-    sortedMJD = np.sort(fieldDict[fieldid][w].mjd)
-    
-    if fieldid == 101001:
-        numObservations.append(0)
-        cadences.append(0)
-        baselineLengths.append(0)
-        continue
-    
-    medianCadence = np.median(sortedMJD[1:] - sortedMJD[:-1])
-    
-    if numMJDs > 1:
-        cadences.append(medianCadence)
-        baselineLengths.append(sortedMJD.max()-sortedMJD.min())
-    else:
-        cadences.append(0)
-        baselineLengths.append(0)
-
-    numObservations.append(numMJDs)
-
-fig = plt.figure()
-ax = fig.add_subplot(111, projection="aitoff")
-ax.grid()
-
-maxNum = max(numObservations)
-maxBaseline = max(baselineLengths)
-
-baselines = np.array(baselineLengths)
-wavelengths = (((baselines-min(baselines))/max(baselines)-min(baselines))*400. + 380.)
-
-for ii, fieldid in enumerate(fields):
-    if numObservations[ii] < 1:
-        continue
+    def __init__(self, ra, dec, id=None, width=None, height=None):
+        # Must specify coordinates
+        self.ra = g.RA(ra)
+        self.dec = g.Dec(dec)
         
-    data = fieldDict[fieldid][fieldDict[fieldid].ccdid == 1]
-    
-    #centerX, centerY = -((np.mean(data.ra)-5.*3.5/12.)-180.), np.mean(data.dec)-2.31/4.
-    ra = g.RA.fromDegrees(np.mean(data.ra)-5.*3.5/12.)
-    dec = g.Dec.fromDegrees(np.mean(data.dec)-2.31/4.)
-    centerX, centerY = raDecToGalactic(ra, dec)
-    #centerX -= 180.0
-    
-    rec_x1, rec_y1 = centerX + (3.5/np.cos(np.radians(centerY)))/2, centerY - 2.31/2. #?? or -?
-    rec = Rectangle((np.radians(rec_x1), np.radians(rec_y1)), \
-        -np.radians(3.5/np.cos(np.radians(centerY))), np.radians(2.31), color='{:0.2f}'.format(1.-(numObservations[ii]/float(maxNum))**(1/3.)))
-    ax.add_patch(rec)
-    
-# If you want to add OGLE to the plot..
-if OGLE:
-    ogle3 = np.genfromtxt("ogle3_fields.txt", names=True, delimiter=",", dtype=[("name",np.str_,6), ("ra",np.str_, 10), ("dec",np.str_, 10)]).view(np.recarray)
-    derp = True
-    for ra,dec in zip(ogle3.ra, ogle3.dec):
-        ra = g.RA.fromHours(ra).degrees
-        dec = g.Dec.fromDegrees(dec).degrees
-        print ra,dec
+        # Field ID is optional in case we want to create some fake ones
+        self.id = id
         
-        centerX, centerY = -(ra - 180.0), dec
+        # Can optionally specify a width and height to the field in degrees
+        self.width = width
+        self.height = height
         
-        rec_x1, rec_y1 = centerX + ((36./60)/np.cos(np.radians(centerY)))/2, centerY - (36./60)/2. #?? or -?
+        # TODO:
+        #   self.l, self.b = raDecToGalactic(self.ra, self.dec)
+        self._name = None
         
-        if derp:
-            rec = Rectangle((np.radians(rec_x1), np.radians(rec_y1)), \
-                -np.radians((36./60)/np.cos(np.radians(centerY))), np.radians(36./60), color='r', alpha=0.3, label="OGLE-III")
+    @property
+    def name(self):
+        if not self._name and self.id:
+            return str(self.id)
+        elif not self._name and not self.id:
+            raise ValueError("No name or id set!")
         else:
-            rec = Rectangle((np.radians(rec_x1), np.radians(rec_y1)), \
-                -np.radians((36./60)/np.cos(np.radians(centerY))), np.radians(36./60), color='r', alpha=0.3)
-        ax.add_patch(rec)
-        derp = False
+            return self._name
     
-#ax.plot([-np.radians(86.42)], [np.radians(-29.)], 'ro', ms=10.)
-ax.set_xticklabels([330, 300, 270, 240, 210, 180, 150, 120, 90, 60, 30])
-ax.legend()
-#fig.suptitle("Bluer = shorter baseline, Redder = longer baseline -- Darker = more observations, Lighter = fewer observations")
+    @name.setter
+    def name(self, val):
+        self._name = str(val)
+    
+class PTFField(Field):
+    """ Represents a PTF field """
+        
+    def __init__(self, ra, dec, id=None, number_of_observations=None):
+        self.number_of_observations = number_of_observations
+        super(PTFField, self).__init__(ra, dec, id=id, width=camera_size_degrees[0], height=camera_size_degrees[1])
 
-plt.show()
-#plt.savefig("t.pdf")
+class OGLEField(Field):
+    """ Represents an OGLEIV field """
+        
+    def __init__(self, ra, dec, id=None):
+        super(OGLEField, self).__init__(ra, dec, id=id, width=ogle_camera_size[0], height=ogle_camera_size[1])
+
+class PTFCoveragePlot(object):
+    """ Given a list of PTFField objects, create a coverage plot """
+    def __init__(self, figsize=None, projection=None):
+        if figsize:
+            self.figure = plt.figure(figsize=figsize)
+        else:
+            self.figure = plt.figure()
+        
+        if projection:
+            self.axis = self.figure.add_subplot(111, projection=projection)
+        else:
+            self.axis = self.figure.add_subplot(111)
+        
+        self.axis.set_xticklabels([330, 300, 270, 240, 210, 180, 150, 120, 90, 60, 30])
+        
+    def addFields(self, fields, label=None, color_by_observations=False, **kwargs):
+        """ Add a list of Field() objects to be plotted as Rectangle patches """
+        
+        if color_by_observations:
+            num_obs = [x.number_of_observations for x in fields]
+            maxNum = scoreatpercentile(num_obs, 99) #max(num_obs)+1
+            print maxNum
+            #scaler = matplotlib.colors.LogNorm(0.9999, maxNum)
+            scaler = matplotlib.colors.Normalize(0, maxNum)
+        
+            sorted_field_indices = np.argsort(num_obs)
+        else:
+            sorted_field_indices = range(len(fields))
+            
+        for ii,field_idx in enumerate(sorted_field_indices):
+            field = fields[field_idx]
+            rec_x1 = ((field.ra.degrees + (camera_size_degrees[0] / np.cos(field.dec.radians)) / 2.) % 360.) * -1 + 180 # degrees
+            rec_y1 = field.dec.degrees - camera_size_degrees[1] / 2. # degrees
+            
+            if color_by_observations:
+                col = ((scaler(field.number_of_observations)-1.)*-1.)*0.5
+                
+                if col < 0: col = 0
+                
+                if ii == 0 and label:
+                    rec = Rectangle((np.radians(rec_x1), np.radians(rec_y1)), \
+                                    -np.radians(camera_size_degrees[0]/np.cos(field.dec.radians)), np.radians(camera_size_degrees[1]), \
+                                    color='{:0.2f}'.format(col), label=label, alpha=0.7)
+                else:
+                    rec = Rectangle((np.radians(rec_x1), np.radians(rec_y1)), \
+                                    -np.radians(camera_size_degrees[0]/np.cos(field.dec.radians)), np.radians(camera_size_degrees[1]), \
+                                    color='{:0.2f}'.format(col), alpha=0.7)
+            else:
+                if ii == 0 and label:
+                    rec = Rectangle((np.radians(rec_x1), np.radians(rec_y1)), \
+                                    -np.radians(camera_size_degrees[0]/np.cos(field.dec.radians)), np.radians(camera_size_degrees[1]),\
+                                    label=label, **kwargs)
+                else:
+                    rec = Rectangle((np.radians(rec_x1), np.radians(rec_y1)), \
+                                    -np.radians(camera_size_degrees[0]/np.cos(field.dec.radians)), np.radians(camera_size_degrees[1]),\
+                                    **kwargs)
+            self.axis.add_patch(rec)
+        
+    def addLegend(self):
+        self.axis.legend()
+            
+# PTF:
+raw_field_data = pf.open("data/exposureData.fits")[1].data
+unq_field_ids = np.unique(raw_field_data.field_id)
+
+ptf_fields = []
+for field_id in unq_field_ids:
+    one_field_data = raw_field_data[raw_field_data.field_id == field_id]
+    mean_ra = np.mean(one_field_data.ra) / 15.
+    mean_dec = np.mean(one_field_data.dec)
+    observations = len(one_field_data) / len(np.unique(one_field_data.ccd_id))
+    
+    ptf_fields.append(PTFField(mean_ra, mean_dec, id=field_id, number_of_observations=observations))
+
+# OGLE:
+high_cadence = np.genfromtxt("data/ogle4_common.txt", names=["ra","dec","l","b"], usecols=[6,7,8,9]).view(np.recarray)
+low_cadence = np.genfromtxt("data/ogle4_less_frequent.txt", names=["ra","dec","l","b"], usecols=[6,7,8,9]).view(np.recarray)
+
+ogle_high_cadence_fields = []
+for row in high_cadence: ogle_high_cadence_fields.append(OGLEField(row["ra"], row["dec"]))
+
+ogle_low_cadence_fields = []
+for row in low_cadence: ogle_low_cadence_fields.append(OGLEField(row["ra"], row["dec"]))
+
+coverage_plot = PTFCoveragePlot(figsize=(25,10), projection="aitoff")
+coverage_plot.addFields(ptf_fields, label="PTF", color_by_observations=True)
+coverage_plot.addFields(ogle_low_cadence_fields, label="OGLE-IV - low cadence", color="b", alpha=0.15)
+coverage_plot.addFields(ogle_high_cadence_fields, label="OGLE-IV - high cadence", color="r", alpha=0.15)
+
+coverage_plot.addLegend()
+
+#plt.show()
+coverage_plot.figure.savefig("plots/ptf_coverage.png")

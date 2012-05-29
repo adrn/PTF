@@ -25,6 +25,9 @@ import numpy as np
 from scipy.optimize import curve_fit
 import scipy.optimize as so
 
+# Project
+from ..ptflightcurve import PTFLightCurve
+
 def straight(t, b):
     return np.ones((len(t),), dtype=float)*b
 
@@ -241,16 +244,16 @@ class SimulatedLightCurve(PTFLightCurve):
             
         """
         
-        self.mjd = np.array(mjd)
+        self.amjd = self.mjd = np.array(mjd)
         
-        if error:
+        if error != None:
             self.error = np.array(error)
         else:
             # TODO: Implement this
             raise NotImplementedError("TODO!")
         
-        if mag:
-            self.mag = np.array(mag)
+        if mag != None:
+            self.amag = self.mag = np.array(mag)
         else:
             if outliers:
                 # Add ~1% outliers
