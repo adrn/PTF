@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 
 try:
     import apwlib.geometry as g
+    import apwlib.astrodatetime as adatetime
 except ImportError:
     logging.warn("apwlib not found! Some functionality may not work correctly.\nDo: 'git clone git@github.com:adrn/apwlib.git' and run 'python setup.py install' to install.")
 
@@ -41,21 +42,39 @@ class PTFImageQuery:
             date : str, tuple, datetime.datetime
                 If str, must be a date like YEAR-MONTH-DAY. If tuple, must be (year, month, day).
         """
+        
+        fmt_string = "where=obsdate+LIKE+'%25{}-{:02}-{:02}%25'"
+        fmt_items = []
+        
         if isinstance(date, str):
-            year, month, day = date.split("-")
+            fmt_items = date.split("-")
         elif isinstance(date, datetime.datetime):
-            year = date.year
-            month = date.month
-            day = date.day
+            fmt_items.append(date.year)
+            fmt_items.append(date.month)
+            fmt_items.append(date.day)
+            
+            if not (date.hour == 0 and date.minute == 0 and date.second == 0):
+                fmt_items.append(date.hour)
+                fmt_items.append(date.minute)
+                fmt_items.append(date.second)
+                fmt_string = "obsdate%20LIKE%20%27{}-{:02}-{:02}%20{:02}:{:02}:{:02}%25%27"
+                
         elif isinstance(date, tuple):
-            year, month, day = date
-        elif isinstance(date, int):
-            # Convert mjd to date
-            raise NotImplementedError()
+            fmt_items = list(date)
         else:
             raise ValueError("Invalid date type")
-            
-        self.where_clauses.append("where=obsdate+LIKE+'%25{}-{:02}-{:02}%25'".format(year, month, day))
+        
+        self.where_clauses.append(fmt_string.format(*fmt_items))
+    
+    def on_mjd(self, mjd):
+        """ Add a date constraint to the query with an MJD """
+        
+        if isinstance(mjd, int):
+            self.where_clauses.append("obsmjd%20between%20{}%20and%20{}".format(mjd, mjd+1))
+        elif isinstance(mjd, float):
+            self.where_clauses.append("obsmjd%20between%20{}%20and%20{}".format(mjd-0.05, mjd+0.05))
+        else:
+            raise ValueError("Invalid MJD")
     
     def at_position(self, ra, dec):
         """ Add a position constraint to the query
@@ -87,11 +106,32 @@ class PTFImageQuery:
         
         fieldid = [str(x) for x in fieldid]
         
-        self.where_clauses.append("where=ptffield+IN+({})".format(",".join(fieldid)))
+        self.where_clauses.append("ptffield%20IN%20({})".format(",".join(fieldid)))
+    
+    def filter(self, filter):
+        """ Constrain on R or g filter """
+        self.where_clauses.append("filter=%27{}%27".format(filter))
+    
+    def ccds(self, ccds):
+        """ Add a CCD constraint to the query 
+            
+            ccds : list
+                A lsit of CCDs
+        """
+        if not isinstance(ccds, list):
+            ccds = [ccds]
+        
+        ccds = [str(x) for x in ccds]
+        
+        self.where_clauses.append("ccdid%20IN%20({})".format(",".join(ccds)))
+    
+    @property
+    def where(self):
+        return "where=" + "%20and%20".join(self.where_clauses)
     
     @property
     def url(self):
-        return self.base_url + "&" + "&".join(self.search_clauses + self.where_clauses)
+        return self.base_url + "&".join(self.search_clauses) + "&{}".format(self.where)
     
     def __repr__(self):
         return "<PTFImageQuery:\t{}".format("\n\t\t".join(self.search_clauses + self.where_clauses)) + ">"
@@ -101,7 +141,8 @@ class PTFImageQuery:
 
 class PTFImageList:
     
-    def __init__(self, ptf_image_query):
+    @classmethod
+    def fromImageQuery(cls, ptf_image_query):
         """ Given a PTFImageQuery object, run the query and get the image list back """
         
         recarray_columns = ["date", "time", "ra", "dec", "filter", "ccdid", "fieldid", \
@@ -115,7 +156,14 @@ class PTFImageList:
         request.add_header("Authorization", "Basic %s" % base64string)
         file = StringIO.StringIO(urllib2.urlopen(request).read())
         
-        self.table = np.genfromtxt(file, skiprows=4, usecols=range(len(recarray_columns)+3)[3:], dtype=dtype).view(np.recarray)
+        #self.table = np.genfromtxt(file, skiprows=4, usecols=range(len(recarray_columns)+3)[3:], dtype=dtype).view(np.recarray)
+        table = np.genfromtxt(file, skiprows=4, dtype=dtype).view(np.recarray)
+        
+        return cls(table)
+        
+    def __init__(self, recarray):
+        """ Given a numpy recarray, create an image list """
+        self.table = recarray
     
     @property
     def scie(self):
@@ -124,6 +172,10 @@ class PTFImageList:
     @property
     def mask(self):
         return self.table.mask_filename
+    
+    def best_seeing_images(self):
+        tb = self.table[np.logical_not(np.isnan(self.table.seeing))]
+        return tb[tb.seeing == np.min(tb.seeing)]
         
 #class PTFCCDImage:    
 #    def __init__(self, ccdid, fieldid, filter

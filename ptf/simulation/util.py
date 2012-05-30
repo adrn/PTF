@@ -27,6 +27,7 @@ import scipy.optimize as so
 
 # Project
 from ..ptflightcurve import PTFLightCurve
+from ..aov import findPeaks_aov
 
 def straight(t, b):
     return np.ones((len(t),), dtype=float)*b
@@ -169,6 +170,8 @@ def compute_variability_indices(lightCurve, indices=[]):
     # Compute variability indices
     # ===========================
     
+    idx_dict = {} 
+    
     # sigma/mu : root-variance / mean
     mu = contMag #np.mean(lightCurve.mag)
     #sigma = np.sqrt(np.sum(lightCurve.mag - mu)**2 / (N-1.))
@@ -206,15 +209,20 @@ def compute_variability_indices(lightCurve, indices=[]):
     # delta_chi_squared : matched filter approach, fit a line, then a gaussian; compare.
     delta_chi_squared = compute_delta_chi_squared(lightCurve)
     
-    idx_dict = {"sigma_mu" : sigma_to_mu,\
-                "con" : Con,\
-                "eta" : eta,\
-                "j" : J,\
-                "k" : K,\
-                "b" : B,\
-                "f" : F,\
-                "delta_chi_squared" : delta_chi_squared,
-                "mu" : mu}
+    # Analysis of Variance maximum
+    if "aovm" in indices:
+        peaks = findPeaks_aov(lightCurve.mjd, lightCurve.mag, lightCurve.error, 2, 0.1, 100., 0.1, 0.01, 20)
+        idx_dict["aovm"] = peaks["peak_power"][0]
+    
+    idx_dict["sigma_mu"] = sigma_to_mu
+    idx_dict["con"] = Con
+    idx_dict["eta"] = eta
+    idx_dict["j"] = J
+    idx_dict["k"] = K
+    idx_dict["b"] = B
+    idx_dict["f"] = F
+    idx_dict["delta_chi_squared"] = delta_chi_squared
+    idx_dict["mu"] = mu
     
     if indices:
         return_list = []

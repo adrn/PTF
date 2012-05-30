@@ -51,6 +51,7 @@ from sqlalchemy import func
 # Project
 from ptf.db.DatabaseConnection import *
 import ptf.simulation.util as simu
+from ptf import PTFLightCurve
 
 def txt_file_light_curve_to_recarray(filename):
     """ All columns in this file are:
@@ -158,7 +159,7 @@ def compute_indices():
                 lightCurve.ignore = True
                 continue
             
-            lc = simu.PTFLightCurve(lightCurve.amjd[idx], lightCurve.amag[idx], lightCurve.error[idx])
+            lc = PTFLightCurve(lightCurve.amjd[idx], lightCurve.amag[idx], lightCurve.error[idx])
             try:
                 # Returns a dictionary with keys = the names of the indices
                 var_indices = simu.compute_variability_indices(lc)
@@ -722,7 +723,7 @@ def test_delta_chi_squared(number=1E5):
     light_curves = session.query(LightCurve).filter(LightCurve.objid < 100000).limit(number).all()
     
     for lc in light_curves:
-        light_curve = simu.PTFLightCurve.fromDBLightCurve(lc)
+        light_curve = PTFLightCurve.fromDBLightCurve(lc)
         light_curve.addMicrolensingEvent()
         
         linear_fit_params, lin_num = so.leastsq(simu.linear_error_function, x0=(np.median(light_curve.amag), 0.), args=(light_curve.amjd, light_curve.amag, light_curve.error))
@@ -946,7 +947,7 @@ def delta_chi_squared_detection_efficiency(num_light_curves=1E5, num_events=1000
         light_curves = session.query(LightCurve).filter(LightCurve.objid < 100000).order_by(LightCurve.objid).offset(xx*1000).limit(1000).all()
         
         for light_curve in light_curves:
-            ptf_light_curve = simu.PTFLightCurve.fromDBLightCurve(light_curve)
+            ptf_light_curve = PTFLightCurve.fromDBLightCurve(light_curve)
             
             for ii in range(num_events):
                 sim_light_curve = copy.copy(ptf_light_curve)
@@ -958,6 +959,25 @@ def delta_chi_squared_detection_efficiency(num_light_curves=1E5, num_events=1000
     print "took {} seconds for {} events added to {} light curves".format(time.time()-a, num_events, num_light_curves)
     data = np.array(data, dtype=[("mean_mag", float), ("delta_chisquared", float)]).view(np.recarray)
     np.savetxt("data/mean_mag_delta_chisquared.txt", data, delimiter=",", fmt="%.3f")
+
+def compute_aovm():
+    """ Select out chunks of light curves, compute AoV Maximum, if aovm is greater than some amount
+        flag that light curve as interesting (light_curve.interesting = True)
+    """
+    
+    light_curves = session.query(LightCurve).join(VariabilityIndices).\
+                                             filter(VariabilityIndices.j > 100).\
+                                             filter(LightCurve.objid < 100000).all()
+    
+    for lc in light_curves:
+        ptf_lc = PTFLightCurve.fromDBLightCurve(lc)
+        indices = simu.compute_variability_indices(ptf_lc, indices=["aovm"])
+        lc.variability_indices.aovm = indices[0]
+        if indices[0] > 10:
+            lc.interesting = True
+        
+    session.flush()
+    
 
 if __name__ == "__main__":
     from argparse import ArgumentParser

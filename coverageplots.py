@@ -2,8 +2,6 @@
 """
     Various functions for plotting PTF's sky coverage and number of observations.
     
-    TODO: Implement PTFField.fromCCDList()
-    
     TODO: Make a 2D plot on a grid (with arbitrary units) -- size of the squares correspond
             to the baseline, color corresponds to the number of observations
             
@@ -23,13 +21,8 @@ import numpy as np
 import pyfits as pf
 from scipy.stats import scoreatpercentile
 
-# OGLE IV field sizes
-ogle_camera_size = (1.225,0.9) #degrees
-
-# PTF Stats
-pix_scale = 1.01 #arcsec / pixel
-camera_size = (12000., 8000.) #pixels
-camera_size_degrees = (camera_size[0]*pix_scale/3600., camera_size[1]*pix_scale/3600.)
+# PTF
+from ptf.parameters import *
 
 # =~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~
 
@@ -138,36 +131,37 @@ class PTFCoveragePlot(object):
         
     def addLegend(self):
         self.axis.legend()
-            
-# PTF:
-raw_field_data = pf.open("data/exposureData.fits")[1].data
-unq_field_ids = np.unique(raw_field_data.field_id)
 
-ptf_fields = []
-for field_id in unq_field_ids:
-    one_field_data = raw_field_data[raw_field_data.field_id == field_id]
-    mean_ra = np.mean(one_field_data.ra) / 15.
-    mean_dec = np.mean(one_field_data.dec)
-    observations = len(one_field_data) / len(np.unique(one_field_data.ccd_id))
+if __name__ == "__main__":
+    # PTF:
+    raw_field_data = pf.open("data/exposureData.fits")[1].data
+    unq_field_ids = np.unique(raw_field_data.field_id)
     
-    ptf_fields.append(PTFField(mean_ra, mean_dec, id=field_id, number_of_observations=observations))
-
-# OGLE:
-high_cadence = np.genfromtxt("data/ogle4_common.txt", names=["ra","dec","l","b"], usecols=[6,7,8,9]).view(np.recarray)
-low_cadence = np.genfromtxt("data/ogle4_less_frequent.txt", names=["ra","dec","l","b"], usecols=[6,7,8,9]).view(np.recarray)
-
-ogle_high_cadence_fields = []
-for row in high_cadence: ogle_high_cadence_fields.append(OGLEField(row["ra"], row["dec"]))
-
-ogle_low_cadence_fields = []
-for row in low_cadence: ogle_low_cadence_fields.append(OGLEField(row["ra"], row["dec"]))
-
-coverage_plot = PTFCoveragePlot(figsize=(25,10), projection="aitoff")
-coverage_plot.addFields(ptf_fields, label="PTF", color_by_observations=True)
-coverage_plot.addFields(ogle_low_cadence_fields, label="OGLE-IV - low cadence", color="b", alpha=0.15)
-coverage_plot.addFields(ogle_high_cadence_fields, label="OGLE-IV - high cadence", color="r", alpha=0.15)
-
-coverage_plot.addLegend()
-
-#plt.show()
-coverage_plot.figure.savefig("plots/ptf_coverage.png")
+    ptf_fields = []
+    for field_id in unq_field_ids:
+        one_field_data = raw_field_data[raw_field_data.field_id == field_id]
+        mean_ra = np.mean(one_field_data.ra) / 15.
+        mean_dec = np.mean(one_field_data.dec)
+        observations = len(one_field_data) / len(np.unique(one_field_data.ccd_id))
+        
+        ptf_fields.append(PTFField(mean_ra, mean_dec, id=field_id, number_of_observations=observations))
+    
+    # OGLE:
+    high_cadence = np.genfromtxt("data/ogle4_common.txt", names=["ra","dec","l","b"], usecols=[6,7,8,9]).view(np.recarray)
+    low_cadence = np.genfromtxt("data/ogle4_less_frequent.txt", names=["ra","dec","l","b"], usecols=[6,7,8,9]).view(np.recarray)
+    
+    ogle_high_cadence_fields = []
+    for row in high_cadence: ogle_high_cadence_fields.append(OGLEField(row["ra"], row["dec"]))
+    
+    ogle_low_cadence_fields = []
+    for row in low_cadence: ogle_low_cadence_fields.append(OGLEField(row["ra"], row["dec"]))
+    
+    coverage_plot = PTFCoveragePlot(figsize=(25,10), projection="aitoff")
+    coverage_plot.addFields(ptf_fields, label="PTF", color_by_observations=True)
+    coverage_plot.addFields(ogle_low_cadence_fields, label="OGLE-IV - low cadence", color="b", alpha=0.15)
+    coverage_plot.addFields(ogle_high_cadence_fields, label="OGLE-IV - high cadence", color="r", alpha=0.15)
+    
+    coverage_plot.addLegend()
+    
+    #plt.show()
+    coverage_plot.figure.savefig("plots/ptf_coverage.png")

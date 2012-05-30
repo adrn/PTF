@@ -8,6 +8,7 @@ import logging
 
 # Third-party dependencies
 import numpy as np
+import matplotlib.pyplot as plt
 
 # Package dependences
 import aov
@@ -29,19 +30,29 @@ class PTFLightCurve:
         """
         return cls(db_light_curve.amjd, db_light_curve.amag, db_light_curve.error)
     
-    def plot(self, ax=None):
+    def plot(self, ax=None, **kwargs):
         """ Either plots the light curve and show()'s it to the display, or plots it on 
             the given matplotlib Axes object
         """
+        
+        if not kwargs.has_key("ls") and not kwargs.has_key("linestyle"):
+            kwargs["ls"] = 'none'
+        
+        if not kwargs.has_key("marker"):
+            kwargs["marker"] = 'o'
+        
+        if not kwargs.has_key("c") and not kwargs.has_key("color"):
+            kwargs["c"] = 'k'
+        
         if ax == None:
             fig = plt.figure()
             ax = fig.add_subplot(111)
-            ax.errorbar(self.mjd, self.mag, self.error, ls='none', marker='o', c='k', ecolor='0.7', capsize=0)
+            ax.errorbar(self.mjd, self.mag, self.error, ecolor='0.7', capsize=0, **kwargs)
             ax.set_ylim(ax.get_ylim()[::-1])
             ax.set_xlim(min(self.mjd), max(self.mjd))
             plt.show()
         
-        ax.errorbar(self.mjd, self.mag, self.error, ls='none', marker='o', c='k', ecolor='0.7', capsize=0)
+        ax.errorbar(self.mjd, self.mag, self.error, ecolor='0.7', capsize=0, **kwargs)
         ax.set_ylim(ax.get_ylim()[::-1])
         
         return ax

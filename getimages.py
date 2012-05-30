@@ -15,13 +15,76 @@ import cPickle as pickle
 import matplotlib.pyplot as plt
 import numpy as np
 import apwlib.geometry as g
-import aplpy
 
 # Project-specific
-import db.util as dbu
+import ptf.util as pu
 
+def download_one_field(path, field, ccd=None, filter=None, mask=False, mjd=None, best=False):
+    """ Given a PTF Field ID, download the image for that field.
+        
+        Parameters
+        ----------
+        path : str
+            Path to save the downloaded images to
+        field : int
+            The PTF Field ID
+        ccd : (optional) int, list
+            Only download one or a list of CCD's
+        filter : (optional) str
+            Specify only observations of a given filter
+        mask : (optional) bool
+            Also download the mask files.
+        best : (optional) bool
+            If True, only select the best images (lowest seeing)
+    
+    """
+    image_query = pu.PTFImageQuery()
+    
+    if not field == int(field):
+        raise ValueError("Invalid field id!")
+    
+    logging.debug("Field: {}".format(field))
+    image_query.field(field)
+    
+    if ccd:
+        if isinstance(ccd, int):
+            ccd = [ccd]
+        elif isinstance(ccd, list):
+            ccd = map(int, ccd)
+        else:
+            raise ValueError("Invalid CCD ID! Must be a number (e.g. 4) or a list (e.g. [0, 3, 11])")
+        
+        ccds = list(set(ccd).intersection(list(range(12))))
+        logging.debug("CCDs: {}".format(",".join(map(str,ccds))))
+        image_query.ccds(ccds)
+    
+    if filter: 
+        image_query.filter(filter.upper())
+    
+    if mjd and best:
+        raise ValueError("You can't specify an MJD and best=True")
+    
+    if mjd:
+        image_query.on_mjd(mjd)
+    
+    print image_query.url
+    image_list = pu.PTFImageList.fromImageQuery(image_query)
+    
+    if best:
+        best_mjd = image_list.best_seeing_images().mjd[0]
+        image_query.on_mjd(best_mjd)
+        image_list = pu.PTFImageList.fromImageQuery(image_query)
+    
+    pu.getAllImages(image_list, prefix=path)
+    
+    return 0
+        
+
+##########################
+# DON'T use the code below
+##########################
 def singleField(verbosity):
-    """ """
+    """ ??????? """
     try:
         f = open("data/denseCoordinates.pickle")
         denseCoordinates = pickle.load(f)
@@ -85,16 +148,27 @@ if __name__ == "__main__":
                     help="Overwrite all image files (default = False)")
     parser.add_argument("-v", "--verbose", action="store_true", dest="verbose", default=False,
                     help="Be chatty!")
-    parser.add_argument("-a", "--all-fields", action="store_true", dest="all", default=False,
-                    help="Get all fields around specified RA/Dec")
+    parser.add_argument("-f", "--field", dest="field", type=int, default=None, required=True,
+                    help="Get a single image of the specified field")
+    parser.add_argument("-m", "--mjd", dest="mjd", default=None, type=float,
+                    help="Specify the epoch of the field image to download.")
+    parser.add_argument("--ccd", nargs="*", dest="ccd", default=list(range(12)),
+                    help="Specify a ccd or list of ccds to download from this field")
+    parser.add_argument("--filter", dest="filter", default="R",
+                    help="Specify a filter (R or g)")
+    parser.add_argument("--mask", dest="mask", action="store_true", default=False,
+                    help="Also download the mask file for that image")
+    parser.add_argument("--best", dest="best", action="store_true", default=False,
+                    help="Only download the best observation")
+    parser.add_argument("--path", dest="path", required=True,
+                    help="Path to save the images")
+
     
     args = parser.parse_args()
     if args.verbose:
-        verbosity = logging.DEBUG
+        logging.basicConfig(level=logging.DEBUG)
     else:
-        verbosity = logging.INFO
+        logging.basicConfig(level=logging.INFO)
     
-    if args.all:
-        allFields(verbosity)
-    else:
-        singleField(verbosity)
+    if args.field:
+        download_one_field(args.path, args.field, ccd=args.ccd, filter=args.filter, mask=args.mask, mjd=args.mjd, best=args.best)
