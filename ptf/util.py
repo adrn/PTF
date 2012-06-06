@@ -142,6 +142,31 @@ class PTFImageQuery:
 class PTFImageList:
     
     @classmethod
+    def fromQueryReturnFile(cls, filename):
+        recarray_columns = ["date", "time", "ra", "dec", "filter", "ccdid", "fieldid", \
+                            "seeing", "airmass", "data_filename", "mask_filename", "mjd"]
+        recarray_dtypes = ["|S10", "|S12", float, float, "|S1", int, int, \
+                           float, float, "|S120", "|S120", float]
+        dtype = zip(recarray_columns, recarray_dtypes)
+        
+        table = np.genfromtxt(filename, skiprows=4, dtype=dtype).view(np.recarray)
+        
+        return cls(table)
+    
+    @classmethod
+    def fromQueryReturn(cls, text_blob):
+        recarray_columns = ["date", "time", "ra", "dec", "filter", "ccdid", "fieldid", \
+                            "seeing", "airmass", "data_filename", "mask_filename", "mjd"]
+        recarray_dtypes = ["|S10", "|S12", float, float, "|S1", int, int, \
+                           float, float, "|S120", "|S120", float]
+        dtype = zip(recarray_columns, recarray_dtypes)
+        
+        file = StringIO.StringIO(text_blob)
+        table = np.genfromtxt(file, skiprows=4, dtype=dtype).view(np.recarray)
+        
+        return cls(table)
+        
+    @classmethod
     def fromImageQuery(cls, ptf_image_query):
         """ Given a PTFImageQuery object, run the query and get the image list back """
         
