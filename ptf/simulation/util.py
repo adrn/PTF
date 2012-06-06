@@ -16,6 +16,7 @@
 __author__ = "adrn <adrn@astro.columbia.edu>"
 
 # Standard Library
+import copy
 import sys, os
 import logging
 
@@ -131,7 +132,7 @@ def findClustersFainter(mag, continuumMag, continuumSigma, num_points_per_cluste
     
     return findClusters(w, mag, continuumMag, continuumSigma, num_points_per_cluster, num_sigma)
 
-def compute_delta_chi_squared(light_curve):
+def compute_delta_chi_squared(light_curve, force_fit=False):
     """ """
     if isinstance(light_curve, tuple):
         mjd, mag, error = light_curve
@@ -139,9 +140,25 @@ def compute_delta_chi_squared(light_curve):
         mjd = light_curve.amjd
         mag = light_curve.amag
         error = light_curve.error
+    
+    if force_fit:
+        lin_ier = 0
+        ml_ier = 0
         
-    linear_fit_params, lin_num = so.leastsq(linear_error_function, x0=(np.median(mag), 0.), args=(mjd, mag, error))
-    microlensing_fit_params, ml_num = so.leastsq(microlensing_error_function, x0=(np.median(mag), mjd[mag.argmin()], 10., -25.), args=(mjd, mag, error), maxfev=1000)
+        tries = 0
+        while lin_ier not in [1,2,3,4] and tries <= 10:
+            linear_fit_params, covx, infodict, mesg, lin_ier = so.leastsq(linear_error_function, x0=(np.random.normal(np.median(mag), 0.5), 0.), args=(mjd, mag, error), full_output=1)
+            tries += 1
+        
+        tries = 0
+        while ml_ier not in [1,2,3,4] and tries <= 10:
+            microlensing_fit_params, covx, infodict, mesg, ml_ier = so.leastsq(microlensing_error_function, x0=(np.random.normal(np.median(mag), 0.5), np.random.normal(mjd[mag.argmin()], 10), np.random.normal(10., 2), np.random.normal(-25., 5)), args=(mjd, mag, error), maxfev=1000, full_output=1)
+            tries += 1
+            
+    else:
+        linear_fit_params, lin_ier = so.leastsq(linear_error_function, x0=(np.random.normal(np.median(mag), 0.5), 0.), args=(mjd, mag, error))
+        microlensing_fit_params, ml_ier = so.leastsq(microlensing_error_function, x0=(np.median(mag), mjd[mag.argmin()], 10., -25.), args=(mjd, mag, error), maxfev=1000)
+        
     
     linear_chisq = np.sum(linear_error_function(linear_fit_params, \
                                                 mjd, \
@@ -173,63 +190,69 @@ def compute_variability_indices(lightCurve, indices=[]):
     idx_dict = {} 
     
     # sigma/mu : root-variance / mean
-    mu = contMag #np.mean(lightCurve.mag)
-    #sigma = np.sqrt(np.sum(lightCurve.mag - mu)**2 / (N-1.))
-    sigma = np.sqrt(np.var(lightCurve.mag))
-    sigma_to_mu = sigma / mu
-
-    # Con : number of consecutive series of 3 points BRIGHTER than the light curve
-    num_sigma = 2.
-    clusters = findClustersBrighter(lightCurve.mag, contMag, contSig, 3, num_sigma=num_sigma)
-    Con = len(clusters) / (N - 2.)
+    if "sigma_mu" in indices:
+        mu = contMag #np.mean(lightCurve.mag)
+        idx_dict["mu"] = mu
+        
+        #sigma = np.sqrt(np.sum(lightCurve.mag - mu)**2 / (N-1.))
+        sigma = np.std(lightCurve.mag)
+        sigma_to_mu = sigma / mu
+        idx_dict["sigma_mu"] = sigma_to_mu
     
-    clusters = findClustersBrighter(lightCurve.mag, contMag, contSig, 3, num_sigma=3)
-    B = len(clusters) # Number of clusters of >3 points BRIGHTER than 3-sigma over the baseline
+    if "con" in indices:
+        # Con : number of consecutive series of 3 points BRIGHTER than the light curve
+        num_sigma = 2.
+        clusters = findClustersBrighter(lightCurve.mag, contMag, contSig, 3, num_sigma=num_sigma)
+        Con = len(clusters) / (N - 2.)
+        idx_dict["con"] = Con
     
-    clusters = findClustersFainter(lightCurve.mag, contMag, contSig, 3, num_sigma=3)
-    F = len(clusters) # Number of clusters of >3 points FAINTER than 3-sigma over the baseline
+    if "b" in indices:
+        clusters = findClustersBrighter(lightCurve.mag, contMag, contSig, 3, num_sigma=3)
+        B = len(clusters) # Number of clusters of >3 points BRIGHTER than 3-sigma over the baseline
+        idx_dict["b"] = B
+    
+    if "f" in indices:
+        clusters = findClustersFainter(lightCurve.mag, contMag, contSig, 3, num_sigma=3)
+        F = len(clusters) # Number of clusters of >3 points FAINTER than 3-sigma over the baseline
+        idx_dict["f"] = F
     
     # eta : ratio of mean square successive difference to the sample variance
-    delta_squared = np.sum((lightCurve.mag[1:] - lightCurve.mag[:-1])**2 / (N - 1.))
-    variance = sigma**2
-    eta = delta_squared / variance
+    if "eta" in indices:
+        delta_squared = np.sum((lightCurve.mag[1:] - lightCurve.mag[:-1])**2 / (N - 1.))
+        variance = sigma**2
+        eta = delta_squared / variance
+        idx_dict["eta"] = eta
     
-    delta_n = np.sqrt(float(N)/(N-1.)) * (lightCurve.mag[:-1] - mu) / lightCurve.error[:-1] 
-    delta_n_plus_1 = np.sqrt(float(N)/(N-1.)) * (lightCurve.mag[1:] - mu) / lightCurve.error[1:]
-    # J : eqn. 3 in M.-S. Shin et al. 2009
-    #   Modified 2012-05-24 to use eq. 1 in Fruth et al.
-    #weight = np.exp(-(lightCurve.mjd[1:]-lightCurve.mjd[:-1]) / np.mean(lightCurve.mjd[1:]-lightCurve.mjd[:-1]))
-    #J = np.sum(np.sign(delta_n*delta_n_plus_1)*np.sqrt(np.fabs(delta_n*delta_n_plus_1)) / weight)
-    J = np.sum(np.sign(delta_n*delta_n_plus_1)*np.sqrt(np.fabs(delta_n*delta_n_plus_1)))
+    if "j" in indices or "k" in indices:
+        delta_n = np.sqrt(float(N)/(N-1.)) * (lightCurve.mag[:-1] - mu) / lightCurve.error[:-1] 
+        delta_n_plus_1 = np.sqrt(float(N)/(N-1.)) * (lightCurve.mag[1:] - mu) / lightCurve.error[1:]
     
-    # K : eqn. 3 in M.-S. Shin et al. 2009
-    delta_n = np.sqrt(float(N)/(N-1.)) * (lightCurve.mag - mu) / lightCurve.error
-    K = np.sum(np.fabs(delta_n)) / (float(N)*np.sqrt((1./N)*np.sum(delta_n**2)))
+    if "j" in indices:
+        # J : eqn. 3 in M.-S. Shin et al. 2009
+        #   Modified 2012-05-24 to use eq. 1 in Fruth et al.
+        #weight = np.exp(-(lightCurve.mjd[1:]-lightCurve.mjd[:-1]) / np.mean(lightCurve.mjd[1:]-lightCurve.mjd[:-1]))
+        #J = np.sum(np.sign(delta_n*delta_n_plus_1)*np.sqrt(np.fabs(delta_n*delta_n_plus_1)) / weight)
+        J = np.sum(np.sign(delta_n*delta_n_plus_1)*np.sqrt(np.fabs(delta_n*delta_n_plus_1)))
+        idx_dict["j"] = J
     
-    # delta_chi_squared : matched filter approach, fit a line, then a gaussian; compare.
-    delta_chi_squared = compute_delta_chi_squared(lightCurve)
+    if "k" in indices:
+        # K : eqn. 3 in M.-S. Shin et al. 2009
+        delta_n = np.sqrt(float(N)/(N-1.)) * (lightCurve.mag - mu) / lightCurve.error
+        K = np.sum(np.fabs(delta_n)) / (float(N)*np.sqrt((1./N)*np.sum(delta_n**2)))
+        idx_dict["k"] = K
+    
+    if "delta_chi_squared" in indices:
+        # delta_chi_squared : matched filter approach, fit a line, then a gaussian; compare.
+        delta_chi_squared = compute_delta_chi_squared(lightCurve)
+        idx_dict["delta_chi_squared"] = delta_chi_squared
     
     # Analysis of Variance maximum
     if "aovm" in indices:
         peaks = findPeaks_aov(lightCurve.mjd, lightCurve.mag, lightCurve.error, 2, 0.1, 100., 0.1, 0.01, 20)
         idx_dict["aovm"] = peaks["peak_power"][0]
     
-    idx_dict["sigma_mu"] = sigma_to_mu
-    idx_dict["con"] = Con
-    idx_dict["eta"] = eta
-    idx_dict["j"] = J
-    idx_dict["k"] = K
-    idx_dict["b"] = B
-    idx_dict["f"] = F
-    idx_dict["delta_chi_squared"] = delta_chi_squared
-    idx_dict["mu"] = mu
-    
     if indices:
-        return_list = []
-        for idx in indices:
-            return_list.append(idx_dict[idx])
-        
-        return tuple(return_list)
+        return tuple([idx_dict[x] for x in indices])
     else:
         return idx_dict
     
@@ -273,6 +296,14 @@ class SimulatedLightCurve(PTFLightCurve):
             self.mag = np.ones(len(self.mjd), dtype=float)*FluxToRMag(self.F0) + outlier_points
     
             self._addNoise()
+        
+        self._original_mag = copy.copy(self.mag)
+    
+    def reset(self):
+        self.amag = self.mag = copy.copy(self._original_mag)
+        self.u0 = None
+        self.t0 = None
+        self.tE = None
     
     def addMicrolensingEvent(self, u0=None, t0=None, tE=None):
         """ Adds a simulated microlensing event to the light curve

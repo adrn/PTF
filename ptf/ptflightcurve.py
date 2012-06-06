@@ -127,6 +127,22 @@ class PTFLightCurve:
     def aovBestPeriod(self):
         raise NotImplementedError("TODO!")
 
+class LightCurveCollection(object):
+    """ Represents a list or collection of Light curves """
+    pass
+
+class HomogeneousLightCurveCollection(LightCurveCollection):
+    """ Represents a list of light curves that share a dispersion (time) axis """
+    
+    def __init__(self):
+        pass
+
+class InhomogeneousLightCurveCollection(LightCurveCollection):
+    """ Represents a list of light curves that DON'T share a dispersion (time) axis """
+    
+    def __init__(self):
+        pass
+
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
     from ptf.db.DatabaseConnection import *

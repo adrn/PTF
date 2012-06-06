@@ -85,6 +85,8 @@ class PTFCoveragePlot(object):
             self.axis = self.figure.add_subplot(111)
         
         self.axis.set_xticklabels([330, 300, 270, 240, 210, 180, 150, 120, 90, 60, 30])
+        self.title = self.axis.set_title("Comparing survey coverage in equatorial coordinates")
+        self.title.set_y(1.07)
         
     def addFields(self, fields, label=None, color_by_observations=False, **kwargs):
         """ Add a list of Field() objects to be plotted as Rectangle patches """
@@ -92,7 +94,6 @@ class PTFCoveragePlot(object):
         if color_by_observations:
             num_obs = [x.number_of_observations for x in fields]
             maxNum = scoreatpercentile(num_obs, 99) #max(num_obs)+1
-            print maxNum
             #scaler = matplotlib.colors.LogNorm(0.9999, maxNum)
             scaler = matplotlib.colors.Normalize(0, maxNum)
         
@@ -130,7 +131,7 @@ class PTFCoveragePlot(object):
             self.axis.add_patch(rec)
         
     def addLegend(self):
-        self.axis.legend()
+        self.legend = self.axis.legend(bbox_to_anchor=(0.75, -0.05), ncol=3, fancybox=True, shadow=True)
 
 if __name__ == "__main__":
     # PTF:
@@ -156,7 +157,7 @@ if __name__ == "__main__":
     ogle_low_cadence_fields = []
     for row in low_cadence: ogle_low_cadence_fields.append(OGLEField(row["ra"], row["dec"]))
     
-    coverage_plot = PTFCoveragePlot(figsize=(25,10), projection="aitoff")
+    coverage_plot = PTFCoveragePlot(figsize=(25,25), projection="aitoff")
     coverage_plot.addFields(ptf_fields, label="PTF", color_by_observations=True)
     coverage_plot.addFields(ogle_low_cadence_fields, label="OGLE-IV - low cadence", color="b", alpha=0.15)
     coverage_plot.addFields(ogle_high_cadence_fields, label="OGLE-IV - high cadence", color="r", alpha=0.15)

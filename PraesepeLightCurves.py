@@ -27,6 +27,7 @@
 
 # Standard library
 import copy
+import cPickle as pickle
 import glob
 import logging
 import math
@@ -52,6 +53,8 @@ from sqlalchemy import func
 from ptf.db.DatabaseConnection import *
 import ptf.simulation.util as simu
 from ptf import PTFLightCurve
+
+parameter_to_label = {"j" : "J", "k" : "K", "sigma_mu" : r"$\sigma/\mu$", "eta" : r"$\eta$", "delta_chi_squared" : r"$\Delta \chi^2$"}
 
 def txt_file_light_curve_to_recarray(filename):
     """ All columns in this file are:
@@ -394,14 +397,14 @@ class VIFigure:
         if legend:
             # Stole the below from http://matplotlib.sourceforge.net/api/axes_api.html
             h,l = self.subplot_array[0,1].get_legend_handles_labels()
-            thisSubplot.legend(h,l)
+            self.legend = thisSubplot.legend(h,l)
         
         if vi_axis.plot_function == "loglog":
-            xlabel = "log({0})".format(vi_axis.x_axis_parameter)
-            ylabel = "log({0})".format(vi_axis.y_axis_parameter)
+            xlabel = r"log({0})".format(parameter_to_label[vi_axis.x_axis_parameter])
+            ylabel = r"log({0})".format(parameter_to_label[vi_axis.y_axis_parameter])
         elif vi_axis.plot_function == "plot":
-            xlabel = vi_axis.x_axis_parameter
-            ylabel = vi_axis.y_axis_parameter
+            xlabel = parameter_to_label[vi_axis.x_axis_parameter]
+            ylabel = parameter_to_label[vi_axis.y_axis_parameter]
         else:
             xlabel = ""
             ylabel = ""
@@ -663,7 +666,7 @@ def single_field_add_microlensing(indices, field, num_light_curves=100000, color
                 vmin = min(color_by_parameter_array)
                 vmax = max(color_by_parameter_array)
                 viAxis.add_series(var_indices_with_event_array[xParameter], var_indices_with_event_array[yParameter], \
-                              name="to_color", c=color_by_parameter_array, alpha=0.2, vmin=vmin, vmax=vmax, cmap=cm, edgecolors='none')
+                              name="color", c=color_by_parameter_array, alpha=0.2, vmin=vmin, vmax=vmax, cmap=cm, edgecolors='none')
             else:
                 viAxis.add_series(var_indices_with_event_array[xParameter], var_indices_with_event_array[yParameter], \
                               color='k', alpha=0.2, marker=".")
@@ -683,14 +686,14 @@ def single_field_add_microlensing(indices, field, num_light_curves=100000, color
             else:
                 viFigure.add_subplot(viAxis)
     
-    viFigure.add_colorbar(name="to_color")
+    viFigure.add_colorbar(name="color")
     viFigure2 = copy.copy(viFigure)
     viFigure.save()
     
     if color_by:
         for ax in viFigure.vi_axis_list:
             try:
-                ax.series_plot_return["to_color"].set_alpha(0.0)
+                ax.series_plot_return["color"].set_alpha(0.0)
             except KeyError:
                 pass
         
@@ -979,6 +982,376 @@ def compute_aovm():
     session.flush()
     
 
+def aas_figure_old():
+    """ For all light curves in a single PTF field around Praesepe, produce a 5x5 plot for 
+        all light curves and then a random sample of all objects with random microlensing
+        event parameters added.
+        
+        color_by controls which parameter to color the points on. 
+    """
+    
+    indices = ["j", "k", "eta", "sigma_mu", "delta_chi_squared"]
+    field = 110001
+    color_by = "tE"
+    num_light_curves = 10000
+
+    if not os.path.exists("data/aas_var_indices_coloredby{}.pickle".format(color_by)):    
+        # Select any light curve with at least one observation on the given field 
+        lightCurves = session.query(LightCurve).\
+                              filter(LightCurve.objid < 100000).\
+                              limit(num_light_curves).\
+                              all()
+        
+        print "---> Light curves loaded from database"
+        
+        # Now we loop through all light curves selected above and only select data points with 
+        #   nonzero error that were taken in the given PTF field
+        var_indices = []
+        var_indices_with_event = []
+        color_by_parameter = []
+        
+        for lightCurve in lightCurves:
+            # Only select points where the error is less than 0.1 mag and only for the specified field
+            this_field_idx = (lightCurve.afield == field) & (lightCurve.error != 0)
+    
+            if len(lightCurve.amjd[this_field_idx]) <= 25:
+                logging.debug("Light curve doesn't have enough data points on this field")
+                continue
+            
+            logging.debug("Light curve selected")
+    
+            # Create a PTFLightCurve object so we can easily compute the variability indices
+            ptf_light_curve = simu.SimulatedLightCurve(lightCurve.amjd[this_field_idx], mag=lightCurve.amag[this_field_idx], error=lightCurve.error[this_field_idx])
+            var_indices.append(simu.compute_variability_indices(ptf_light_curve, indices=indices))
+            
+            # For a random sample of 10% of the light curves, add 100 different microlensing events to 
+            #   their light curves and recompute the variability indices. Then
+            if np.random.uniform() <= 0.1:
+                for ii in range(100):
+                    # Copy the PTFLightCurve object, add a microlensing event, and recompute the variability indices
+                    lc = copy.copy(ptf_light_curve)
+                    
+                    # TODO: Sample timescale from the distribution that Amanda will send me
+                    lc.addMicrolensingEvent()
+                    var_indices_with_event.append(simu.compute_variability_indices(lc, indices=indices))
+                    
+                    if color_by:
+                        color_by_parameter.append(getattr(lc, color_by))
+        
+        if not lightCurves or not var_indices:
+            logging.info("No light curves selected.")
+            return
+        
+        var_indices_array = np.array(var_indices, dtype=zip(indices, [float]*len(indices))).view(np.recarray)
+        var_indices_with_event_array = np.array(var_indices_with_event, dtype=zip(indices, [float]*len(indices))).view(np.recarray)
+        color_by_parameter_array = np.array(color_by_parameter)
+        
+        f = open("data/aas_var_indices_coloredby{}.pickle".format(color_by), "w")
+        pickle.dump((var_indices_array, var_indices_with_event_array, color_by_parameter_array), f)
+        f.close()
+    
+    f = open("data/aas_var_indices_coloredby{}.pickle".format(color_by), "r")
+    var_indices_array, var_indices_with_event_array, color_by_parameter_array = pickle.load(f)
+    
+    figure_filename = "plots/aas_praesepe_field{0}.png".format(field)
+    overlay_filename = "plots/aas_praesepe_field{0}_coloredby{1}.png".format(field, color_by)
+        
+    viFigure = VIFigure("", indices)
+    cm = matplotlib.cm.get_cmap('Spectral')
+    for ii, yParameter in enumerate(indices):
+        for jj, xParameter in enumerate(indices):
+            if ii < jj:
+                # Top triangular section: Log-Log plots
+                viAxis = VIAxis(xParameter, yParameter, plot_function="loglog")
+            else:
+                continue
+
+            if color_by == "tE":
+                cba = np.log10(color_by_parameter_array)
+                vmin = 0.
+                vmax = 3.
+            elif color_by == "u0":
+                cba = color_by_parameter_array
+                vmin = min(cba)
+                vmax = max(cba)
+            
+            viAxis.add_series(var_indices_with_event_array[xParameter], var_indices_with_event_array[yParameter], \
+                          name="color", alpha=0.2, c=cba, vmin=vmin, vmax=vmax, cmap=cm, edgecolors='none')
+            
+            viAxis.add_series(var_indices_array[xParameter], var_indices_array[yParameter], \
+                              name="black", color="k", marker=".", alpha=0.25, label="All Light Curves in Field {0}".format(field))
+            
+            # Add whatever other series here
+            # viAxis.add_series(varIndices[xParameter], varIndices[yParameter], color="r", marker=".", alpha=0.3)
+            if ii == jj == 4:
+                viFigure.add_subplot(viAxis, legend=True)
+            else:
+                viFigure.add_subplot(viAxis)
+    
+    viFigure.add_colorbar(name="color")
+    
+    for ax in viFigure.vi_axis_list:
+        try:
+            ax.series_plot_return["black"].set_alpha(0.0)
+        except KeyError:
+            pass
+    
+    # Turn off everything except the data points!
+    visible_tf = []
+    for ax in viFigure.figure.axes:
+        visible_tf.append(ax.get_xaxis().get_visible())
+        ax.get_xaxis().set_visible(False)
+        ax.get_yaxis().set_visible(False)
+        ax.set_frame_on(False)
+    
+    viFigure.legend.set_visible(False)
+    viFigure.save("plots/aas_praesepe_field{0}_coloredby{1}.png".format(field, color_by))
+    
+    for ax in viFigure.vi_axis_list:
+        try:
+            ax.series_plot_return["color"].set_alpha(0.0)
+        except KeyError:
+            pass
+        
+        try:
+            ax.series_plot_return["black"].set_alpha(0.25)
+        except KeyError:
+            pass
+    
+    for ii, ax in enumerate(viFigure.figure.axes):
+        if visible_tf[ii]:
+            ax.get_xaxis().set_visible(True)
+            ax.get_yaxis().set_visible(True)
+            ax.set_frame_on(True)
+    
+    viFigure.legend.set_visible(True)
+    viFigure.save("plots/aas_praesepe_field{0}.png".format(field))
+    
+    """for ax in viFigure.vi_axis_list:
+        try:
+            ax.series_plot_return["color"].set_alpha(0.3)
+        except KeyError:
+            pass
+    """    
+
+def aas_figure():
+    """ For all light curves in a single PTF field around Praesepe, produce a 5x5 plot for 
+        all light curves and then a random sample of all objects with random microlensing
+        event parameters added.
+        
+        color_by controls which parameter to color the points on. 
+    """
+    
+    from AASPoster import label_font_size, tick_font_size, title_font_size
+    
+    indices = ["j", "k", "eta", "sigma_mu", "delta_chi_squared"]
+    field = 110001
+    color_by = "tE"
+    num_light_curves = 10000
+
+    if not os.path.exists("data/aas_var_indices_coloredby{}.pickle".format(color_by)):    
+        # Select any light curve with at least one observation on the given field 
+        lightCurves = session.query(LightCurve).\
+                              filter(LightCurve.objid < 100000).\
+                              limit(num_light_curves).\
+                              all()
+        
+        print "---> Light curves loaded from database"
+        
+        # Now we loop through all light curves selected above and only select data points with 
+        #   nonzero error that were taken in the given PTF field
+        var_indices = []
+        var_indices_with_event = []
+        color_by_parameter = []
+        
+        for lightCurve in lightCurves:
+            # Only select points where the error is less than 0.1 mag and only for the specified field
+            this_field_idx = (lightCurve.afield == field) & (lightCurve.error != 0)
+    
+            if len(lightCurve.amjd[this_field_idx]) <= 25:
+                logging.debug("Light curve doesn't have enough data points on this field")
+                continue
+            
+            logging.debug("Light curve selected")
+    
+            # Create a PTFLightCurve object so we can easily compute the variability indices
+            ptf_light_curve = simu.SimulatedLightCurve(lightCurve.amjd[this_field_idx], mag=lightCurve.amag[this_field_idx], error=lightCurve.error[this_field_idx])
+            var_indices.append(simu.compute_variability_indices(ptf_light_curve, indices=indices))
+            
+            # For a random sample of 10% of the light curves, add 100 different microlensing events to 
+            #   their light curves and recompute the variability indices. Then
+            if np.random.uniform() <= 0.1:
+                for ii in range(100):
+                    # Copy the PTFLightCurve object, add a microlensing event, and recompute the variability indices
+                    lc = copy.copy(ptf_light_curve)
+                    
+                    # TODO: Sample timescale from the distribution that Amanda will send me
+                    lc.addMicrolensingEvent()
+                    var_indices_with_event.append(simu.compute_variability_indices(lc, indices=indices))
+                    
+                    if color_by:
+                        color_by_parameter.append(getattr(lc, color_by))
+        
+        if not lightCurves or not var_indices:
+            logging.info("No light curves selected.")
+            return
+        
+        var_indices_array = np.array(var_indices, dtype=zip(indices, [float]*len(indices))).view(np.recarray)
+        var_indices_with_event_array = np.array(var_indices_with_event, dtype=zip(indices, [float]*len(indices))).view(np.recarray)
+        color_by_parameter_array = np.array(color_by_parameter)
+        
+        f = open("data/aas_var_indices_coloredby{}.pickle".format(color_by), "w")
+        pickle.dump((var_indices_array, var_indices_with_event_array, color_by_parameter_array), f)
+        f.close()
+    
+    f = open("data/aas_var_indices_coloredby{}.pickle".format(color_by), "r")
+    var_indices_array, var_indices_with_event_array, color_by_parameter_array = pickle.load(f)
+    
+    # Determine the variable to color the microlensing points by
+    if color_by == "tE":
+        cba = np.log10(color_by_parameter_array)
+        vmin = 0.
+        vmax = 3.
+    elif color_by == "u0":
+        cba = color_by_parameter_array
+        vmin = min(cba)
+        vmax = max(cba)    
+    
+    figure_filename = "plots/aas_praesepe_field{0}.png".format(field)
+    overlay_filename = "plots/aas_praesepe_field{0}_coloredby{1}.png".format(field, color_by)
+        
+    figure, axes = plt.subplots(len(indices), len(indices), figsize=(20,20)) # TODO: Change to 25,25
+    figure.subplots_adjust(hspace=0.1, wspace=0.1, top=0.92, bottom=0.08, left=0.03, right=0.91)
+    scatterpts_list = []
+    
+    cmap = matplotlib.cm.get_cmap('Spectral')
+    for ii, xParameter in enumerate(indices):
+        for jj, yParameter in enumerate(indices):
+            
+            axes[jj,ii].set_xscale("log")
+            axes[jj,ii].set_yscale("log")
+            axes[jj,ii].yaxis.set_visible(False)
+            
+            if ii == jj:
+                #histograms
+                nim,xam = np.fabs(var_indices_with_event_array[xParameter]).min(), np.fabs(var_indices_with_event_array[xParameter]).max()
+                bins = np.logspace(np.log10(nim), np.log10(xam), 50)
+                
+                mu = np.mean(var_indices_array[xParameter])
+                sigma = np.std(var_indices_array[xParameter])
+                
+                axes[jj,ii].hist(np.fabs(var_indices_with_event_array[xParameter]), bins=bins, color="c", alpha=0.0, label="Praesepe light curves")
+                axes[jj,ii].hist(np.fabs(var_indices_array[xParameter]), bins=bins, color="k", alpha=0.5, label="Light curves with injected events")
+                axes[jj,ii].axvline(mu + 2.*sigma, c='r', ls='-', label=r"$2\sigma$ cut", lw=2, alpha=0.0)
+                axes[jj,ii].axvline(mu - 2.*sigma, c='r', ls='-', lw=2, alpha=0.0)
+                axes[jj,ii].set_xlabel(r"{0}".format(parameter_to_label[xParameter]), size=label_font_size)
+                continue
+            elif ii < jj:
+                axes[jj,ii].set_frame_on(False)
+                axes[jj,ii].xaxis.set_visible(False)
+                axes[jj,ii].yaxis.set_visible(False)
+                continue
+            
+            if ii == len(indices)-1:
+                axes[jj,ii].yaxis.set_visible(True)
+                axes[jj,ii].yaxis.set_label_position('right')
+                axes[jj,ii].yaxis.set_ticks_position('right')
+                axes[jj,ii].set_ylabel(r"{0}".format(parameter_to_label[yParameter]), size=label_font_size, rotation="horizontal")
+            
+            scatterpts = axes[jj,ii].scatter(var_indices_with_event_array[xParameter], var_indices_with_event_array[yParameter], \
+                            alpha=0.3, c=cba, vmin=vmin, vmax=vmax, cmap=cmap, edgecolors='none', label="Light curves with injected events")
+                            
+            axes[jj,ii].scatter(var_indices_array[xParameter], var_indices_array[yParameter],\
+                        color="k", marker=".", alpha=0.25, label="Praesepe light curves".format(field))
+            
+            scatterpts_list.append(scatterpts)
+            
+            axes[jj,ii].xaxis.set_visible(False)
+            
+    # Go back and set histogram axes to be same as var indices
+    for ii in range(len(indices)):
+        if ii == 0: axes[ii,ii].set_xlim(axes[0,-1].get_ylim())
+        else: axes[ii,ii].set_xlim(axes[ii-1,ii].get_xlim())
+        
+        for jj in range(len(indices)):
+            for label in axes[jj,ii].get_xticklabels() + axes[jj,ii].get_yticklabels():
+                label.set_fontsize(tick_font_size-4)
+    
+    axes[4,4].set_xticks(axes[4,4].get_xticks()[::2])
+        
+    # Add legend to panel in bottom right corner
+    h,l = axes[0,1].get_legend_handles_labels()
+    h2,l2 = axes[0,0].get_legend_handles_labels()
+    leg = axes[3,0].legend(h + h2, l + l2, loc="center left", frameon=False)
+    legendtext = leg.get_texts()
+    plt.setp(legendtext, fontsize=label_font_size-4)
+    
+    cax = figure.add_axes([0.1, 0.125, 0.57, 0.05])
+    cbar = figure.colorbar(scatterpts, cax, orientation="horizontal")
+    
+    cbar.set_ticks(np.linspace(0., 3., 11))
+    cbar.set_ticklabels([str(int(round(10**x))) for x in np.linspace(0., 3., 11)])
+    plt.setp(cbar.ax.axes.get_xticklabels(), fontsize=tick_font_size)
+    
+    if color_by == "tE":
+        cbar.set_label(r"$t_E$ [day]", size=label_font_size)
+    elif color_by == "u0":
+        cbar.set_label(r"$u_0$", size=label_font_size)
+    
+    for sc in scatterpts_list: sc.set_alpha(0.0)
+    
+    figure.suptitle("Variability Indices", size=title_font_size+16)
+    
+    #plt.tight_layout()
+    plt.savefig(figure_filename)
+    
+    # Now do it all over again with ONLY the colored points!
+    plt.clf()
+    
+    figure, axes = plt.subplots(len(indices), len(indices), figsize=(20,20)) # TODO: Change to 25,25
+    figure.subplots_adjust(hspace=0.1, wspace=0.1, top=0.92, bottom=0.08, left=0.03, right=0.91)
+    
+    cmap = matplotlib.cm.get_cmap('Spectral')
+    for ii, xParameter in enumerate(indices):
+        for jj, yParameter in enumerate(indices):            
+            axes[jj,ii].set_xscale("log")
+            axes[jj,ii].set_yscale("log")
+            axes[jj,ii].set_frame_on(False)
+            axes[jj,ii].xaxis.set_visible(False)
+            axes[jj,ii].yaxis.set_visible(False)
+            
+            if ii == jj:
+                #histograms
+                nim,xam = np.fabs(var_indices_with_event_array[xParameter]).min(), np.fabs(var_indices_with_event_array[xParameter]).max()
+                bins = np.logspace(np.log10(nim), np.log10(xam), 50)
+                
+                mu = np.mean(var_indices_array[xParameter])
+                sigma = np.std(var_indices_array[xParameter])
+                
+                axes[jj,ii].hist(np.fabs(var_indices_with_event_array[xParameter]), bins=bins, color="c", alpha=0.4)
+                redline = axes[jj,ii].axvline(mu + 2.*sigma, c='r', ls='-', label=r"$2\sigma$ cut", lw=2, alpha=0.7)
+                axes[jj,ii].axvline(mu - 2.*sigma, c='r', ls='-', lw=2, alpha=0.7)
+                continue
+            elif ii < jj:
+                continue
+            
+            scatterpts = axes[jj,ii].scatter(var_indices_with_event_array[xParameter], var_indices_with_event_array[yParameter], \
+                            alpha=0.2, c=cba, vmin=vmin, vmax=vmax, cmap=cmap, edgecolors='none', label="Light curves with injected events")
+            
+    # Go back and set histogram axes to be same as var indices
+    for ii in range(len(indices)):
+        if ii == 0: axes[ii,ii].set_xlim(axes[0,-1].get_ylim())
+        else: axes[ii,ii].set_xlim(axes[ii-1,ii].get_xlim())
+        
+        for jj in range(len(indices)):
+            for label in axes[jj,ii].get_xticklabels() + axes[jj,ii].get_yticklabels():
+                label.set_fontsize(tick_font_size-4)
+    
+    axes[4,4].set_xticks(axes[4,4].get_xticks()[::2])
+    
+    #plt.tight_layout()
+    plt.savefig(overlay_filename)
+    
 if __name__ == "__main__":
     from argparse import ArgumentParser
 
