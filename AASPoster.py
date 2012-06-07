@@ -13,7 +13,7 @@ import cPickle as pickle
 #import apwlib.convert as c
 import apwlib.geometry as g
 import matplotlib
-matplotlib.use("WxAgg")
+matplotlib.use("Agg")
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
@@ -321,7 +321,7 @@ def survey_detection_effieciency():
             
             plt.plot(np.log2(num_observations), efficiencies, ls=linestyles[sampling], color=linecolors[timescale], label=r"$t_E={}$ day, {} sampling".format(int(timescale), sampling), lw=3)
     
-    plt.axvline(np.log2(625.), c="g", ls="--", lw=2, label="PTF Praesepe fields")
+    #plt.axvline(np.log2(625.), c="g", ls="--", lw=2, label="PTF Praesepe fields")
     
     plt.xlabel("Number of Observations / 1 year", size=label_font_size)
     plt.ylabel(r"Detection Efficiency $\mathcal{E}(t_E)$", size=label_font_size)
@@ -442,8 +442,8 @@ def systematics_9347():
 if __name__ == "__main__":
     #survey_coverage()
     #praesepe_detection_efficiency()
-    #survey_detection_effieciency()
+    survey_detection_effieciency()
     #variability_indices()
     #variability_indices_detection_efficiency()
     #praesepe_timescale_distribution()
-    praesepe_event_rate()
+    #praesepe_event_rate()
