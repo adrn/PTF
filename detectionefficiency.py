@@ -24,54 +24,7 @@ from scipy.stats import scoreatpercentile
 # Project
 from ptf.db.DatabaseConnection import *
 import ptf.simulation.util as simu
-
-class AllPraesepeLightCurves(object):
-    """ A generator object for returning all of the Praesepe light curves in a
-        memory efficient way
-    """
-    def __iter__(self):
-        return self
-    
-    def __init__(self, N_per=1000, limit=0, random=False):
-        self._ii_current = 0
-        self.query = session.query(LightCurve).filter(LightCurve.objid < 100000)
-        
-        if limit > 0:
-            self.N_total = limit
-            self.N_per = min([N_per, limit])
-        else:
-            self.N_total = self.query.count()
-            self.N_per = N_per
-        
-        if random:
-            self.next = self.next_random
-            self.all_objids = np.array([x[0] for x in session.query(LightCurve.objid).filter(LightCurve.objid < 100000).all()])
-        else:
-            self.next = self.next_straight
-        
-    @property
-    def offset(self):
-        return self._ii_current * self.N_per
-        
-    def next_straight(self):
-        if self.offset >= self.N_total:
-            raise StopIteration
-            return []
-        
-        lcs = session.query(LightCurve).filter(LightCurve.objid < 100000).order_by(LightCurve.objid).offset(self.offset).limit(self.N_per).all()
-        self._ii_current += 1
-        return lcs
-    
-    def next_random(self):
-        if self.offset >= self.N_total:
-            raise StopIteration
-            return []
-
-        #objid_idx = np.random.randint(0, self.query.count(), size=self.N_per)
-        np.random.shuffle(self.all_objids)
-        lcs = self.query.filter(LightCurve.objid.in_(self.all_objids)).limit(self.N_per).all()
-        self._ii_current += 1
-        return lcs
+from PraesepeLightCurves import AllPraesepeLightCurves
 
 #############################################
 # Multiprocessing stuff

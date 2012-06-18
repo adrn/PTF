@@ -11,6 +11,8 @@ from sqlalchemy.sql.expression import func
 
 import numpy as np
 
+import ptf.simulation.util as simu
+
 __all__ = ["session", "Session", "Base", "engine", "LightCurve", "VariabilityIndices"]
 
 class Singleton(type):
@@ -80,6 +82,15 @@ class LightCurve(Base):
     
     def __repr__(self):
         return "<{0} -- objid: {1}>".format(self.__class__.__name__, self.objid)
+    
+    # TODO: This may not work...
+    @property
+    def mjd(self):
+        return np.array(self.mjd)
+    
+    @property
+    def mag(self):
+        return np.array(self.mag)
     
     @property
     def amjd(self):
@@ -184,6 +195,20 @@ class LightCurve(Base):
             plt.show()
         else:
             return ax
+            
+    def indices(self, indices, recompute=False):
+        """ Return a tuple with the values of the variability indices specified. 
+        
+            If recompute, it will recompute the values on the fly.
+        """
+        if recompute:
+            return simu.compute_variability_indices(self, indices)
+        else:
+            vals = []
+            for idx in indices:
+                vals.append(getattr(self.variability_indices, idx))
+        
+        return tuple(vals)
         
 VariabilityIndices.light_curve = relationship(LightCurve, backref="variability_indices", uselist=False)
 

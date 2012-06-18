@@ -53,32 +53,9 @@ from sqlalchemy import func
 from ptf.db.DatabaseConnection import *
 import ptf.simulation.util as simu
 from ptf import PTFLightCurve
+import ptf.util as pu
 
 parameter_to_label = {"j" : "J", "k" : "K", "sigma_mu" : r"$\sigma/\mu$", "eta" : r"$\eta$", "delta_chi_squared" : r"$\Delta \chi^2$"}
-
-def txt_file_light_curve_to_recarray(filename):
-    """ All columns in this file are:
-        MJD
-        R1	<-- ignore (I think; doesn't matter much
-	    R2	which of these two you use for this, I say)
-        R2 err
-        RA
-        DEC
-        X
-        Y
-        flag
-        file
-        field
-        chip
-        
-        MJD's are relative to 2009-1-1 (54832)
-    """
-    
-    names = ["mjd", "mag", "mag_err", "ra", "dec", "flag", "fieldid", "ccd"]
-    usecols = [0, 2, 3, 4, 5, 8, 10, 11]
-    dtypes = [float, float, float, float, float, float, int, int]
-    
-    return np.genfromtxt(filename, usecols=usecols, dtype=zip(names, dtypes)).view(np.recarray)
 
 def load_txt_file_light_curves_into_database():
     """ Load the text file light curves (sent by Marcel, merged-lc.tar.gz)
@@ -94,7 +71,7 @@ def load_txt_file_light_curves_into_database():
         try:
             dbLC = session.query(LightCurve).filter(LightCurve.objid == objid).one()
         except sqlalchemy.orm.exc.NoResultFound:
-            lc = txt_file_light_curve_to_recarray(file)
+            lc = pu.txt_file_light_curve_to_recarray(file)
             lc = lc[lc.flag == 0]
             
             filterid = [2] * len(lc.mjd)
@@ -124,87 +101,6 @@ def load_txt_file_light_curves_into_database():
     logging.info("All light curves committed!")
     session.commit()
 
-def compute_indices():
-    """ For all of the Praesepe light curves, first check to see that more than
-        50% of the data points in a given light curve are good. If not, ignore that
-        light curve.
-        
-        2012-05-21 TODO: Implement Nick's suggestions for how to select out "good" data points!
-        
-    """
-    
-    # Select out 1000 light curves at a time
-    for ii in range(session.query(LightCurve).filter(LightCurve.objid < 100000).count()/1000+1):
-        num_bad = 0.0
-        for lightCurve in session.query(LightCurve).filter(LightCurve.objid < 100000).order_by(LightCurve.objid).offset(ii*1000).limit(1000).all():
-            try:
-                # Remove old variability indices
-                var = session.query(VariabilityIndices).join(LightCurve).filter(LightCurve.objid == lightCurve.objid).one()
-                session.delete(var)
-            except sqlalchemy.orm.exc.NoResultFound:
-                pass
-            
-            # Only select points where the error is less than the acceptable percent error
-            #   based on a visual fit to the plot Nick sent on 4/30/12
-            if 15 <= np.median(lightCurve.amag) <= 19:
-                percent_acceptable = 0.01 * 10**( (np.median(lightCurve.amag) - 15.) / 3.5 )
-            elif np.median(lightCurve.amag) < 15:
-                percent_acceptable = 0.01
-            else:
-                percent_acceptable = 0.5
-            
-            idx = (lightCurve.error / lightCurve.amag) < percent_acceptable
-            
-            # Check that less than half of the data points are bad
-            if float(sum(idx)) / len(lightCurve.error) <= 0.5:
-                logging.debug("Bad light curve -- ignore=True")
-                num_bad += 1
-                lightCurve.ignore = True
-                continue
-            
-            lc = PTFLightCurve(lightCurve.amjd[idx], lightCurve.amag[idx], lightCurve.error[idx])
-            try:
-                # Returns a dictionary with keys = the names of the indices
-                var_indices = simu.compute_variability_indices(lc)
-            except NameError:
-                continue
-            
-            logging.debug("Good light curve -- ignore=False")
-            lightCurve.ignore = False
-            variabilityIndices = VariabilityIndices()
-            
-            for key in var_indices.keys():
-                setattr(variabilityIndices, key, var_indices[key])
-
-            variabilityIndices.light_curve = lightCurve
-            session.add(variabilityIndices)
-            
-        logging.info("Fraction of good light curves: {}".format(1-num_bad/1000))
-        session.flush()
-        
-    session.flush()
-
-# THIS FUNCTION NEEDS AN OVERHAUL
-def load_and_match_txt_coordinates(file, vi_names):    
-    raDecs = np.genfromtxt(file, delimiter=",")
-    
-    matchedTargets = []
-    for raDec in raDecs:
-        ra = raDec[0]
-        dec = raDec[1]
-        try:
-            varIdx = session.query(VariabilityIndices)\
-                        .join(LightCurve)\
-                        .filter(LightCurve.objid < 100000)\
-                        .filter(func.q3c_radial_query(LightCurve.ra, LightCurve.dec, ra, dec, 5./3600))\
-                        .one()
-                        
-            matchedTargets.append(tuple([getattr(varIdx, idx) for idx in vi_names]))
-        except sqlalchemy.orm.exc.NoResultFound:
-            pass
-            
-    return np.array(matchedTargets, dtype=zip(vi_names, [float]*len(vi_names))).view(np.recarray)
-
 def variability_indices_to_recarray(vi_list, vi_names):
     """ Convert a list of VariabilityIndices database objects into
         a numpy recarray
@@ -212,10 +108,6 @@ def variability_indices_to_recarray(vi_list, vi_names):
     arr = np.array([tuple([getattr(vi_item, name) for name in vi_names]) for vi_item in vi_list], \
                    dtype=zip(vi_names, [float]*len(vi_names))).view(np.recarray)
     return arr
-
-def linear_rescale(x):
-    x = np.array(x)
-    return (x - x.min()) / (x.max() - x.min())
 
 # =====================================================================================
 #   These next functions will be my "pipeline" for downweighting or ignoring light
@@ -507,11 +399,11 @@ def plot_indices(indices, filename=None, number=1E6):
     varIndicesArray = variability_indices_to_recarray(varIndices, indices)
     
     # This code finds any known rotators from Agueros et al.
-    knownRotators = load_and_match_txt_coordinates("data/praesepe_rotators.txt", indices)    
-    kraus2007Members = load_and_match_txt_coordinates("data/praesepe_krauss2007_members.txt", indices)
-    rrLyrae = load_and_match_txt_coordinates("data/praesepe_rrlyrae.txt", indices)
-    eclipsing = load_and_match_txt_coordinates("data/praesepe_eclipsing.txt", indices)
-    wUma = load_and_match_txt_coordinates("data/praesepe_wuma.txt", indices)
+    knownRotators = pu.load_and_match_txt_coordinates("data/praesepe_rotators.txt", indices)    
+    kraus2007Members = pu.load_and_match_txt_coordinates("data/praesepe_krauss2007_members.txt", indices)
+    rrLyrae = pu.load_and_match_txt_coordinates("data/praesepe_rrlyrae.txt", indices)
+    eclipsing = pu.load_and_match_txt_coordinates("data/praesepe_eclipsing.txt", indices)
+    wUma = pu.load_and_match_txt_coordinates("data/praesepe_wuma.txt", indices)
     
     viFigure = VIFigure(filename, indices)
     for ii,yParameter in enumerate(indices):
@@ -1351,7 +1243,55 @@ def aas_figure():
     
     #plt.tight_layout()
     plt.savefig(overlay_filename)
+
+class AllPraesepeLightCurves(object):
+    """ A generator object for returning all of the Praesepe light curves in a
+        memory efficient way
+    """
+    def __iter__(self):
+        return self
     
+    def __init__(self, N_per=1000, limit=0, random=False):
+        self._ii_current = 0
+        self.query = session.query(LightCurve).filter(LightCurve.objid < 100000)
+        
+        if limit > 0:
+            self.N_total = limit
+            self.N_per = min([N_per, limit])
+        else:
+            self.N_total = self.query.count()
+            self.N_per = N_per
+        
+        if random:
+            self.next = self.next_random
+            self.all_objids = np.array([x[0] for x in session.query(LightCurve.objid).filter(LightCurve.objid < 100000).all()])
+        else:
+            self.next = self.next_straight
+        
+    @property
+    def offset(self):
+        return self._ii_current * self.N_per
+        
+    def next_straight(self):
+        if self.offset >= self.N_total:
+            raise StopIteration
+            return []
+        
+        lcs = session.query(LightCurve).filter(LightCurve.objid < 100000).order_by(LightCurve.objid).offset(self.offset).limit(self.N_per).all()
+        self._ii_current += 1
+        return lcs
+    
+    def next_random(self):
+        if self.offset >= self.N_total:
+            raise StopIteration
+            return []
+
+        #objid_idx = np.random.randint(0, self.query.count(), size=self.N_per)
+        np.random.shuffle(self.all_objids)
+        lcs = self.query.filter(LightCurve.objid.in_(self.all_objids)).limit(self.N_per).all()
+        self._ii_current += 1
+        return lcs
+   
 if __name__ == "__main__":
     from argparse import ArgumentParser
 
@@ -1404,7 +1344,8 @@ if __name__ == "__main__":
         logging.basicConfig(level=logging.INFO)
     
     if args.compute_indices:
-        compute_indices()
+        lcg = AllPraesepeLightCurves()
+        pu.compute_indices(lcg)
     
     if args.plot:
         plot_indices(args.indices, number=args.number)

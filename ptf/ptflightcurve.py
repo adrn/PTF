@@ -4,6 +4,7 @@ __author__ = "adrn <adrn@astro.columbia.edu>"
 
 # Standard Library
 import sys, os
+import copy
 import logging
 
 # Third-party dependencies
@@ -48,13 +49,13 @@ class PTFLightCurve:
             fig = plt.figure()
             ax = fig.add_subplot(111)
             ax.errorbar(self.mjd, self.mag, self.error, ecolor='0.7', capsize=0, **kwargs)
-            ax.set_ylim(ax.get_ylim()[::-1])
             ax.set_xlim(min(self.mjd), max(self.mjd))
+            ax.set_ylim(ax.get_ylim()[::-1])
             plt.show()
+            return
         
         ax.errorbar(self.mjd, self.mag, self.error, ecolor='0.7', capsize=0, **kwargs)
         ax.set_ylim(ax.get_ylim()[::-1])
-        
         return ax
     
     def lombScargle(self, ws):
@@ -101,13 +102,13 @@ class PTFLightCurve:
             
         return (periods, aov.aov_periodogram_asczerny(self.mjd, self.mag, len(periods), periods, nbins))
     
-    def aovFindPeaks(self, Npeaks=5):
-        raise NotImplementedError("TODO!")
-        """
+    def aovFindPeaks(self, min_period, max_period, subsample=0.1, finetune=0.01, Npeaks=5):
+        #raise NotImplementedError("TODO!")
+
         T = 2.*(self.mjd[-1] - self.mjd[0])
-        min_period = 0.1 #days
-        max_period = 200 #days
-        subsample = 0.1
+        
+        #min_period = 0.1 #days
+        #max_period = T/2. #days
         
         freqstep = subsample / T
         freq = 1. / min_period
@@ -121,27 +122,21 @@ class PTFLightCurve:
         periods = np.array(periods)
         nbins = 20
         
-        aov.findPeaks_aov(self.mjd, self.mag, self.error, Npeaks, min_period, max_period, subsample, subsample/10., nbins)
-        """
+        lc = copy.deepcopy(self)
+        return aov.findPeaks_aov(lc.mjd, lc.mag, lc.error, Npeaks, min_period, max_period, subsample, finetune, nbins)
+    
+    def phase_fold(self, T0=None):
+        raise NotImplementedError("aovFindPeaks takes FOREVER")
+        
+        if T0 == None:
+            course_period_data = self.aovFindPeaks(0.1, 200.0, subsample=0.1, finetune=0.01, Npeaks=5)
+            for peak_period in course_period_data["peak_period"]:
+                fine_period_data = self.aovFindPeaks(peak_period-0.1*peak_period, peak_period+0.1*peak_period, subsample=0.01, finetune=0.001, Npeaks=1)
+                print fine_period_data
+                
     
     def aovBestPeriod(self):
         raise NotImplementedError("TODO!")
-
-class LightCurveCollection(object):
-    """ Represents a list or collection of Light curves """
-    pass
-
-class HomogeneousLightCurveCollection(LightCurveCollection):
-    """ Represents a list of light curves that share a dispersion (time) axis """
-    
-    def __init__(self):
-        pass
-
-class InhomogeneousLightCurveCollection(LightCurveCollection):
-    """ Represents a list of light curves that DON'T share a dispersion (time) axis """
-    
-    def __init__(self):
-        pass
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt

@@ -19,6 +19,7 @@ import apwlib.convert as c
 
 # Project
 import ptf.db.util as dbu
+from ptf.db.DatabaseConnection import *
 
 if socket.gethostname() != "kepler" and socket.gethostname() != "navtara":
     try:

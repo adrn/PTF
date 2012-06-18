@@ -28,7 +28,7 @@ import scipy.optimize as so
 
 # Project
 from ..ptflightcurve import PTFLightCurve
-from ..aov import findPeaks_aov
+#from ..aov import findPeaks_aov
 
 def straight(t, b):
     return np.ones((len(t),), dtype=float)*b
@@ -190,14 +190,14 @@ def compute_variability_indices(lightCurve, indices=[]):
     idx_dict = {} 
     
     # sigma/mu : root-variance / mean
-    if "sigma_mu" in indices:
-        mu = contMag #np.mean(lightCurve.mag)
-        idx_dict["mu"] = mu
-        
-        #sigma = np.sqrt(np.sum(lightCurve.mag - mu)**2 / (N-1.))
-        sigma = np.std(lightCurve.mag)
-        sigma_to_mu = sigma / mu
-        idx_dict["sigma_mu"] = sigma_to_mu
+    #if "sigma_mu" in indices:
+    mu = contMag #np.mean(lightCurve.mag)
+    idx_dict["mu"] = mu
+    
+    #sigma = np.sqrt(np.sum(lightCurve.mag - mu)**2 / (N-1.))
+    sigma = np.std(lightCurve.mag)
+    sigma_to_mu = sigma / mu
+    idx_dict["sigma_mu"] = sigma_to_mu
     
     if "con" in indices:
         # Con : number of consecutive series of 3 points BRIGHTER than the light curve
