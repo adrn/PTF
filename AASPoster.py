@@ -13,7 +13,7 @@ import cPickle as pickle
 #import apwlib.convert as c
 import apwlib.geometry as g
 import matplotlib
-matplotlib.use("Agg")
+matplotlib.use("WxAgg")
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
@@ -103,22 +103,27 @@ timescale_bins = np.logspace(np.log10(1), np.log10(1000), 100) # from 1 day to 1
 
 def praesepe_timescale_distribution():
     
-    # TODO: get file from Amanda, put in data/ and put the correct filename below
     filename = "data/praesepeTimeScales.npy"
     timescales = np.load(filename)
     
-    plt.hist(timescales, bins=timescale_bins)
+    plt.figure(figsize=(15,15))
+    plt.hist(timescales, bins=timescale_bins, normed=True)
     plt.xscale("log")
-    plt.show()
+    plt.xlabel(r"$t_E$ [days]", size=label_font_size)
+    t = plt.title("Normalized timescale distribution for Praesepe field", size=title_font_size)
+    t.set_y(1.04)
+    ax = plt.gca()
+    for label in ax.get_xticklabels():
+        label.set_fontsize(tick_font_size)
+    
+    ax.set_yticklabels([])
+    plt.savefig("plots/aas_praesepe_timescale.png")
 
 def praesepe_event_rate():
-
-    # TODO: get file from Amanda, put in data/ and put the correct filename below
     filename = "data/praesepeTimeScales.npy"
     timescales = np.load(filename)
     
-    # TODO: get the global Praesepe event rate from Amanda
-    global_event_rate = 0.01 #??
+    global_event_rate = 0.0081 #
     
     # To get the event rate distribution, I have to normalize the timescale dist. so
     #   the integral from 0 to infinity = global event rate
@@ -158,8 +163,8 @@ def praesepe_event_rate():
     # Number of events if we had observed it consistently for 3 years
     N_exp_all_survey = np.sum(detection_efficiency_distribution * event_rate_distribution / 365. * bin_widths) * 1095. # days of Praesepe obs.
     
-    print "Number of events in our Praesepe sample (102 days):", N_exp
-    print "Number of events if we had observed it consistently for 3 years:", N_exp_all_survey
+    print "Number of events in our Praesepe sample (102 days): {} +/- {}".format(N_exp, np.sqrt(N_exp))
+    print "Number of events if we had observed it consistently for 3 years: {} +/- {}".format(N_exp_all_survey, np.sqrt(N_exp_all_survey))
 
 def praesepe_detection_efficiency():
     filename = "data/praesepe_detection_efficiency.npy"
@@ -442,8 +447,8 @@ def systematics_9347():
 if __name__ == "__main__":
     #survey_coverage()
     #praesepe_detection_efficiency()
-    survey_detection_effieciency()
+    #survey_detection_effieciency()
     #variability_indices()
     #variability_indices_detection_efficiency()
-    #praesepe_timescale_distribution()
+    praesepe_timescale_distribution()
     #praesepe_event_rate()

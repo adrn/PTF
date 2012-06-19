@@ -1,1 +1,0 @@
-from ptflightcurve import PTFLightCurve

@@ -12,6 +12,7 @@ __author__ = "adrn <adrn@astro.columbia.edu>"
 
 # Standard Library
 import os, sys
+import glob
 from optparse import OptionParser
 import logging
 
@@ -19,10 +20,12 @@ import logging
 import numpy as np
 try:
     import tables
-except ImportError:
-    raise ImportError("You have to run this with David Levitan's installation of Python here:\n\n \t/scr4/dlevitan/sw/epd-7.1-1-rh5-x86_64/bin/\n")
+except:
+    logging.warning("You should run this on Navtara with David Levitan's installation of Python here:\n\n \t/scr4/dlevitan/sw/epd-7.1-1-rh5-x86_64/bin/\n")
+import matplotlib.pyplot as plt
 
 # PTF dependences
+from ptf.ptflightcurve import PTFLightCurve
 
 db_path = "/scr4/dlevitan/matches"
 
@@ -117,8 +120,102 @@ def find_all_candidates(path="data/candidates"):
 def analyze_candidates_from_file(filename):
     """ Given a .npy file (e.g. created with candidate_light_curves_from_field()), analyze
         the selected candidate microlensing event light curves.
-    """
+        
+        Info per object:
+        ('a_world', 'absphotzp', 'alpha_j2000', 'b_world', 'background', 'class_star', 
+        'delta_j2000', 'errx2_image', 'errxy_image', 'erry2_image', 'flux_auto', 'flux_radius_1', 
+        'flux_radius_2', 'flux_radius_3', 'flux_radius_4', 'flux_radius_5', 'fluxerr_auto', 
+        'fwhm_image', 'ipacFlags', 'isoarea_world', 'kron_radius', 'mag', 'magErr', 'mag_aper_1', 
+        'mag_aper_2', 'mag_aper_3', 'mag_aper_4', 'mag_aper_5', 'mag_auto', 'mag_iso', 'mag_petro', 
+        'magerr_aper_1', 'magerr_aper_2', 'magerr_aper_3', 'magerr_aper_4', 'magerr_aper_5', 
+        'magerr_auto', 'magerr_iso', 'magerr_petro', 'matchedSourceID', 'mjd', 'mu_max', 
+        'mu_threshold', 'petro_radius', 'pid', 'relPhotFlags', 'sextractorFlags', 'sid', 
+        'theta_j2000', 'threshold', 'x', 'x2_image', 'x_image', 'xpeak_image', 'y', 'y2_image', 
+        'y_image', 'ypeak_image', 'z')
     
+        Interesting ones:
+        903
+        1519
+        1940
+        2124
+        2350
+        2999
+        3233
+        3668
+        4267
+        4512
+        5829
+        9358
+        
+    
+    """
+    data = np.load(filename)
+    scanned_lc_file = "data/candidates/scanned_light_curves.txt"
+    plot_filename = "data/candidates/{}.png"
+    
+    # Remove nan or inf values from data
+    data = data[np.isfinite(data["mag"])]
+    data = data[np.isfinite(data["mjd"])]
+    data = data[np.isfinite(data["magErr"])]
+    
+    # Remove points with ridiculous error bars / bad values
+    data = data[data["magErr"] < 0.5]
+    data = data[data["mag"] > 13.5]
+    data = data[data["mag"] < 22]
+    
+    #fig = plt.figure()
+    for objid in np.unique(data["matchedSourceID"]):
+        if objid in np.genfromtxt(scanned_lc_file): continue
+        if os.path.exists(plot_filename.format(objid)): continue
+        
+        one_object = data[data["matchedSourceID"] == objid]
+        
+        if len(one_object) < 50: continue
+        
+        light_curve = PTFLightCurve(mjd=one_object["mjd"].astype(float), mag=one_object["mag"].astype(float), error=one_object["magErr"].astype(float))
+        J,K = light_curve.variability_index(indices=["j", "k"])
+        
+        if J >= 1000:
+            #logging.debug("Saving objid {}; J={}, K={}".format(objid, J, K))
+            print "Saving objid {}; J={}, K={}".format(objid, J, K)
+            
+            fig = plt.figure()
+            fig.suptitle("{}".format(objid))
+            ax = fig.add_subplot(211)
+            light_curve.plot(ax)
+            
+            ax2 = fig.add_subplot(212)
+            short_period_data = light_curve.aovFindPeaks(min_period=0.05, max_period=1.0, subsample=0.01, finetune=0.001)
+            long_period_data = light_curve.aovFindPeaks(min_period=1.0, max_period=100.0, subsample=0.5, finetune=0.05)
+            ax2.plot(period_data["period"], -period_data["periodogram"], 'k-')
+            
+            plt.show()
+            del fig
+            #sys.exit(0)
+            
+            #fig.savefig(plot_filename.format(objid))
+            #fig.clf()
+        
+        with open(scanned_lc_file, "a+") as f:
+            f.write("{}\n".format(objid))
+
+def save_objid_to_txt(objid, path="data/candidates"):
+    """ Given an objid, save that light curve to a text file, e.g.
+        
+        # mjd mag mag_error
+        55123.124 14.6 0.052
+        etc... ... ...
+        
+    """
+    for npy_file in glob.glob(os.path.join(path, "*.npy")):
+        data = np.load(npy_file)
+        obj_data = data[data["matchedSourceID"] == objid]
+        if len(obj_data) == 0: 
+            continue
+        else:
+            light_curve = PTFLightCurve(mjd=obj_data["mjd"], mag=obj_data["mag"], error=obj_data["magErr"])
+            light_curve.savetxt(os.path.join(path, "lc_{}.txt".format(objid)))
+            break
 
 if __name__ == "__main__":
     import pyfits as pf
@@ -140,9 +237,9 @@ if __name__ == "__main__":
     elif options.quiet: logging.basicConfig(level=logging.ERROR, format='%(message)s')
     else: logging.basicConfig(level=logging.INFO, format='%(message)s')
     
-    if args.find:
-        find_all_candidates(path=args.path)
+    if options.find:
+        find_all_candidates(path=options.path)
     
-    if args.analyze:
-        print glob.glob(os.path.join(args.path, "*.npy"))
-        #analyze_candidates_from_file()
+    if options.analyze:
+        for file in glob.glob(os.path.join(options.path, "*.npy")):
+            analyze_candidates_from_file(file)

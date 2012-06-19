@@ -70,23 +70,27 @@ class PTFLightCurve:
         
         return lombscargle(self.mjd, self.mag, ws)
     
-    def aovPeriodogram(self, periods=None, nbins=None):
+    def aovPeriodogram(self, period=None, min_period=None, max_period=None, subsample=0.1, nbins=20):
         """ Create a periodogram using the Analysis of Variance method presented
             in Schwarzenberg-Czerny 1996.
             
             Parameters
             ----------
-            periods : numpy.array
-                
+            period : numpy.array
+                A numpy array of periods to evaluate.
+            min_period / max_period : int, float
+                The minimum / maximum period in DAYS to evaluate the periodogram at. Ignore if periods is specified.
+            subsample : float
+                ?
             nbins : int
+                ?
                 
         """
-        if not periods:
-            T = 2.*(self.mjd[-1] - self.mjd[0])
-            min_period = 0.1 #days
-            max_period = 200 #days
-            subsample = 0.1
+        if period == None:
+            if min_period == None or max_period == None:
+                raise ValueError("If 'period' is not specified, you must specify a minimum and maximum.")
             
+            T = 2.*(self.mjd[-1] - self.mjd[0])
             freqstep = subsample / T
             freq = 1. / min_period
             min_freq = 1. / max_period
@@ -97,19 +101,13 @@ class PTFLightCurve:
                 freq -= freqstep
             
             periods = np.array(periods)
-        
-        if not nbins:
-            nbins = 20
             
-        return (periods, aov.aov_periodogram_asczerny(self.mjd, self.mag, len(periods), periods, nbins))
+        return {"period" : periods, \
+                "periodogram" : aov.aov_periodogram_asczerny(self.mjd, self.mag, len(periods), periods, nbins)}
     
     def aovFindPeaks(self, min_period, max_period, subsample=0.1, finetune=0.01, Npeaks=5):
-        #raise NotImplementedError("TODO!")
 
         T = 2.*(self.mjd[-1] - self.mjd[0])
-        
-        #min_period = 0.1 #days
-        #max_period = T/2. #days
         
         freqstep = subsample / T
         freq = 1. / min_period
@@ -139,8 +137,17 @@ class PTFLightCurve:
         raise NotImplementedError("TODO!")
     
     def variability_index(self, indices=[]):
-        simu.compute_variability_indices(self, indices=indices)
+        return simu.compute_variability_indices(self, indices=indices)
+    
+    def savetxt(self, filename, overwrite=False):
+        """ Save the light curve to a text file """
+
+        if os.path.exists(filename) and not overwrite:
+            raise IOError("File {} already exists! You must specify overwrite=True or be more careful!".format(filename))
+        elif os.path.exists(filename) and overwrite:
+            os.remove(filename)
         
+        np.savetxt(filename, np.transpose((self.mjd, self.mag, self.error)), fmt="%.5f\t%.5f\t%.5f")
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
