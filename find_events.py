@@ -39,7 +39,6 @@ def compute_eta_2sigma(chip):
     etas = chip.sources.col("vonNeumannRatio")
     mu = np.mean(etas[etas > 0.0])
     sigma = np.std(etas[etas > 0.0])
-    
     return (mu - 2.*sigma, mu + 2.*sigma)
 
 def select_candidates_from_chip(chip):
@@ -52,14 +51,16 @@ def select_candidates_from_chip(chip):
             dbFile.root.filter02.field100083.chip10
     """
     sigma_cut = compute_eta_2sigma(chip)
-    candidate_sources = chip.sources.readWhere("(vonNeumannRatio < {}) & (vonNeumannRatio > 0)".format(sigma_cut[0]))
+    candidate_sources = chip.sources.readWhere("(vonNeumannRatio < {}) & (vonNeumannRatio > 0) & (ngoodobs > 50)".format(sigma_cut[0]))
     idx = np.in1d(chip.sourcedata.col("matchedSourceID"), candidate_sources["matchedSourceID"])    
     return chip.sourcedata[idx]
 
-def save_candidate_light_curves_from_field(fieldid):
+def candidate_light_curves_from_field(fieldid, filename=None):
     """ Given a field id, return photometric information for candidate
         microlensing events selected on their von Neumann ratios.
     """
+    
+    if os.path.exists(filename): return
     
     field_candidates = None 
     for ccdid in range(12):
@@ -67,7 +68,7 @@ def save_candidate_light_curves_from_field(fieldid):
         ccd_filename = os.path.join(db_path, file)
         
         if not os.path.exists(ccd_filename):
-            logging.debug("Field: {}, CCD: {} table not found".format(fieldid, ccdid))
+            logging.debug("Field: {}, CCD: {} table not found..skipping...".format(fieldid, ccdid))
             continue
         
         dbFile = tables.openFile(ccd_filename)
@@ -77,19 +78,71 @@ def save_candidate_light_curves_from_field(fieldid):
         if field_candidates == None:
             field_candidates = candidates
         else:
-            field_candidates = np.hstack(field_candidates, candidates)
-    
-    return field_candidates
+            field_candidates = np.hstack((field_candidates, candidates))
         
+        dbFile.close()
+    
+    if filename == None:
+        return field_candidates
+    else:
+        np.save(filename, field_candidates)
 
-if __name__ == "__main__":    
+def find_all_candidates(path="data/candidates"):
+    """ Search all fields that have been observed enough times for candidate microlensing
+        events. Then select out these light curves and save them to .npy files.
+    """
+    f = pf.open("data/exposureData.fits")
+    data = f[1].data
+    fields = np.unique(data["field_id"])
+    
+    for fieldid in fields:
+        one_field = data[data["field_id"] == fieldid]
+        one_filter = one_field[one_field["filter_id"] == 2]
+        
+        nums = []
+        for ccdid in range(12):
+            one_ccd = one_filter[one_filter["ccd_id"] == ccdid]
+            nums.append(len(one_ccd))
+        
+        num_observations = max(nums)
+        
+        if num_observations > 100:
+            logging.debug("Field: {}".format(fieldid))
+            array_filename = os.path.join(path, "{:06d}.npy".format(fieldid))
+            try:
+                candidate_light_curves_from_field(fieldid, array_filename)
+            except NameError:
+                logging.warning("No non-zero eta values...seems fishy")
+
+def analyze_candidates_from_file(filename):
+    """ Given a .npy file (e.g. created with candidate_light_curves_from_field()), analyze
+        the selected candidate microlensing event light curves.
+    """
+    
+
+if __name__ == "__main__":
+    import pyfits as pf
+    
     parser = OptionParser(description="")
     parser.add_option("-v", "--verbose", action="store_true", dest="verbose", default=False,
                     help="Be chatty (default = False)")
     parser.add_option("-q", "--quiet", action="store_true", dest="quiet", default=False,
-                    help="Be quiet! (default = False)")
+                    help="Be quiet! Shhh! (default = False)")
+    parser.add_option("--find", action="store_true", dest="find", default=False,
+                    help="Find candidate events -- must be run on navtara!")
+    parser.add_option("--analyze", action="store_true", dest="analyze", default=False,
+                    help="Analyze!")
+    parser.add_option("--path", dest="path", type=str, default="data/candidates",
+                    help="Path to the .npy files.")
     
     (options, args) = parser.parse_args()
     if options.verbose: logging.basicConfig(level=logging.DEBUG, format='%(message)s')
     elif options.quiet: logging.basicConfig(level=logging.ERROR, format='%(message)s')
     else: logging.basicConfig(level=logging.INFO, format='%(message)s')
+    
+    if args.find:
+        find_all_candidates(path=args.path)
+    
+    if args.analyze:
+        print glob.glob(os.path.join(args.path, "*.npy"))
+        #analyze_candidates_from_file()
