@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 
 # Package dependences
 import aov
+import ptf.simulation.util as simu
 
 # ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=
 
@@ -134,9 +135,12 @@ class PTFLightCurve:
                 fine_period_data = self.aovFindPeaks(peak_period-0.1*peak_period, peak_period+0.1*peak_period, subsample=0.01, finetune=0.001, Npeaks=1)
                 print fine_period_data
                 
-    
     def aovBestPeriod(self):
         raise NotImplementedError("TODO!")
+    
+    def variability_index(self, indices=[]):
+        simu.compute_variability_indices(self, indices=indices)
+        
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
