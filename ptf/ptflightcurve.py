@@ -21,9 +21,10 @@ class PTFLightCurve:
     """ Represents a PTF Light Curve """
     
     def __init__(self, mjd, mag, error):
-        self.amjd = self.mjd = np.array(mjd)
-        self.amag = self.mag = np.array(mag)
-        self.error = np.array(error)
+        idx = np.argsort(mjd)
+        self.amjd = self.mjd = np.array(mjd)[idx]
+        self.amag = self.mag = np.array(mag)[idx]
+        self.error = np.array(error)[idx]
     
     @classmethod
     def fromDBLightCurve(cls, db_light_curve):

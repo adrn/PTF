@@ -16,6 +16,9 @@ import glob
 from optparse import OptionParser
 import logging
 
+import matplotlib
+matplotlib.use("Agg")
+
 # Third-party dependencies
 import numpy as np
 try:
@@ -163,41 +166,51 @@ def analyze_candidates_from_file(filename):
     data = data[data["mag"] > 13.5]
     data = data[data["mag"] < 22]
     
-    #fig = plt.figure()
-    for objid in np.unique(data["matchedSourceID"]):
-        if objid in np.genfromtxt(scanned_lc_file): continue
-        if os.path.exists(plot_filename.format(objid)): continue
+    fig = plt.figure()
+    scanned_light_curves = np.genfromtxt(scanned_lc_file)
+    for data_objid in np.unique(data["matchedSourceID"]):
+        logging.debug("objid: {}".format(data_objid))
+        if data_objid in scanned_light_curves:
+            logging.debug("objid in scanned_light_curves.txt. skipping...")
+            continue
+        if os.path.exists(plot_filename.format(data_objid)):
+            logging.debug("Plot exists for objid. skipping...")
+            continue
         
-        one_object = data[data["matchedSourceID"] == objid]
+        one_object = data[data["matchedSourceID"] == data_objid]
         
         if len(one_object) < 50: continue
         
         light_curve = PTFLightCurve(mjd=one_object["mjd"].astype(float), mag=one_object["mag"].astype(float), error=one_object["magErr"].astype(float))
-        J,K = light_curve.variability_index(indices=["j", "k"])
+        J,K,eta,delta_chi_squared = light_curve.variability_index(indices=["j", "k", "eta", "delta_chi_squared"])
         
-        if J >= 1000:
+        if J >= 1000 and eta < 1.0:
             #logging.debug("Saving objid {}; J={}, K={}".format(objid, J, K))
-            print "Saving objid {}; J={}, K={}".format(objid, J, K)
+            print "Saving objid {}; J={}, K={}, eta={}, delta_chi_squared={}".format(data_objid, J, K, eta, delta_chi_squared)
             
-            fig = plt.figure()
-            fig.suptitle("{}".format(objid))
+            #fig = plt.figure()
+            fig.suptitle("objid {}; J={}, K={}, eta={}, delta_chi_squared={}".format(data_objid, J, K, eta, delta_chi_squared))
             ax = fig.add_subplot(211)
             light_curve.plot(ax)
             
             ax2 = fig.add_subplot(212)
-            short_period_data = light_curve.aovFindPeaks(min_period=0.05, max_period=1.0, subsample=0.01, finetune=0.001)
-            long_period_data = light_curve.aovFindPeaks(min_period=1.0, max_period=100.0, subsample=0.5, finetune=0.05)
-            ax2.plot(period_data["period"], -period_data["periodogram"], 'k-')
+            sparse_period_data = light_curve.aovFindPeaks(min_period=0.05, max_period=100.0, subsample=0.1, finetune=0.01)
+            #long_period_data = light_curve.aovFindPeaks(min_period=1.0, max_period=100.0, subsample=0.5, finetune=0.05)
+            ax2.plot(sparse_period_data["period"], -sparse_period_data["periodogram"], 'k-')
+            #ax2.plot(long_period_data["period"], -long_period_data["periodogram"], 'k-')
             
-            plt.show()
-            del fig
+            #plt.show()
+            #del fig
             #sys.exit(0)
             
-            #fig.savefig(plot_filename.format(objid))
-            #fig.clf()
+            fig.savefig(plot_filename.format(data_objid))
+            fig.clf()
         
-        with open(scanned_lc_file, "a+") as f:
-            f.write("{}\n".format(objid))
+        else:
+            with open(scanned_lc_file, "a+") as f:
+                f.write("{}\n".format(data_objid))
+            scanned_light_curves = np.genfromtxt(scanned_lc_file)
+
 
 def save_objid_to_txt(objid, path="data/candidates"):
     """ Given an objid, save that light curve to a text file, e.g.
@@ -231,6 +244,8 @@ if __name__ == "__main__":
                     help="Analyze!")
     parser.add_option("--path", dest="path", type=str, default="data/candidates",
                     help="Path to the .npy files.")
+    parser.add_option("--objid", dest="objid", type=int, default=None,
+                    help="Specific objid")
     
     (options, args) = parser.parse_args()
     if options.verbose: logging.basicConfig(level=logging.DEBUG, format='%(message)s')
