@@ -66,19 +66,21 @@ def test_send_ipac_search_request():
     table_file = send_ipac_search_request(url)
 
 class PTFImage(object):
-    __metaclass__ = abc.ABCMeta
     
-    @abc.abstractmethod
-    def from_position(ra, dec, size, filter="R", epoch=None):
-        return
+    def __init__(self, fits_file, mask_file=None):
+        pass
     
-    @abc.abstractmethod
-    def from_name(name, size, filter="R", epoch=None):
-        return
-    
-    @abc.abstractmethod
-    def from_fieldid(fieldid, ccds, filter="R", epoch=None):
-        return
+    def from_metadata(metadata):
+        """ Initialize a PTFImage object from image metadata """
+        fits_filename = metadata["pfilename"]
+        mask_filename = metadata["afilename1"]
+        
+        # Retrieve FITS files
+        print IPAC_DATA_URL, fits_filename
+        
+        img = PTFImage(fits_file, mask_file)
+        img.metadata = metadata
+        return img
 
 def test_ptfimage():
     # Test that we can't create an instance of the abstract class PTFImage
@@ -88,18 +90,6 @@ def test_ptfimage():
 class PTFFITSImage(PTFImage):
     
     def __init__(self):
-        raise NotImplementedError()
-    
-    @staticmethod
-    def from_position(ra, dec, size, filter="R", epoch=None):
-        raise NotImplementedError()
-    
-    @staticmethod
-    def from_name():
-        raise NotImplementedError()
-    
-    @staticmethod
-    def from_fieldid():
         raise NotImplementedError()
 
 class TestPTFFITSImage:
@@ -119,7 +109,17 @@ class TestPTFFITSImage:
         
         # Test creating rectangular image
         ptf_image = PTFFITSImage.from_position(ra=self.ra, dec=self.dec, size=(self.x_size,self.y_size))
-
+        
+        
+""" def from_position(ra, dec, size, filter="R", epoch=None):
+        return
+    
+    def from_name(name, size, filter="R", epoch=None):
+        return
+    
+    def from_fieldid(fieldid, ccds, filter="R", epoch=None):
+        return
+"""
 def ptf_images_from_position(ra, dec, size, filter="R", epoch=None):
     """ Creates PTF FITS Images given an equatorial position (RA/Dec) 
         and a size.
