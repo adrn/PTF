@@ -268,7 +268,7 @@ def test_ptf_images_from_fieldid():
     ptf_images_from_fieldid(fieldid, epoch=55242.39601)
 
 def test_ptf_images_from_name():
-    names = ["m42", "ngc752", "m101", "m31", "orion", "albireo"]
+    names = ["m42"]
     size = g.Angle.fromDegrees(0.05)
     
     for name in names:
