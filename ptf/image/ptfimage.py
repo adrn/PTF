@@ -98,7 +98,7 @@ def download_images_from_metadatas(metadatas):
 
 class PTFImage(object):
     
-    def __init__(self, fits_file, mask_file=None, metadata=None):
+    def __init__(self, fits_file, metadata=None):
         self.fits = pf.open(fits_file)
         self.metadata = metadata
     
@@ -119,7 +119,7 @@ class PTFImage(object):
             
         self.fits.writeto(full_image_path)
 
-def ptf_images_from_fieldid(fieldid, ccds=[], filter="R", epoch=None):
+def ptf_images_from_fieldid(fieldid, ccds=[], filter="R", epoch=None, number=None):
     """ Creates PTF FITS Images given a PTF Field ID and optionally CCD IDs.
         
         Parameters
@@ -133,6 +133,8 @@ def ptf_images_from_fieldid(fieldid, ccds=[], filter="R", epoch=None):
         epoch : (optional) float
             The MJD of the observation of the image. If not specified, the
             image with the best seeing is returned.
+        number : (optional) int
+            Constrain the number of images to return.
     """
     
     # Construct search URL with parameters
@@ -148,11 +150,13 @@ def ptf_images_from_fieldid(fieldid, ccds=[], filter="R", epoch=None):
     
     table_file = retrieve_ipac_file(IPAC_SEARCH_URL + urllib.quote(where_str) + "&columns={}".format(",".join(SEARCH_COLUMNS)))
     metadatas = parse_ipac_table(table_file)
+    if number is not None and len(metadatas) > number:
+        metadatas = metadatas[:number]
     ptf_images = download_images_from_metadatas(metadatas)
     
     return ptf_images
 
-def ptf_images_from_name(name, size, intersect="overlaps", filter="R", epoch=None):
+def ptf_images_from_name(name, size, intersect="overlaps", filter="R", epoch=None, number=None):
     """ Creates PTF FITS Images given a name of an astronomical object that can be
         resolved by SIMBAD.
         
@@ -171,6 +175,8 @@ def ptf_images_from_name(name, size, intersect="overlaps", filter="R", epoch=Non
         epoch : (optional) float
             The MJD of the observation of the image. If not specified, the
             image with the best seeing is returned.
+        number : (optional) int
+            Constrain the number of images to return.
     """
     
     url = "http://simbad.u-strasbg.fr/simbad/sim-id?Ident={}&NbIdent=1&Radius=2&Radius.unit=arcmin&submit=submit+id&output.format=ASCII_TAB".format(urllib.quote(name))
@@ -187,9 +193,9 @@ def ptf_images_from_name(name, size, intersect="overlaps", filter="R", epoch=Non
     ra = g.RA(ra)
     dec = g.Dec(dec)
     
-    return ptf_images_from_position(ra, dec, size=size, intersect=intersect, filter=filter, epoch=epoch)
+    return ptf_images_from_position(ra, dec, size=size, intersect=intersect, filter=filter, epoch=epoch, number=number)
 
-def ptf_images_from_position(ra, dec, size, intersect="covers", filter="R", epoch=None):
+def ptf_images_from_position(ra, dec, size, intersect="covers", filter="R", epoch=None, number=None):
     """ Creates PTF FITS Images given an equatorial position (RA/Dec) 
         and a size.
         
@@ -210,6 +216,8 @@ def ptf_images_from_position(ra, dec, size, intersect="covers", filter="R", epoc
         epoch : (optional) float
             The MJD of the observation of the image. If not specified, the
             image with the best seeing is returned.
+        number : (optional) int
+            Constrain the number of images to return.
     """
         
     ra = g.RA(ra)
@@ -226,7 +234,7 @@ def ptf_images_from_position(ra, dec, size, intersect="covers", filter="R", epoc
     pos_str = "POS={ra.degrees},{dec.degrees}".format(ra=ra, dec=dec)
     intersect_str = "INTERSECT={}".format(intersect.upper())
     
-    search_url_append =  "?{}&{}&{}&where=filter IN ('{}')".format(pos_str, size_str, intersect_str, filter)
+    search_url_append = "?{}&{}&{}&where=filter IN ('{}')".format(pos_str, size_str, intersect_str, filter)
     
     if epoch is not None:
         search_url_append += " AND obsmjd IN ({})".format(epoch)
@@ -235,13 +243,21 @@ def ptf_images_from_position(ra, dec, size, intersect="covers", filter="R", epoc
     
     metadatas = parse_ipac_table(table_file)
     
+    num = 0
     ptf_images = []
     for metadata in metadatas:
         cutout_url = os.path.join(IPAC_DATA_URL, metadata["pfilename"])
         cutout_url_query = "?center={ra.degrees},{dec.degrees}&{size}&gzip=false".format(ra=ra, dec=dec, size=size_str.lower())
         
-        ptf_images.append(PTFImage(retrieve_ipac_file(cutout_url + cutout_url_query), metadata=metadata))
-        print greenText("Image {} downloaded.")
+        try:
+            ptf_images.append(PTFImage(retrieve_ipac_file(cutout_url + cutout_url_query), metadata=metadata))
+            num += 1
+            print greenText("Image {} downloaded.".format(os.path.basename(ptf_images[-1].metadata["pfilename"])))
+        except urllib2.HTTPError:    
+            print yellowText("Image failed to download:\n\t{}".format(cutout_url + cutout_url_query))
+            
+        if number is not None and num >= number:
+            break
     
     return ptf_images
 
