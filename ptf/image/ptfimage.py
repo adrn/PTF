@@ -102,7 +102,7 @@ class PTFImage(object):
         self.fits = pf.open(fits_file)
         self.metadata = metadata
     
-    def save(self, path, filename=None):
+    def save(self, path, filename=None, overwrite=False):
         """ Given a path, save the PTFImage as a FITS file in that path """
         
         if filename is None and self.metadata is None:
@@ -112,7 +112,12 @@ class PTFImage(object):
         elif filename is None and self.metadata is not None:
             filename = os.path.basename(self.metadata["pfilename"])
         
-        self.fits.writeto(os.path.join(path, filename))
+        full_image_path = os.path.join(path, filename)
+        
+        if overwrite and os.path.exists(full_image_path):
+            os.remove(full_image_path)
+            
+        self.fits.writeto(full_image_path)
 
 def ptf_images_from_fieldid(fieldid, ccds=[], filter="R", epoch=None):
     """ Creates PTF FITS Images given a PTF Field ID and optionally CCD IDs.
@@ -257,10 +262,10 @@ def test_ptfimage():
     image = ptf_images_from_fieldid(110001, ccds=[0], epoch=55242.39601)[0]
     
     # Test save()
-    image.save("/tmp/")
-    image.save("/tmp/", "ptf_test_image.fits")
+    image.save("/tmp/", overwrite=True)
+    image.save("/tmp/", "ptf_test_image.fits", overwrite=True)
     
-    assert os.path.exists("/tmp/{}".format(image.metadata["pfilename"]))
+    assert os.path.exists("/tmp/{}".format(os.path.basename(image.metadata["pfilename"])))
     assert os.path.exists("/tmp/ptf_test_image.fits")
 
 def test_ptf_images_from_fieldid():
