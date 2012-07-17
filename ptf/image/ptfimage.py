@@ -118,6 +118,12 @@ class PTFImage(object):
             os.remove(full_image_path)
             
         self.fits.writeto(full_image_path)
+    
+    def show(self):
+        import aplpy
+        ff = aplpy.FITSFigure(self.fits)
+        ff.show_grayscale()
+        return ff
 
 def ptf_images_from_fieldid(fieldid, ccds=[], filter="R", epoch=None, number=None):
     """ Creates PTF FITS Images given a PTF Field ID and optionally CCD IDs.
@@ -232,7 +238,11 @@ def ptf_images_from_position(ra, dec, size, intersect="covers", filter="R", epoc
     
     # Construct search URL with parameters
     pos_str = "POS={ra.degrees},{dec.degrees}".format(ra=ra, dec=dec)
-    intersect_str = "INTERSECT={}".format(intersect.upper())
+    
+    if number == 1:
+        intersect_str = "INTERSECT=CENTER&mcen"
+    else:
+        intersect_str = "INTERSECT={}".format(intersect.upper())
     
     search_url_append = "?{}&{}&{}&where=filter IN ('{}')".format(pos_str, size_str, intersect_str, filter)
     
