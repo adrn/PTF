@@ -23,7 +23,7 @@ import pyfits as pf
 from scipy.stats import scoreatpercentile
 
 # PTF
-from ptf.parameters import *
+from ptf.globals import *
 
 # =~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~
 
