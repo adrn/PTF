@@ -197,14 +197,6 @@ def compute_delta_chi_squared(light_curve, model1, model1_initial, model2, model
                 args=(light_curve.mjd, light_curve.mag, light_curve.error), \
                 full_output=1)
     
-    import matplotlib.pyplot as plt
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    ax.plot(light_curve.mjd, model1(model1_params, light_curve.mjd), 'r--')
-    ax.plot(light_curve.mjd, model2(model2_params, light_curve.mjd), 'g--')
-    ax = light_curve.plot(ax)
-    plt.show()
-    
     model1_chisq = np.sum(error_func_1(model1_params, \
                                        light_curve.mjd, \
                                        light_curve.mag, \
@@ -218,6 +210,15 @@ def compute_delta_chi_squared(light_curve, model1, model1_initial, model2, model
     return model1_chisq - model2_chisq
 
 def test_compute_delta_chi_squared():
+    """ 
+    import matplotlib.pyplot as plt
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.plot(light_curve.mjd, model1(model1_params, light_curve.mjd), 'r--')
+    ax.plot(light_curve.mjd, model2(model2_params, light_curve.mjd), 'g--')
+    ax = light_curve.plot(ax)
+    plt.show()
+    """
     
     from ptf.simulation.simulatedlightcurve import SimulatedLightCurve
     mjd = np.linspace(0., 500., 150)
@@ -333,6 +334,7 @@ def compute_variability_indices(light_curve, indices=[]):
             delta_chi_squared : Difference in chi-squared values for a linear fit vs. a Gaussian
             eta : Ratio of mean square successive difference to the sample variance, von Neumann 1941
             continuum : the continuum magnitude
+            sigma_mu : the ratio of the root-sample variance to the continuum magnitude
         
         Parameters
         ----------
@@ -341,6 +343,9 @@ def compute_variability_indices(light_curve, indices=[]):
         indices : iterable
             See valid indices above.
     """
+    if len(indices) == 0:
+        indices = ["j", "k", "sigma_mu", "eta", "delta_chi_squared"]
+        
     idx_dict = dict()
     
     if "j" in indices:
@@ -360,8 +365,30 @@ def compute_variability_indices(light_curve, indices=[]):
                                                                   model2_initial=(-5.0, np.median(light_curve.mjd), 5.0, np.median(light_curve.mag))\
                                                                  )
         
-    if "continuum" in indices:
+    if "continuum" in indices or "sigma_mu" in indices:
         continuum_mag, noise_sigma = estimate_continuum(light_curve, sigma_clip=True)
+    
+    if "continuum" in indices:
         idx_dict["continuum"] = continuum_mag
     
+    if "sigma_mu" in indices:
+        idx_dict["sigma_mu"] = np.std(light_curve.mag) / continuum_mag
     
+    return idx_dict
+
+def test_compute_variability_indices():
+    # Here we're really just seeing how long it takes to run...
+    
+    from ptf.simulation.simulatedlightcurve import SimulatedLightCurve
+    mjd = np.linspace(0., 500., 150)
+    sigmas = 10.**np.random.uniform(-2, -3, size=150)
+    light_curve = SimulatedLightCurve(mjd, error=sigmas)
+    light_curve.addMicrolensingEvent()
+    
+    import time
+    
+    a = time.time()
+    idx = compute_variability_indices(light_curve)
+    print time.time() - a 
+    
+    print idx
