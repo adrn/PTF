@@ -27,6 +27,7 @@ from ptf.parameters import *
 
 # =~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~
 
+"""
 class CCD(object):
     
     def __init__(self, table_data):
@@ -43,6 +44,7 @@ class CCD(object):
     @property
     def baseline(self):
         return max(self.mjd) - min(self.mjd)
+"""
 
 class Field(object):
     """ Abstract Field class """
