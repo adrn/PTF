@@ -1,5 +1,23 @@
+import copy
 import numpy as np
 from ..ptflightcurve import PTFLightCurve
+
+def RMagToFlux(R):
+    # Returns a flux in Janskys
+    return 2875.*10**(R/-2.5)
+
+def FluxToRMag(f):
+    # Accepts a flux in Janskys
+    return -2.5*np.log10(f/2875.)
+
+def u_t(t, u_0, t_0, t_E):
+    return np.sqrt(u_0**2 + ((t - t_0)/t_E)**2)
+
+def A_u(u):
+    return (u**2 + 2) / (u*np.sqrt(u**2 + 4))
+
+def fluxModel(t, **p):
+    return p["F0"]*A_u(u_t(t, p["u0"], p["t0"], p["tE"]))
 
 class SimulatedLightCurve(PTFLightCurve):
     
