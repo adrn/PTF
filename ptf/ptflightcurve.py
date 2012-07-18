@@ -1,5 +1,7 @@
 """ Contains the PTFLightCurve class """
 
+# TODO: Add flags to PTFLightCurve
+
 __author__ = "adrn <adrn@astro.columbia.edu>"
 
 # Standard Library
