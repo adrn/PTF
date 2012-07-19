@@ -53,12 +53,12 @@ for field in fields:
     sigma_mu = np.ravel(sigma_mu)
     
     subset_idx = np.random.randint(0, len(j), size=SAMPLE_SIZE)
-    j = j[subset_idx]
-    k = k[subset_idx]
-    eta = eta[subset_idx]
-    sigma_mu = sigma_mu[subset_idx]
+    species_arr = np.zeros(5, dtype=[('species',"|S1"),('j',float),('k',float),('eta',float),('sigma_mu',float)])
+    species_arr["species"] = np.array(["d"]*SAMPLE_SIZE)
+    species_arr["j"] = j[subset_idx]
+    species_arr["k"] = k[subset_idx]
+    species_arr["eta"] = eta[subset_idx]
+    species_arr["sigma_mu"] = sigma_mu[subset_idx]
     
-    species = [0]*len(j)
     header = "species,j,k,eta,sigma_mu"
-        
-    np.savetxt(os.path.join(CSV_PATH,filename), np.transpose((species,j,k,eta,sigma_mu)), fmt="%.5f", delimiter=",", header=header, comments="")
+    np.savetxt(os.path.join(CSV_PATH,filename), species_arr, fmt="%s %f %f %f %f", delimiter=",", header=header, comments="")
