@@ -20,6 +20,9 @@ import numpy as np
 import candidate_pipeline
 import ptf.photometricdatabase as pdb
 
+# Randomly sample this many points from the total number ~100,000
+SAMPLE_SIZE = 2000
+
 CSV_PATH = os.path.join(os.getcwd(), "data", "js")
 if not os.path.exists(CSV_PATH):
     os.mkdir(CSV_PATH)
@@ -49,7 +52,13 @@ for field in fields:
     eta = np.ravel(eta)
     sigma_mu = np.ravel(sigma_mu)
     
+    subset_idx = np.random.randint(0, len(j), size=SAMPLE_SIZE)
+    j = j[subset_idx]
+    k = k[subset_idx]
+    eta = eta[subset_idx]
+    sigma_mu = sigma_mu[subset_idx]
+    
     species = [0]*len(j)
     header = "species,j,k,eta,sigma_mu"
         
-    np.savetxt(os.path.join(CSV_PATH,filename), np.transpose((species,j,k,eta,sigma_mu)), fmt="%.5f", delimiter=",", header=header)
+    np.savetxt(os.path.join(CSV_PATH,filename), np.transpose((species,j,k,eta,sigma_mu)), fmt="%.5f", delimiter=",", header=header, comments="")
