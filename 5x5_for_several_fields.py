@@ -10,7 +10,7 @@ from __future__ import division
 __author__ = "adrn <adrn@astro.columbia.edu>"
 
 # Standard library
-import os
+import os, sys
 import logging
 
 # Third-party
@@ -28,8 +28,28 @@ field_ids = [2471]
 fields = [pdb.PTFField(field_id) for field_id in field_ids]
 
 for field in fields:
+    filename = "field{:06d}.csv".format(field.id)
+    if os.path.exists(os.path.join(CSV_PATH,filename)): continue
+    
+    j,k,eta,sigma_mu = [],[],[],[]
+    
     for ccdid,ccd in field.ccds.items():
         ccd_file = ccd.read()
-        var_statistics = ccd_file.sources.col(["stetsonJ", "stetsonK", "vonNeumannRatio", "medianAbsDev", "meanMag"])
         
-
+        subset = ccd_file.sources.readWhere("vonNeumannRatio > 0.0")
+        w = np.isfinite(subset["stetsonJ"]) & np.isfinite(subset["stetsonK"]) & np.isfinite(subset["vonNeumannRatio"])
+        
+        j += list(subset["stetsonJ"][w])
+        k += list(subset["stetsonK"][w])
+        eta += list(subset["vonNeumannRatio"][w])
+        sigma_mu += list(subset["medianAbsDev"][w] / subset["meanMag"][w])
+    
+    j = np.ravel(j)
+    k = np.ravel(k)
+    eta = np.ravel(eta)
+    sigma_mu = np.ravel(sigma_mu)
+    
+    species = [0]*len(j)
+    header = "species,j,k,eta,sigma_mu"
+        
+    np.savetxt(os.path.join(CSV_PATH,filename), np.transpose((species,j,k,eta,sigma_mu)), fmt="%.5f", delimiter=",", header=header)
