@@ -21,7 +21,7 @@ import candidate_pipeline
 import ptf.photometricdatabase as pdb
 
 # Randomly sample this many points from the total number ~100,000
-SAMPLE_SIZE = 2000
+SAMPLE_SIZE = 1000
 
 CSV_PATH = os.path.join(os.getcwd(), "data", "js")
 if not os.path.exists(CSV_PATH):
