@@ -27,7 +27,7 @@ CSV_PATH = os.path.join(os.getcwd(), "data", "js")
 if not os.path.exists(CSV_PATH):
     os.mkdir(CSV_PATH)
 
-field_ids = [2471]
+field_ids = [100400, 100038, 3696]
 fields = [pdb.PTFField(field_id) for field_id in field_ids]
 
 for field in fields:
