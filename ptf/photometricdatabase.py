@@ -148,6 +148,11 @@ class PTFCCD(object):
     
     def close(self):
         self._file.close()
+        
+    def light_curves(self, limit=None):
+        """ Return a generator that will return all light_curves from this CCD """
+        chip = self.read()
+        source_ids = chip.sources.col("matchedSourceID")
 
 # ==================================================================================================
 #   Convenience functions
