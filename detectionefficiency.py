@@ -22,9 +22,66 @@ import numpy as np
 from scipy.stats import scoreatpercentile
 
 # Project
-from ptf.db.DatabaseConnection import *
-import ptf.simulation.util as simu
-from PraesepeLightCurves import AllPraesepeLightCurves
+import ptf.photometricdatabase as pdb
+
+def variability_indices_detection_efficiency(light_curves, indices=["j","k","eta","sigma_mu","delta_chi_squared"]):
+    """ This figure should show the detection efficiency curve for all indices by
+        injecting events into a random sampling of light_curves.
+    """
+    
+    # Help with plotting
+    line_styles = [(3,"-."), (3,":"), (3,"--"), (1.5,"--"), (2,"-")]
+    line_colors = ["c", "m", "g", "y", "k"]
+    
+    plt.figure(figsize=(15,15))
+    for ii,idx in enumerate(indices):
+        values = [getattr(x, idx) for x in var_indices]
+        sigma = np.std(values)
+        mu = np.mean(values)
+        
+        sim_results[np.isnan(sim_results["tE"])] = 0.
+        
+        detections = sim_results[(np.fabs(sim_results[idx]) > (mu + 2.*sigma)) | (np.fabs(sim_results[idx]) < (mu - 2.*sigma))]
+        detections = detections[detections["event_added"] == True]
+        
+        tE_counts, tE_bin_edges = np.histogram(detections["tE"], bins=timescale_bins)
+        total_counts, total_bin_edges = np.histogram(sim_results[sim_results["event_added"] == True]["tE"], bins=timescale_bins)
+        
+        lw,ls = styles[ii]
+        plt.semilogx((total_bin_edges[1:]+total_bin_edges[:-1])/2, tE_counts / total_counts, c=colors[ii], lw=lw, label=r"{}".format(parameter_to_label[idx]), ls=ls)
+        
+    plt.xlabel(r"$t_E$ [days]", size=label_font_size)
+    plt.ylabel(r"Detection Efficiency $\mathcal{E}(t_E)$", size=label_font_size)
+    plt.ylim(0., 1.0)
+    t = plt.title("PTF Detection Efficiency for Praesepe Light Curves", size=title_font_size)
+    t.set_y(1.04)
+    
+    # Change tick label size
+    ax = plt.gca()
+    for label in ax.get_xticklabels() + ax.get_yticklabels():
+        label.set_fontsize(tick_font_size)
+    
+    leg = plt.legend(shadow=True, fancybox=True)
+    legendtext = leg.get_texts()
+    plt.setp(legendtext, fontsize=label_font_size)
+    plt.tight_layout()
+    plt.savefig("plots/aas_var_indices_detection_efficiency.png")
+    #plt.show()    
+
+def test_variability_indices_detection_efficiency_eta():
+    # Select some light curves
+    pdb
+    
+    variability_indices_detection_efficiency(
+
+
+
+
+
+
+
+
+
 
 #############################################
 # Multiprocessing stuff
