@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 # Package dependences
 import aov
 import ptf.simulation.util as simu
+import ptf.analyze.analyze as analyze
 
 # ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=
 
@@ -24,9 +25,9 @@ class PTFLightCurve:
     
     def __init__(self, mjd, mag, error):
         idx = np.argsort(mjd)
-        self.amjd = self.mjd = np.array(mjd)[idx]
-        self.amag = self.mag = np.array(mag)[idx]
-        self.error = np.array(error)[idx]
+        self.amjd = self.mjd = np.array(mjd)[idx].astype(np.float64)
+        self.amag = self.mag = np.array(mag)[idx].astype(np.float64)
+        self.error = np.array(error)[idx].astype(np.float64)
     
     @classmethod
     def fromDBLightCurve(cls, db_light_curve):
@@ -34,6 +35,30 @@ class PTFLightCurve:
             PTFLightCurve object
         """
         return cls(db_light_curve.amjd, db_light_curve.amag, db_light_curve.error)
+    
+    @classmethod
+    def fromPDBData(cls, light_curve_data):
+        """ Creates a PTFLightCurve from a block of data (array) from David Levitan's
+            photometric database.
+            TODO : This sucks -- should be fromRecArray or something
+        """
+        
+        return cls(light_curve_data["mjd"], light_curve_data["mag"], light_curve_data["magErr"])
+    
+    @property
+    def field_id(self):
+        """ TODO: make sure 'metadata' and 'exposures' are set """
+        return int(self.exposures["fieldID"][0])
+    
+    @property
+    def ccd_id(self):
+        """ TODO: make sure 'metadata' and 'exposures' are set """
+        return int(self.exposures["ccdID"][0])
+        
+    @property
+    def source_id(self):
+        """ TODO: make sure 'metadata' and 'exposures' are set """
+        return int(self.metadata["matchedSourceID"])
     
     def plot(self, ax=None, **kwargs):
         """ Either plots the light curve and show()'s it to the display, or plots it on 
@@ -138,9 +163,6 @@ class PTFLightCurve:
                 
     def aovBestPeriod(self):
         raise NotImplementedError("TODO!")
-    
-    def variability_index(self, indices=[]):
-        return simu.compute_variability_indices(self, indices=indices)
     
     def savetxt(self, filename, overwrite=False):
         """ Save the light curve to a text file """

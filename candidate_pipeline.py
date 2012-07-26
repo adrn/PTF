@@ -11,6 +11,7 @@ __author__ = "adrn <adrn@astro.columbia.edu>"
 import os
 import math
 import logging
+import cPickle as pickle
 
 # Third-party
 import numpy as np
@@ -24,6 +25,7 @@ except ImportError:
 # Project
 import ptf.photometricdatabase as pdb
 import ptf.analyze.analyze as pa
+from ptf.ptflightcurve import PTFLightCurve
 
 # Create logger
 logger = logging.getLogger(__name__)
@@ -31,6 +33,10 @@ ch = logging.StreamHandler()
 formatter = logging.Formatter("%(name)s / %(levelname)s / %(message)s")
 ch.setFormatter(formatter)
 logger.addHandler(ch)
+
+# TODO: 
+# I need to separate my selection criteria from this code. Then I need to have a function that 
+#   computes the detection efficiency for a given field.
 
 def remove_bad_data(data):
     """ Given a data structure with named columns, e.g. anything
@@ -52,6 +58,9 @@ def remove_bad_data(data):
     data = data[data["mag"] > 13.5]
     data = data[data["mag"] < 22]
     
+    # Only select data points where star is not near the edge of the image
+    # TODO
+    
     # Finally, make cuts on sextractor flags to remove blended light curves
     data = data[(data["sextractorFlags"] < 8) == 0]
     data = data[(data["sextractorFlags"] & 1) == 0]
@@ -61,7 +70,7 @@ def remove_bad_data(data):
     
     return data
 
-def select_candidates_from_ccd(ccd_data):
+def select_candidates_from_ccd(ccd):
     """ Given a pytables object from the photometric database for one field/ccd,
         select out candidate microlensing events.
         
@@ -70,14 +79,82 @@ def select_candidates_from_ccd(ccd_data):
         you should pass this object:
             dbFile.root.filter02.field100083.chip10
     """
-    raise NotImplementedError()
+    logger.debug(greenText("/// select_candidates_from_ccd ///"))
     
-    candidate_sources = ccd_data.sources.readWhere("")
-    idx = np.in1d(ccd_data.sourcedata.col("matchedSourceID"), candidate_sources["matchedSourceID"])
-    return chip.sourcedata[idx]
+    chip = ccd.read()
+    
+    all_J = chip.sources.col("stetsonJ")
+    all_eta = chip.sources.col("vonNeumannRatio")
+    
+    J = all_J[all_J > 0.]
+    med_J = np.median(J)
+    sig_J = np.std(J)
+    J_significance = 3.
+    
+    eta = all_eta[all_eta > 0.]
+    med_eta = np.median(eta)
+    sig_eta = np.std(eta)
+    eta_significance = 2.
+    
+    exposures = chip.exposures[:]
+    
+    light_curves = []
+    for row in chip.sources[:]:
+        if (row["stetsonJ"] > (med_J+J_significance*sig_J)) and \
+           ((med_eta-eta_significance*sig_eta) < row["vonNeumannRatio"] < (med_eta+eta_significance*sig_eta)) and \
+           (row["ngoodobs"] > 25) and \
+           (22. > row["referenceMag"] > 13.):
+            
+            source_id = row["matchedSourceID"]
+            sourcedata = chip.sourcedata.readWhere('(matchedSourceID == {id}) & (sextractorFlags < 8) & \
+                                                    (x_image > {}) & (x_image < {}) & \
+                                                    (y_image > {}) & (y_image < {}) & \
+                                                    (magErr < 0.5)'.format(50, 2048-50, 50, 4096-50, id=source_id))
+            mjd = sourcedata["mjd"]
+            mag = sourcedata["mag"]
+            mag_err = sourcedata["magErr"]
 
-def run_pipeline(fields):
+            if len(mjd) > 25:
+                # TODO: Light curve object should have more metadata
+                lc = PTFLightCurve(mjd=mjd, mag=mag, error=mag_err)
+                var_indices = pa.compute_variability_indices(lc, indices=["j", "k", "eta", "delta_chi_squared", "simga_mu"])
+                
+                if (var_indices["j"] > (med_J+J_significance*sig_J)) and (var_indices["delta_chi_squared"] > 25):
+                    lc.metadata = row
+                    lc.exposures = exposures
+                    light_curves.append(lc)
+    
+    ccd.close()
+    
+    return light_curves
+
+def save_light_curves(light_curves, path="data/candidates/light_curves"):
+    """ Takes a list of PTFLightCurve objects and saves them each to .npy files """
+    
+    for light_curve in light_curves:
+        filename = "field{:06d}_ccd{:02d}_source{:06d}.pickle".format(light_curve.field_id, light_curve.ccd_id, light_curve.source_id)
+        f = open(os.path.join(path, filename), "w")
+        pickle.dump(light_curve, f)
+        f.close()
+
+def run_pipeline():
     """ Given a list of PTF fields (PTFField objects), run the candidate selection
         pipeline on each field.
     """
-    raise NotImplementedError()
+    logger.debug(greenText("/// Running Pipeline! ///"))
+    
+    R = pdb.Filter("R")
+    import time
+    
+    # Select out all fields that have been observed many times
+    # TODO: for now, I just know 110002 is a good one!
+    fields = [pdb.Field(110001, filter=R), pdb.Field(110002, filter=R), pdb.Field(110003, filter=R), pdb.Field(110004, filter=R)]
+    for field in fields:
+        for ccd in field.ccds.values():
+            a = time.time()
+            candidate_light_curves = select_candidates_from_ccd(ccd)
+            print len(candidate_light_curves), time.time() - a
+            save_light_curves(candidate_light_curves)
+
+if __name__ == "__main__":
+    run_pipeline()
