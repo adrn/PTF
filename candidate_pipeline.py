@@ -26,6 +26,7 @@ except ImportError:
 import ptf.photometricdatabase as pdb
 import ptf.analyze.analyze as pa
 from ptf.ptflightcurve import PTFLightCurve
+import ptf.globals as pg
 
 # Create logger
 logger = logging.getLogger(__name__)
@@ -70,6 +71,30 @@ def remove_bad_data(data):
     
     return data
 
+def quality_cut(sourcedata, ccd_edge_cutoff=25):
+    """ This function accepts a Pytables table object (from the 'sourcedata' table)
+        and returns only the rows that pass the given quality cuts.
+        
+        Parameters
+        ----------
+        sourcedata : table
+            A pytables Table object -> 'chip.sourcedata'
+        ccd_edge_cutoff : int
+            Define the cutoff for sources near the edge of a CCD. The cut will remove
+            all data points where the source is nearer than this limit to the edge.
+    """
+    x_cut1, x_cut2 = ccd_edge_cutoff, pg.ccd_size[0] - ccd_edge_cutoff
+    y_cut1, y_cut2 = ccd_edge_cutoff, pg.ccd_size[1] - ccd_edge_cutoff
+    
+    sourcedata = sourcedata.readWhere('(sextractorFlags < 8) & \
+                                       (x_image > {}) & (x_image < {}) & \
+                                       (y_image > {}) & (y_image < {}) & \
+                                       (magErr < 0.3)'.format(x_cut1, x_cut2, y_cut1, y_cut2))
+                                       
+    # (matchedSourceID == {id}) & 
+    
+    return sourcedata
+
 def select_candidates_from_ccd(ccd):
     """ Given a pytables object from the photometric database for one field/ccd,
         select out candidate microlensing events.
@@ -98,6 +123,8 @@ def select_candidates_from_ccd(ccd):
     
     exposures = chip.exposures[:]
     
+    sourcedata = quality_cut(chip.sourcedata)
+    
     light_curves = []
     for row in chip.sources[:]:
         if (row["stetsonJ"] > (med_J+J_significance*sig_J)) and \
@@ -105,14 +132,13 @@ def select_candidates_from_ccd(ccd):
            (row["ngoodobs"] > 25) and \
            (22. > row["referenceMag"] > 13.):
             
-            source_id = row["matchedSourceID"]
-            sourcedata = chip.sourcedata.readWhere('(matchedSourceID == {id}) & (sextractorFlags < 8) & \
-                                                    (x_image > {}) & (x_image < {}) & \
-                                                    (y_image > {}) & (y_image < {}) & \
-                                                    (magErr < 0.5)'.format(50, 2048-50, 50, 4096-50, id=source_id))
-            mjd = sourcedata["mjd"]
-            mag = sourcedata["mag"]
-            mag_err = sourcedata["magErr"]
+            this_source = sourcedata[sourcedata["matchedSourceID"] == row["matchedSourceID"]]
+            
+            mjd = this_source["mjd"]
+            mag = this_source["mag"]
+            mag_err = this_source["magErr"]
+
+            light_curve = PTFLightCurve(mjd=mjd, mag=mag, error=mag_err)
 
             if len(mjd) > 25:
                 # TODO: Light curve object should have more metadata
@@ -120,7 +146,7 @@ def select_candidates_from_ccd(ccd):
                 var_indices = pa.compute_variability_indices(lc, indices=["j", "k", "eta", "delta_chi_squared", "simga_mu"])
                 
                 if (var_indices["j"] > (med_J+J_significance*sig_J)) and (var_indices["delta_chi_squared"] > 25):
-                    lc.metadata = row
+                    lc.metadata = np.array(row)
                     lc.exposures = exposures
                     light_curves.append(lc)
     
