@@ -36,40 +36,9 @@ ch.setFormatter(formatter)
 logger.addHandler(ch)
 
 # TODO: 
-# I need to separate my selection criteria from this code. Then I need to have a function that 
+# - I need to separate my selection criteria from this code. Then I need to have a function that 
 #   computes the detection efficiency for a given field.
-
-def remove_bad_data(data):
-    """ Given a data structure with named columns, e.g. anything
-        that can be called like this: data['blah'], make cuts on
-        the photometric error flags.
-    """
-    
-    logger.debug(greenText("/// remove_bad_data ///"))
-    logger.debug("Initial number of light curves: {}".format(len(np.unique(data["matchedSourceID"]))))
-    
-    # First remove any NaN of inf values from the data
-    data = data[np.isfinite(data["mag"])]
-    data = data[np.isfinite(data["mjd"])]
-    data = data[np.isfinite(data["magErr"])]
-    
-    # Then remove points with huge error bars or magnitude values outside
-    #   the linear regime
-    data = data[data["magErr"] < 0.5]
-    data = data[data["mag"] > 13.5]
-    data = data[data["mag"] < 22]
-    
-    # Only select data points where star is not near the edge of the image
-    # TODO
-    
-    # Finally, make cuts on sextractor flags to remove blended light curves
-    data = data[(data["sextractorFlags"] < 8) == 0]
-    data = data[(data["sextractorFlags"] & 1) == 0]
-    #data = data[(data["relPhotFlags"] & 5949) == 0]
-    
-    logger.debug("Final number of light curves: {}".format(len(np.unique(data["matchedSourceID"]))))
-    
-    return data
+# - Rather than writing out a bunch of files, this should save candidates to a database (sqlite file)
 
 def quality_cut(sourcedata, ccd_edge_cutoff=25):
     """ This function accepts a Pytables table object (from the 'sourcedata' table)
@@ -83,16 +52,22 @@ def quality_cut(sourcedata, ccd_edge_cutoff=25):
             Define the cutoff for sources near the edge of a CCD. The cut will remove
             all data points where the source is nearer than this limit to the edge.
     """
+    logger.debug(greenText("/// remove_bad_data ///"))
+    
     x_cut1, x_cut2 = ccd_edge_cutoff, pg.ccd_size[0] - ccd_edge_cutoff
     y_cut1, y_cut2 = ccd_edge_cutoff, pg.ccd_size[1] - ccd_edge_cutoff
     
     sourcedata = sourcedata.readWhere('(sextractorFlags < 8) & \
                                        (x_image > {}) & (x_image < {}) & \
                                        (y_image > {}) & (y_image < {}) & \
-                                       (magErr < 0.3)'.format(x_cut1, x_cut2, y_cut1, y_cut2))
-                                       
-    # (matchedSourceID == {id}) & 
+                                       (magErr < 0.3) & \
+                                       (mag > 13.5) & (mag < 22)'.format(x_cut1, x_cut2, y_cut1, y_cut2))
     
+    sourcedata = sourcedata[(sourcedata["sextractorFlags"] & 1) == 0]
+    sourcedata = sourcedata[np.isfinite(sourcedata["mag"]) & \
+                            np.isfinite(sourcedata["mjd"]) & \
+                            np.isfinite(sourcedata["magErr"])]
+                            
     return sourcedata
 
 def select_candidates_from_ccd(ccd):
@@ -129,26 +104,31 @@ def select_candidates_from_ccd(ccd):
     for row in chip.sources[:]:
         if (row["stetsonJ"] > (med_J+J_significance*sig_J)) and \
            ((med_eta-eta_significance*sig_eta) < row["vonNeumannRatio"] < (med_eta+eta_significance*sig_eta)) and \
-           (row["ngoodobs"] > 25) and \
-           (22. > row["referenceMag"] > 13.):
+           (row["ngoodobs"] > 25):
             
+            # TODO: Look for clumps brighter or fainter -- if clump has less than 3 points, throw it out?
             this_source = sourcedata[sourcedata["matchedSourceID"] == row["matchedSourceID"]]
+            faint_idx, = np.where(this_source["mag"] > (row["referenceMag"] + 4*row["magRMS"]))
+            bright_idx, = np.where(this_source["mag"] < (row["referenceMag"] - 4*row["magRMS"]))
             
-            mjd = this_source["mjd"]
-            mag = this_source["mag"]
-            mag_err = this_source["magErr"]
-
-            light_curve = PTFLightCurve(mjd=mjd, mag=mag, error=mag_err)
-
-            if len(mjd) > 25:
+            if len(faint_idx) < 3:
+                this_source = this_source[this_source["mag"] < (row["referenceMag"] + 4*row["magRMS"])]
+            
+            if len(bright_idx) < 3:
+                this_source = this_source[this_source["mag"] > (row["referenceMag"] - 4*row["magRMS"])]
+            
+            light_curve = PTFLightCurve(mjd=this_source["mjd"], mag=this_source["mag"], error=this_source["magErr"])
+            
+            if len(light_curve.mjd) > 25:
                 # TODO: Light curve object should have more metadata
-                lc = PTFLightCurve(mjd=mjd, mag=mag, error=mag_err)
-                var_indices = pa.compute_variability_indices(lc, indices=["j", "k", "eta", "delta_chi_squared", "simga_mu"])
+                var_indices = pa.compute_variability_indices(light_curve, indices=["j", "k", "eta", "delta_chi_squared", "simga_mu"])
                 
-                if (var_indices["j"] > (med_J+J_significance*sig_J)) and (var_indices["delta_chi_squared"] > 25):
-                    lc.metadata = np.array(row)
-                    lc.exposures = exposures
-                    light_curves.append(lc)
+                if (var_indices["j"] > (med_J+J_significance*sig_J)) and \
+                   ((med_eta-eta_significance*sig_eta) < var_indices["eta"] < (med_eta+eta_significance*sig_eta)):
+                   
+                    light_curve.metadata = np.array(row)
+                    light_curve.exposures = exposures
+                    light_curves.append(light_curve)
     
     ccd.close()
     
@@ -174,7 +154,8 @@ def run_pipeline():
     
     # Select out all fields that have been observed many times
     # TODO: for now, I just know 110002 is a good one!
-    fields = [pdb.Field(110001, filter=R), pdb.Field(110002, filter=R), pdb.Field(110003, filter=R), pdb.Field(110004, filter=R)]
+    #fields = [pdb.Field(110001, filter=R), pdb.Field(110002, filter=R), pdb.Field(110003, filter=R), pdb.Field(110004, filter=R)]
+    fields = [pdb.Field(110002, filter=R)]
     for field in fields:
         for ccd in field.ccds.values():
             a = time.time()
@@ -183,4 +164,5 @@ def run_pipeline():
             save_light_curves(candidate_light_curves)
 
 if __name__ == "__main__":
+    logger.setLevel(logging.INFO)
     run_pipeline()

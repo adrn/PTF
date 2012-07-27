@@ -2,6 +2,8 @@
 # PTF Stats
 pix_scale = 1.01 #arcsec / pixel
 camera_size = (12000., 8000.) #pixels
+ccd_size = (2048, 4096) # x, y
+
 camera_size_degrees = (camera_size[0]*pix_scale/3600., camera_size[1]*pix_scale/3600.)
 
 # OGLE IV field sizes
