@@ -1,9 +1,14 @@
 """
 cython -a aov.pyx
-gcc -shared -pthread -fPIC -fwrapv -O2 -Wall -fno-strict-aliasing -I/usr/include/python2.7 -L/usr/include/python2.7 -o aov.so aov.c
-
-cython -a aov.pyx; gcc -shared -pthread -fPIC -fwrapv -O2 -Wall -fno-strict-aliasing -I/usr/include/python2.7 -L/usr/include/python2.7 -o aov.so aov.c;
-python aov_tester.py
+deimos:
+    gcc -shared -pthread -fPIC -fwrapv -O2 -Wall -fno-strict-aliasing -I/usr/include/python2.7 -L/usr/include/python2.7 -o aov.so aov.c
+laptop:
+    gcc -shared -pthread -fPIC -fwrapv -O2 -Wall -fno-strict-aliasing \
+    -I /usr/include/python2.7 \
+    -L /usr/lib/python2.7 \
+    -l python \
+    -I/System/Library/Frameworks/Python.framework/Versions/2.7/Extras/lib/python/numpy/core/include \
+    -o aov.so aov.c
 """
 from __future__ import division
 

@@ -1,4 +1,3 @@
-
 # PTF Stats
 pix_scale = 1.01 #arcsec / pixel
 camera_size = (12000., 8000.) #pixels
