@@ -150,39 +150,4 @@ def some_name(light_curves, indices, figure=None, figsize=(25,25)):
     for ii, yParameter in enumerate(indices):
         for jj, xParameter in enumerate(indices):
             pass
-            
-####################################################################################################
-## -- Classes --
-#
-class LightCurveGenerator(object):
-    """ A generator object for returning light curves in a memory efficient way """
-    def __iter__(self):
-        return self
-    
-    def __init__(self, field=None, N_per=1000, limit=0):
-        self._ii_current = 0
         
-        if field:
-            self.query = session.query(LightCurve).filter(sqlalchemy.literal(field) == func.any(LightCurve.field))
-        else:
-            self.query = session.query(LightCurve)
-        
-        if limit > 0:
-            self.N_total = limit
-            self.N_per = min([N_per, limit])
-        else:
-            self.N_total = self.query.count()
-            self.N_per = N_per
-        
-    @property
-    def offset(self):
-        return self._ii_current * self.N_per
-        
-    def next(self):
-        if self.offset >= self.N_total:
-            raise StopIteration
-            return []
-        
-        lcs = self.query.order_by(LightCurve.objid).offset(self.offset).limit(self.N_per).all()
-        self._ii_current += 1
-        return lcs
