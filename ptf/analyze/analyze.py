@@ -32,6 +32,9 @@ linear_error_func = lambda p, x, mag, sigma: (mag - linear_model(p, x)) / sigma
 
 gaussian_model = lambda p, x: p[0]*np.exp(-(x - p[1])**2 / (2*p[2]**2)) + p[3]
 gaussian_error_func = lambda p, x, mag, sigma: (mag - gaussian_model(p, x)) / sigma
+#import ext
+#gaussian_model = ext.gaussian_model
+#gaussian_error_func = ext.gaussian_error_func
 
 def u_t(p, t):
     return np.sqrt(p[0]**2 + ((t - p[1])/p[2])**2)
@@ -125,7 +128,7 @@ def test_estimate_continuum():
         ax.legend()
         plt.show()
 
-def compute_delta_chi_squared(light_curve, model1, model1_initial, model2, model2_initial, force_fit=False, num_attempts=10):
+def compute_delta_chi_squared(light_curve, error_func1, model1_initial, error_func2, model2_initial, force_fit=False, num_attempts=10):
     """ Compute the difference in chi-squared between two different model 
         fits to the light curve.
         
@@ -133,10 +136,10 @@ def compute_delta_chi_squared(light_curve, model1, model1_initial, model2, model
         ----------
         light_curve : LightCurve
             A LightCurve object -- must have mjd, mag, and error attributes.
-        model1 : function
+        error_func1 : function
         model1_initial : tuple
             The initial parameter guess for model1.
-        model2 : function
+        error_func2 : function
         model2_initial : tuple
             The initial parameter guess for model2.
         force_fit : bool
@@ -145,9 +148,6 @@ def compute_delta_chi_squared(light_curve, model1, model1_initial, model2, model
             Number of times to try iterating the fit with new initial conditions. Only relevant
             if force_fit=True.
     """
-    
-    error_func_1 = lambda p, x, mag, sigma: (mag - model1(p, x)) / sigma
-    error_func_2 = lambda p, x, mag, sigma: (mag - model2(p, x)) / sigma
     
     # If we need to force the fits to converge, we have to iterate the fits
     #   until the fit succeeds.
@@ -160,7 +160,7 @@ def compute_delta_chi_squared(light_curve, model1, model1_initial, model2, model
         tries = 0
         initial_params = model1_initial
         while model1_ier not in [1,2,3,4] and tries <= num_attempts:
-            model1_params, covx, infodict, mesg, model1_ier = so.leastsq(error_func_1, \
+            model1_params, covx, infodict, mesg, model1_ier = so.leastsq(error_func1, \
                 x0=initial_params, \
                 args=(light_curve.mjd, light_curve.mag, light_curve.error), \
                 full_output=1)
@@ -175,7 +175,7 @@ def compute_delta_chi_squared(light_curve, model1, model1_initial, model2, model
         tries = 0
         initial_params = model2_initial
         while model2_ier not in [1,2,3,4] and tries <= num_attempts:
-            model2_params, covx, infodict, mesg, model2_ier = so.leastsq(error_func_2, \
+            model2_params, covx, infodict, mesg, model2_ier = so.leastsq(error_func2, \
                 x0=initial_params, \
                 args=(light_curve.mjd, light_curve.mag, light_curve.error), \
                 full_output=1)
@@ -187,22 +187,22 @@ def compute_delta_chi_squared(light_curve, model1, model1_initial, model2, model
         
     else:
         # Otherwise, only try to fit once
-        model1_params, covx, infodict, mesg, model1_ier = so.leastsq(error_func_1, \
+        model1_params, covx, infodict, mesg, model1_ier = so.leastsq(error_func1, \
                 x0=model1_initial, \
                 args=(light_curve.mjd, light_curve.mag, light_curve.error), \
                 full_output=1)
         
-        model2_params, covx, infodict, mesg, model2_ier = so.leastsq(error_func_2, \
+        model2_params, covx, infodict, mesg, model2_ier = so.leastsq(error_func2, \
                 x0=model2_initial, \
                 args=(light_curve.mjd, light_curve.mag, light_curve.error), \
                 full_output=1)
     
-    model1_chisq = np.sum(error_func_1(model1_params, \
+    model1_chisq = np.sum(error_func1(model1_params, \
                                        light_curve.mjd, \
                                        light_curve.mag, \
                                        light_curve.error)**2)# / len(model1_params)
     
-    model2_chisq = np.sum(error_func_2(model2_params, \
+    model2_chisq = np.sum(error_func2(model2_params, \
                                        light_curve.mjd, \
                                        light_curve.mag, \
                                        light_curve.error)**2)# / len(model2_params)
@@ -225,11 +225,14 @@ def test_compute_delta_chi_squared():
     sigmas = 10.**np.random.uniform(-2, -3, size=150)
     light_curve = SimulatedLightCurve(mjd, error=sigmas)
     
+    error_func1 = lambda p, x, mag, sigma: (mag - linear_model(np.array(p), x)) / sigma
+    error_func2 = lambda p, x, mag, sigma: (mag - gaussian_model(np.array(p), x)) / sigma
+    
     # Make a flat light curve, and show that the difference in chi-squared is
     #   negligible between the two fits.
     dcs = compute_delta_chi_squared(light_curve, \
-                                    model1=linear_model, model1_initial=(0.0, np.median(light_curve.mag)),\
-                                    model2=gaussian_model, model2_initial=(-1.0, np.median(light_curve.mjd), 5.0, np.median(light_curve.mag))\
+                                    error_func1=error_func1, model1_initial=(0.0, np.median(light_curve.mag)),\
+                                    error_func2=error_func2, model2_initial=(-1.0, np.median(light_curve.mjd), 5.0, np.median(light_curve.mag))\
                                     )
     
     print dcs
@@ -238,8 +241,8 @@ def test_compute_delta_chi_squared():
     #   chi-squared is better.
     light_curve.addMicrolensingEvent(t0=250.)
     dcs = compute_delta_chi_squared(light_curve, \
-                                    model1=linear_model, model1_initial=(0.0, np.median(light_curve.mag)),\
-                                    model2=gaussian_model, model2_initial=(-5.0, np.median(light_curve.mjd), 5.0, np.median(light_curve.mag))\
+                                    error_func1=error_func1, model1_initial=(0.0, np.median(light_curve.mag)),\
+                                    error_func2=error_func2, model2_initial=(-5.0, np.median(light_curve.mjd), 5.0, np.median(light_curve.mag))\
                                     )
     
     print dcs
@@ -359,9 +362,9 @@ def compute_variability_indices(light_curve, indices=[]):
     
     if "delta_chi_squared" in indices:
         idx_dict["delta_chi_squared"] = compute_delta_chi_squared(light_curve,\
-                                                                  model1=linear_model, \
+                                                                  error_func1=linear_error_func, \
                                                                   model1_initial=(0.0, np.median(light_curve.mag)),\
-                                                                  model2=gaussian_model, \
+                                                                  error_func2=gaussian_error_func, \
                                                                   model2_initial=(-5.0, np.median(light_curve.mjd), 5.0, np.median(light_curve.mag))\
                                                                  )
         
