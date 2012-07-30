@@ -14,7 +14,8 @@ import time
 # Third-party
 import apwlib.geometry as g
 import apwlib.convert as c
-import esutil
+from apwlib.globals import greenText
+
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -22,12 +23,55 @@ import numpy as np
 from scipy.stats import scoreatpercentile
 
 # Project
+from ptf.simulation.simulatedlightcurve import SimulatedLightCurve
 import ptf.photometricdatabase as pdb
+import ptf.analyze.analyze as analyze
 
-def variability_indices_detection_efficiency(light_curves, indices=["j","k","eta","sigma_mu","delta_chi_squared"]):
+# Create logger
+logger = logging.getLogger(__name__)
+ch = logging.StreamHandler()
+formatter = logging.Formatter("%(name)s / %(levelname)s / %(message)s")
+ch.setFormatter(formatter)
+logger.addHandler(ch)
+
+def variability_indices_detection_efficiency(light_curves, events_per_light_curve=100, indices=["j","k","eta","sigma_mu","delta_chi_squared"]):
     """ This figure should show the detection efficiency curve for all indices by
         injecting events into a random sampling of light_curves.
+        
+            1) Given a list of light curves, compute the variability indices for these "vanilla" light curves
+            2) For each light curve, add 'events_per_light_curve' different events to each light curve, and 
+                recompute the indices. Then use the selection criteria from the original light curves to define
+                the detection efficiency and false positive rate for each index as a function of event timescale.
+                
     """
+    
+    logger.debug(greenText("/// variability_indices_detection_efficiency ///"))
+    logger.debug("Analyzing {} light curves".format(len(light_curves)))
+    var_indices = np.array([analyze.compute_variability_indices(light_curve, indices, tuple=True) for light_curve in light_curves], dtype=float, names=indices)
+    
+    sim_light_curves = [SimulatedLightCurve(lc.mjd, mag=lc.mag, error=lc.error) for lc in light_curves]
+    
+    var_indices_with_events = []
+    # For each light curve, add 100 different microlensing events and recompute indices
+    for light_curve in sim_light_curves:
+        for event_id in range(events_per_light_curve):
+            light_curve.reset()
+            event_added = False
+            
+            if np.random.uniform() > 0.5:
+                light_curve.addMicrolensingEvent()
+                event_added = True
+            
+            var_indices_with_events.append(analyze.compute_variability_indices(light_curve, indices, tuple=True) + (event_added,))
+    
+    names = indices + ["event_added"]
+    dtypes = [float]*len(indices) + [bool]
+    var_indices_with_events = np.array(var_indices_with_events, dtype=zip(names,dtypes))
+    
+    print len(var_indices_with_events["j"])
+    
+    return
+    
     
     # Help with plotting
     line_styles = [(3,"-."), (3,":"), (3,"--"), (1.5,"--"), (2,"-")]
