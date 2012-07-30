@@ -329,7 +329,7 @@ def test_eta():
     
     print eta(light_curve)
 
-def compute_variability_indices(light_curve, indices=[]):
+def compute_variability_indices(light_curve, indices=[], tuple=False):
     """ Computes variability statistics, such as those explained in M.-S. Shin et al. 2009.
         Valid indices:
             j : Stetson J parameter
@@ -377,7 +377,10 @@ def compute_variability_indices(light_curve, indices=[]):
     if "sigma_mu" in indices:
         idx_dict["sigma_mu"] = np.std(light_curve.mag) / continuum_mag
     
-    return idx_dict
+    if tuple:
+        return tuple([idx_dict[idx] for idx in indices])
+    else:
+        return idx_dict
 
 def test_compute_variability_indices():
     # Here we're really just seeing how long it takes to run...
