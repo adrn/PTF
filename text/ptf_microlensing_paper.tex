@@ -1,0 +1,83 @@
+\documentclass[12pt,preprint]{aastex}
+\newcounter{address}
+\setcounter{address}{1}
+
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsfonts}
+\usepackage{subfigure}
+\usepackage{natbib}
+
+\newcommand{\apwsim}{\raisebox{0.2ex}{\scriptsize$\sim$\normalsize}} 
+
+\begin{document}
+
+\title{Title Placeholder}
+\author{
+  Adrian~M.~Price-Whelan\altaffilmark{\ref{col}}, Marcel~Ag\"ueros\altaffilmark{\ref{col}}, Amanda Fournier\altaffilmark{\ref{ucsb}}, Eran Ofek\altaffilmark{\ref{weiz}}, Rachel Street\altaffilmark{\ref{lcogt}}
+}
+
+\altaffiltext{\theaddress}{\stepcounter{address}\label{col} Department of Astronomy, Columbia University, 550 W 120th St., New York, NY 10027, USA}
+\altaffiltext{\theaddress}{\stepcounter{address}\label{ucsb} Department of Physics, Broida Hall, University of California, Santa Barbara, CA 93106, USA}
+\altaffiltext{\theaddress}{\stepcounter{address}\label{weiz} Benoziyo Center for Astrophysics, Weizmann Institute of Science, 76100 Rehovot, Israel}
+\altaffiltext{\theaddress}{\stepcounter{address}\label{lcogt} Las Cumbres Observatory Global Telescope Network, Inc., 6740 Cortona Dr.\ Suite 102, Santa Barbara, CA 93117, USA}
+
+\begin{abstract}
+	Many current photometric, time-domain surveys are driven by specific goals, such as supernova searches, transiting exoplanet discoveries, or stellar variability studies, which set the cadence with which individual fields get re-imaged. In the case of the Palomar Transient Factory (PTF), several such sub-surveys are being conducted in parallel, leading to an extremely non-uniform sampling gradient over the survey footprint of nearly 20,000 deg$^2$: while the typical 7.26~deg$^2$ PTF field has been imaged 15 times, \apwsim1000~deg$^2$ of the survey has been observed more than 150 times. We use the existing PTF data to study the trade-off between a large survey footprint and irregular sampling when searching for microlensing events, and to examine the probability that such events can be recovered in these data. We conduct Monte Carlo simulations to evaluate our detection efficiency in a hypothetical survey field as a function of both the baseline and number of observations. We also apply variability statistics to systematically differentiate between periodic, transient, and flat light curves. Preliminary results suggest that both recovery and discovery of microlensing events are possible with a careful consideration of photometric systematics. This work can help inform predictions about the observability of microlensing signals in future wide-field time-domain surveys such as that of LSST.
+	
+\end{abstract}
+
+\keywords{
+  survey science
+  ---
+  gravitational microlensing
+  ---
+  time-domain astrophysics
+}
+
+\section{Introduction}
+
+\section{PTF Observations and Data}
+
+\section{Simulated microlensing event recovery}
+
+\section{Searching for events in full PTF data set}
+
+\section{Comparing results to model predictions (?)}
+
+\section{Conclusions and Future Work}
+
+
+%\bibliographystyle{apj}
+%\bibliography{apj-jour,refs}
+%
+%\begin{figure}
+%	\centering
+%	\caption{Computed detection efficiency as a function of number of observations for a fixed baseline of 365 days. This plot uses entirely simulated light curves.}
+%    \includegraphics[width=1.0\textwidth]{figures/detection_efficiency_figure.pdf}
+%    \label{fig:detection_eff}
+%\end{figure}	
+%
+%\begin{figure}
+%	\centering
+%	\caption{A visualization of the different sampling regimes of six different PTF fields over the same one year baseline. Darker points mean more data (more exposures). Some fields have roughly uniform coverage, where others are very dense during some weeks and not others. }
+%    \includegraphics[width=1.0\textwidth]{figures/ptf_sampling_figure.pdf}
+%    \label{fig:light_curves}
+%\end{figure}
+%
+%\begin{figure}
+%	\centering
+%	\caption{Example of how the variability indices may be used to separate microlensing events from periodic or flat light curves.}
+%    \includegraphics[width=1.0\textwidth]{figures/J_vs_K_Con_figure.png}
+%    \label{fig:var_idx1}
+%\end{figure}
+%
+%\begin{figure}[htbp]
+%	\centering
+%	\caption{Two neighboring light curves. The time scale is the same on both plots. Note the strong similarities in the overall shapes of the data.} 
+%	 \includegraphics[width=1.0\textwidth]{figures/bad_data_figure.pdf}
+%	\label{fig:lc_correlated}
+%\end{figure}
+
+\end{document}  
