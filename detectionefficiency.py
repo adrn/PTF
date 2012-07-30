@@ -15,10 +15,6 @@ import time
 import apwlib.geometry as g
 import apwlib.convert as c
 from apwlib.globals import greenText
-
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import numpy as np
 from scipy.stats import scoreatpercentile
 
@@ -47,7 +43,7 @@ def variability_indices_detection_efficiency(light_curves, events_per_light_curv
     
     logger.debug(greenText("/// variability_indices_detection_efficiency ///"))
     logger.debug("Analyzing {} light curves".format(len(light_curves)))
-    var_indices = np.array([analyze.compute_variability_indices(light_curve, indices, tuple=True) for light_curve in light_curves], dtype=float, names=indices)
+    var_indices = np.array([analyze.compute_variability_indices(light_curve, indices, return_tuple=True) for light_curve in light_curves], dtype=float, names=indices)
     
     sim_light_curves = [SimulatedLightCurve(lc.mjd, mag=lc.mag, error=lc.error) for lc in light_curves]
     
@@ -62,7 +58,7 @@ def variability_indices_detection_efficiency(light_curves, events_per_light_curv
                 light_curve.addMicrolensingEvent()
                 event_added = True
             
-            var_indices_with_events.append(analyze.compute_variability_indices(light_curve, indices, tuple=True) + (event_added,))
+            var_indices_with_events.append(analyze.compute_variability_indices(light_curve, indices, return_tuple=True) + (event_added,))
     
     names = indices + ["event_added"]
     dtypes = [float]*len(indices) + [bool]
@@ -71,8 +67,25 @@ def variability_indices_detection_efficiency(light_curves, events_per_light_curv
     print len(var_indices_with_events["j"])
     
     return
+
+field = pdb.Field(110002, filter="R")
+chip = field.ccds[0].read()
+source_ids = chip.sources.readWhere("matchedSourceID < 200")["matchedSourceID"]
+
+light_curves = []
+for sid in source_ids:
+    lc = field.ccds[0].light_curve(sid)
     
-    
+    if len(lc.mjd) > 0:
+        light_curves.append(lc)
+
+field.ccds[0].close()
+
+variability_indices_detection_efficiency(light_curves)
+
+sys.exit(0)
+
+if False:    
     # Help with plotting
     line_styles = [(3,"-."), (3,":"), (3,"--"), (1.5,"--"), (2,"-")]
     line_colors = ["c", "m", "g", "y", "k"]
