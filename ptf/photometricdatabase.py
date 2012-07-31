@@ -12,7 +12,6 @@ import logging
 import numpy as np
 import apwlib.geometry as g
 from apwlib.globals import redText, greenText, yellowText
-import pytest
 
 try:
     import tables
@@ -82,6 +81,8 @@ class Field(object):
         # Validate filter_id
         if isinstance(filter, Filter):
             self.filter = filter
+        elif isinstance(filter, str):
+            self.filter = Filter(filter)
         else:
             raise ValueError(redText("filter") + " parameter must be Filter object")
         
@@ -313,7 +314,7 @@ if __name__ == "__main__":
     #time_compute_var_indices()
     #select_most_observed_fields()
     
-    logging.basicConfig(level=logging.INFO)
+    #logging.basicConfig(level=logging.INFO)
     #test_filter()
     #test_field()
     test_select_most_observed_fields()

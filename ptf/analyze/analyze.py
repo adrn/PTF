@@ -375,7 +375,7 @@ def compute_variability_indices(light_curve, indices=[], return_tuple=False):
         idx_dict["continuum"] = continuum_mag
     
     if "sigma_mu" in indices:
-        idx_dict["sigma_mu"] = np.std(light_curve.mag) / continuum_mag
+        idx_dict["sigma_mu"] = np.std(light_curve.mag) / continuum_mag[0]
     
     if return_tuple:
         return tuple([idx_dict[idx] for idx in indices])
