@@ -18,6 +18,12 @@ try:
 except ImportError:
     raise ImportError("apwlib not found! \nDo: 'git clone git@github.com:adrn/apwlib.git' and run 'python setup.py install' to install.")
 
+try:
+    import error_functions
+except ImportError:
+    print redText("**Error**: ") + "C extension error_functions.so not found! Make sure to do 'python setup.py build_ext' before running."
+    raise
+
 # ------
 # Models
 # ------
@@ -25,16 +31,16 @@ def error_function(p, x, y, sigma_y, model):
     return (y - model(p,x)) / sigma_y
     
 constant_model = lambda p, x: p[0] + np.zeros(len(x))
-constant_error_func = lambda p, x, mag, sigma: (mag - constant_model(p, x)) / sigma
+constant_error_func = error_functions.constant_error_func
+#constant_error_func = lambda p, x, mag, sigma: (mag - constant_model(p, x)) / sigma
 
 linear_model = lambda p, x: p[0]*x + p[1]
-linear_error_func = lambda p, x, mag, sigma: (mag - linear_model(p, x)) / sigma
+linear_error_func = error_functions.linear_error_func
+#linear_error_func = lambda p, x, mag, sigma: (mag - linear_model(p, x)) / sigma
 
 gaussian_model = lambda p, x: p[0]*np.exp(-(x - p[1])**2 / (2*p[2]**2)) + p[3]
-gaussian_error_func = lambda p, x, mag, sigma: (mag - gaussian_model(p, x)) / sigma
-#import ext
-#gaussian_model = ext.gaussian_model
-#gaussian_error_func = ext.gaussian_error_func
+gaussian_error_func = error_functions.gaussian_error_func
+#gaussian_error_func = lambda p, x, mag, sigma: (mag - gaussian_model(p, x)) / sigma
 
 def u_t(p, t):
     return np.sqrt(p[0]**2 + ((t - p[1])/p[2])**2)
@@ -82,7 +88,6 @@ def estimate_continuum(light_curve, sigma_clip=True, clip_sigma=2.5):
             # If we've thrown away 50% of the data points, break the loop and assume it won't converge
             #if (new_len / lc_len) <= 0.5:
             #    break
-            
         
         mjd = light_curve.mjd[w]
         mag = light_curve.mag[w]
@@ -225,8 +230,46 @@ def test_compute_delta_chi_squared():
     sigmas = 10.**np.random.uniform(-2, -3, size=150)
     light_curve = SimulatedLightCurve(mjd, error=sigmas)
     
-    error_func1 = lambda p, x, mag, sigma: (mag - linear_model(np.array(p), x)) / sigma
-    error_func2 = lambda p, x, mag, sigma: (mag - gaussian_model(np.array(p), x)) / sigma
+    error_func1 = linear_error_func
+    error_func2 = gaussian_error_func
+    
+    # Make a flat light curve, and show that the difference in chi-squared is
+    #   negligible between the two fits.
+    dcs = compute_delta_chi_squared(light_curve, \
+                                    error_func1=error_func1, model1_initial=(0.0, np.median(light_curve.mag)),\
+                                    error_func2=error_func2, model2_initial=(-1.0, np.median(light_curve.mjd), 5.0, np.median(light_curve.mag))\
+                                    )
+    
+    print dcs
+    
+    # Make a light curve with a gaussian peak, and show that the gaussian model
+    #   chi-squared is better.
+    light_curve.addMicrolensingEvent(t0=250.)
+    dcs = compute_delta_chi_squared(light_curve, \
+                                    error_func1=error_func1, model1_initial=(0.0, np.median(light_curve.mag)),\
+                                    error_func2=error_func2, model2_initial=(-5.0, np.median(light_curve.mjd), 5.0, np.median(light_curve.mag))\
+                                    )
+    
+    print dcs
+
+def test_compute_delta_chi_squared_slow():
+    """ 
+    import matplotlib.pyplot as plt
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.plot(light_curve.mjd, model1(model1_params, light_curve.mjd), 'r--')
+    ax.plot(light_curve.mjd, model2(model2_params, light_curve.mjd), 'g--')
+    ax = light_curve.plot(ax)
+    plt.show()
+    """
+    
+    from ptf.simulation.simulatedlightcurve import SimulatedLightCurve
+    mjd = np.linspace(0., 500., 150)
+    sigmas = 10.**np.random.uniform(-2, -3, size=150)
+    light_curve = SimulatedLightCurve(mjd, error=sigmas)
+    
+    error_func1 = linear_error_func
+    error_func2 = lambda p, x, mag, sigma: (mag - gaussian_model(p, x)) / sigma
     
     # Make a flat light curve, and show that the difference in chi-squared is
     #   negligible between the two fits.
@@ -386,15 +429,19 @@ def test_compute_variability_indices():
     # Here we're really just seeing how long it takes to run...
     
     from ptf.simulation.simulatedlightcurve import SimulatedLightCurve
-    mjd = np.linspace(0., 500., 150)
-    sigmas = 10.**np.random.uniform(-2, -3, size=150)
+    mjd = np.linspace(0., 500., 200)
+    sigmas = 10.**np.random.uniform(-2, -3, size=200)
     light_curve = SimulatedLightCurve(mjd, error=sigmas)
     light_curve.addMicrolensingEvent()
     
     import time
     
     a = time.time()
-    idx = compute_variability_indices(light_curve)
+    for ii in range(100):
+        idx = compute_variability_indices(light_curve)
+        
     print time.time() - a 
     
-    print idx
+
+if __name__ == "__main__":
+    test_compute_variability_indices()
