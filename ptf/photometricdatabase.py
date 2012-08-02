@@ -171,20 +171,17 @@ class CCD(object):
         # TODO: should this be here?
 
         chip = self.read()
-        sourceDataTable = chip.sourcedata
-        #exposures = self.chip.exposures
-            
-        idx = sourceDataTable.getWhereList('matchedSourceID == {}'.format(source_id))
+        sourcedata = chip.sourcedata.readWhere('matchedSourceID == {}'.format(source_id))
+        mjd = sourcedata["mjd"]
         
-        mjd = sourceDataTable.readCoordinates(idx, field='mjd')
         if mag_type == 'relative':
-            mag = sourceDataTable.readCoordinates(idx, field='mag')
-            mag_err = sourceDataTable.readCoordinates(idx, field='magErr')
+            mag = sourcedata["mag"]
+            mag_err = sourcedata["magErr"]
         elif mag_type == 'absolute':
-            mag = sourceDataTable.readCoordinates(idx, field='mag_auto')/1000.0 + sourceDataTable.readCoordinates(idx, field='absphotzp')
-            mag_err = sourceDataTable.readCoordinates(idx, field='magerr_auto')/10000.0
+            mag = sourcedata["mag_auto"]/1000.0 + sourcedata["absphotzp"]
+            mag_err = sourcedata["magerr_auto"]/10000.0
         
-        return PTFLightCurve(mjd=mjd, mag=mag, error=mag_err)
+        return PTFLightCurve(mjd=mjd, mag=mag, error=mag_err, metadata=sourcedata)
         
 
 # ==================================================================================================
