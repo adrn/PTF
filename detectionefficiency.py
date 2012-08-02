@@ -83,7 +83,10 @@ def simulate_events_compute_indices(light_curves, events_per_light_curve=100, in
                 light_curve.addMicrolensingEvent(tE=tE)
                 event_added = True
             
-            lc_var_indices = analyze.compute_variability_indices(light_curve, indices, return_tuple=True)
+            try:
+                lc_var_indices = analyze.compute_variability_indices(light_curve, indices, return_tuple=True)
+            except:
+                break
             var_indices_with_events.append(lc_var_indices + (light_curve.tE, event_added))
     
     names = indices + ["tE", "event_added"]
@@ -106,7 +109,14 @@ def compare_detection_efficiencies(light_curves, events_per_light_curve=100, ind
     logger.debug(greenText("/// compare_detection_efficiencies ///"))
     logger.debug("Computing indices {} for {} light curves".format(",".join(indices), len(light_curves)))
     
-    selection_var_indices = np.array([analyze.compute_variability_indices(light_curve, indices, return_tuple=True) for light_curve in light_curves], dtype=zip(indices, [float]*len(indices)))
+    var_list = []
+    for light_curve in light_curves:
+        try:
+            var_list.append(analyze.compute_variability_indices(light_curve, indices, return_tuple=True))
+        except:
+            pass
+            
+    selection_var_indices = np.array(var_list, dtype=zip(indices, [float]*len(indices)))
     simulated_var_indices = simulate_events_compute_indices(light_curves, events_per_light_curve, indices=indices)
     
     timescale_bins = np.logspace(0, 3, 100) # from 1 day to 1000 days
@@ -160,7 +170,7 @@ def compare_detection_efficiencies_on_field(field, light_curves_per_ccd, events_
             
             for sid in source_ids:
                 # Get a LightCurve object for this source id on this ccd
-                lc = field.ccds[0].light_curve(sid)
+                lc = field.ccds[0].light_curve(sid, clean=True)
                 
                 # If the light curve has more than 25 observations, include it
                 # HACK

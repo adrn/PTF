@@ -30,6 +30,41 @@ pytable_base_string = os.path.join(match_path, "match_{filter.id:02d}_{field.id:
 filter_map = {"R" : 2, "g" : 1}
 inv_filter_map = {2 : "R", 1 : "g"}
 
+def quality_cut(sourcedata, source_id=None, ccd_edge_cutoff=25):
+    """ This function accepts a Pytables table object (from the 'sourcedata' table)
+        and returns only the rows that pass the given quality cuts.
+        
+        Parameters
+        ----------
+        sourcedata : table
+            A pytables Table object -> 'chip.sourcedata'
+        source_id : int
+            A matchedSourceID
+        ccd_edge_cutoff : int
+            Define the cutoff for sources near the edge of a CCD. The cut will remove
+            all data points where the source is nearer than this limit to the edge.
+    """    
+    x_cut1, x_cut2 = ccd_edge_cutoff, globals.ccd_size[0] - ccd_edge_cutoff
+    y_cut1, y_cut2 = ccd_edge_cutoff, globals.ccd_size[1] - ccd_edge_cutoff
+    
+    if source_id == None:
+        src = ""
+    else:
+        src = "(matchedSourceID == {}) &".format(source_id)
+    
+    sourcedata = sourcedata.readWhere(src + '(sextractorFlags < 8) & \
+                                       (x_image > {}) & (x_image < {}) & \
+                                       (y_image > {}) & (y_image < {}) & \
+                                       (magErr < 0.3) & \
+                                       (mag > 13.5) & (mag < 22)'.format(x_cut1, x_cut2, y_cut1, y_cut2))
+    
+    sourcedata = sourcedata[(sourcedata["sextractorFlags"] & 1) == 0]
+    sourcedata = sourcedata[np.isfinite(sourcedata["mag"]) & \
+                            np.isfinite(sourcedata["mjd"]) & \
+                            np.isfinite(sourcedata["magErr"])]
+                            
+    return sourcedata
+
 # ==================================================================================================
 #   Classes
 #
@@ -167,12 +202,17 @@ class CCD(object):
     def close(self):
         self._file.close()
     
-    def light_curve(self, source_id, mag_type="relative", clean=True):
+    def light_curve(self, source_id, mag_type="relative", clean=False):
         """ Get a light curve for a given source ID from this chip """
         # TODO: should this be here?
 
         chip = self.read()
-        sourcedata = chip.sourcedata.readWhere('matchedSourceID == {}'.format(source_id))
+        
+        if clean:
+            sourcedata = quality_cut(chip.sourcedata, source_id=source_id)
+        else:
+            sourcedata = chip.sourcedata.readWhere('matchedSourceID == {}'.format(source_id))
+            
         mjd = sourcedata["mjd"]
         
         if mag_type == 'relative':
