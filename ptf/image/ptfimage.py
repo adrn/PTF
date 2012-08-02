@@ -92,7 +92,7 @@ def download_images_from_metadatas(metadatas):
     for metadata in metadatas:
         url = os.path.join(IPAC_DATA_URL, metadata["pfilename"])
         ptf_images.append(PTFImage(retrieve_ipac_file(url), metadata=metadata))
-        print greenText("Image {} downloaded.")
+        print greenText("Image {} downloaded.".format(os.path.basename(metadata["pfilename"])))
     
     return ptf_images
 
