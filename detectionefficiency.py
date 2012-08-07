@@ -65,7 +65,7 @@ def detection_efficiency(statistic, indices_with_events, lower_cut=None, upper_c
     
     return (efficiency, N_false_positives)
 
-def simulate_events_compute_indices(light_curves, events_per_light_curve=100, indices=["j","k","eta","sigma_mu","delta_chi_squared"]):
+def simulate_events_compute_indices(light_curves, events_per_light_curve=100, indices=["j","k","eta","sigma_mu","delta_chi_squared"], u0=None):
     """ """
     var_indices_with_events = []
     
@@ -80,7 +80,7 @@ def simulate_events_compute_indices(light_curves, events_per_light_curve=100, in
             # Only add events 50% of the time, to allow for false positives
             if np.random.uniform() > 0.5:
                 tE = 10**np.random.uniform(0., 3.)
-                light_curve.addMicrolensingEvent(tE=tE)
+                light_curve.addMicrolensingEvent(tE=tE, u0=u0)
                 event_added = True
             
             try:
@@ -95,7 +95,7 @@ def simulate_events_compute_indices(light_curves, events_per_light_curve=100, in
     
     return var_indices_with_events
     
-def compare_detection_efficiencies(light_curves, events_per_light_curve=100, indices=["j","k","eta","sigma_mu","delta_chi_squared"]):
+def compare_detection_efficiencies(light_curves, events_per_light_curve=100, indices=["j","k","eta","sigma_mu","delta_chi_squared"], u0=None):
     """ This figure should show the detection efficiency curve for all indices by
         injecting events into a random sampling of light_curves.
         
@@ -117,7 +117,7 @@ def compare_detection_efficiencies(light_curves, events_per_light_curve=100, ind
             pass
             
     selection_var_indices = np.array(var_list, dtype=zip(indices, [float]*len(indices)))
-    simulated_var_indices = simulate_events_compute_indices(light_curves, events_per_light_curve, indices=indices)
+    simulated_var_indices = simulate_events_compute_indices(light_curves, events_per_light_curve, indices=indices, u0=u0)
     
     timescale_bins = np.logspace(0, 3, 100) # from 1 day to 1000 days
     total_counts_per_bin, tE_bin_edges = np.histogram(simulated_var_indices[simulated_var_indices["event_added"]]["tE"], bins=timescale_bins)
@@ -138,7 +138,7 @@ def compare_detection_efficiencies(light_curves, events_per_light_curve=100, ind
     
     return data
 
-def compare_detection_efficiencies_on_field(field, light_curves_per_ccd, events_per_light_curve, overwrite=False, indices=["j","k","eta","sigma_mu","delta_chi_squared"]):
+def compare_detection_efficiencies_on_field(field, light_curves_per_ccd, events_per_light_curve, overwrite=False, indices=["j","k","eta","sigma_mu","delta_chi_squared"], u0=None):
     """ Compare the detection efficiencies of various variability statistics using the
         light curves from an entire PTF field.
     """
@@ -182,7 +182,7 @@ def compare_detection_efficiencies_on_field(field, light_curves_per_ccd, events_
             ccd.close()
         
         logger.debug("All {} light curves loaded, about to run simulation...".format(len(light_curves)))
-        data = compare_detection_efficiencies(light_curves, events_per_light_curve=events_per_light_curve, indices=indices)
+        data = compare_detection_efficiencies(light_curves, events_per_light_curve=events_per_light_curve, indices=indices, u0=u0)
         
         logger.debug("Done running detection efficiency simulation, writing to file...")
         f = open("data/detectionefficiency/{}.pickle".format(file_base), "w")
@@ -257,6 +257,8 @@ if __name__ == "__main__":
                     help="The number of light curves to select from each CCD in a field")
     parser.add_argument("--test", dest="test", action="store_true", default=False,
                     help="Run tests")
+    parser.add_argument("--u0", dest="u0", type=float, default=None,
+                    help="Only add microlensing events with the specified impact parameter.")
     
     args = parser.parse_args()
     
@@ -276,4 +278,4 @@ if __name__ == "__main__":
         sys.exit(0)
     
     field = pdb.Field(args.field_id, filter="R")
-    compare_detection_efficiencies_on_field(field, events_per_light_curve=args.N, light_curves_per_ccd=args.limit, overwrite=args.overwrite)
+    compare_detection_efficiencies_on_field(field, events_per_light_curve=args.N, light_curves_per_ccd=args.limit, overwrite=args.overwrite, u0=args.u0)
