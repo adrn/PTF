@@ -9,16 +9,14 @@ import logging
 
 # Third-party dependencies
 import numpy as np
-
-# Package dependences
-import ptf.analyze.analyze as analyze
+import matplotlib.pyplot as plt
 
 # ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=
 
 class PTFLightCurve:
     """ Represents a PTF Light Curve """
     
-    def __init__(self, mjd, mag, error, metadata=None):
+    def __init__(self, mjd, mag, error, metadata=None, exposures=None):
         """ Create a PTFLightCurve by passing equal-length arrays of mjd, magnitude, and
             magnitude errors. This object also accepts an optional metadata parameter, 
             which is any numpy recarray that contains extra information about the light
@@ -29,7 +27,43 @@ class PTFLightCurve:
         self.amjd = self.mjd = np.array(mjd)[idx].astype(np.float64)
         self.amag = self.mag = np.array(mag)[idx].astype(np.float64)
         self.error = np.array(error)[idx].astype(np.float64)
-        self.metadata = np.array(metadata)
+        
+        if metadata != None:
+            self.metadata = np.array(metadata)
+        else:
+            self.metadata = None
+    
+        if exposures != None:
+            self.exposures = np.array(exposures)
+        else:
+            self.exposures = None
+            
+    @property
+    def field_id(self):
+        if self.exposures != None:
+            fid = int(self.exposures["fieldID"][0])
+        else:
+            fid = None
+        
+        return fid
+        
+    @property
+    def ccd_id(self):
+        if self.exposures != None:
+            cid = int(self.exposures["ccdID"][0])
+        else:
+            cid = None
+        
+        return cid
+    
+    @property
+    def source_id(self):
+        if self.metadata != None:
+            sid = int(self.metadata["matchedSourceID"][0])
+        else:
+            sid = None
+        
+        return sid
     
     def plot(self, ax=None, **kwargs):
         """ Either plots the light curve and show()'s it to the display, or plots it on 
@@ -46,7 +80,6 @@ class PTFLightCurve:
             kwargs["c"] = 'k'
         
         if ax == None:
-            import matplotlib.pyplot as plt
             fig = plt.figure()
             ax = fig.add_subplot(111)
             ax.errorbar(self.mjd, self.mag, self.error, ecolor='0.7', capsize=0, **kwargs)
