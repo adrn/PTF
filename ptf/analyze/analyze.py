@@ -18,29 +18,31 @@ try:
 except ImportError:
     raise ImportError("apwlib not found! \nDo: 'git clone git@github.com:adrn/apwlib.git' and run 'python setup.py install' to install.")
 
+
+
 try:
     import error_functions
-except ImportError:
-    print redText("**Error**: ") + "C extension error_functions.so not found! Make sure to do 'python setup.py build_ext' before running."
-    raise
+    constant_error_func = error_functions.constant_error_func
+    linear_error_func = error_functions.linear_error_func
+    gaussian_error_func = error_functions.gaussian_error_func
+except ImportError, RuntimeError:
+    print redText("**Error**: ") + "C extension error_functions.so not found or unable to import it! Make sure to do 'python setup.py build_ext' before running."
+    
+    constant_model = lambda p, x: p[0] + np.zeros(len(x))
+    constant_error_func = lambda p, x, mag, sigma: (mag - constant_model(p, x)) / sigma
+    
+    linear_model = lambda p, x: p[0]*x + p[1]
+    linear_error_func = lambda p, x, mag, sigma: (mag - linear_model(p, x)) / sigma
+    
+    gaussian_model = lambda p, x: p[0]*np.exp(-(x - p[1])**2 / (2*p[2]**2)) + p[3]
+    gaussian_error_func = lambda p, x, mag, sigma: (mag - gaussian_model(p, x)) / sigma
+    
 
 # ------
 # Models
 # ------
 def error_function(p, x, y, sigma_y, model):
     return (y - model(p,x)) / sigma_y
-    
-constant_model = lambda p, x: p[0] + np.zeros(len(x))
-constant_error_func = error_functions.constant_error_func
-#constant_error_func = lambda p, x, mag, sigma: (mag - constant_model(p, x)) / sigma
-
-linear_model = lambda p, x: p[0]*x + p[1]
-linear_error_func = error_functions.linear_error_func
-#linear_error_func = lambda p, x, mag, sigma: (mag - linear_model(p, x)) / sigma
-
-gaussian_model = lambda p, x: p[0]*np.exp(-(x - p[1])**2 / (2*p[2]**2)) + p[3]
-gaussian_error_func = error_functions.gaussian_error_func
-#gaussian_error_func = lambda p, x, mag, sigma: (mag - gaussian_model(p, x)) / sigma
 
 def u_t(p, t):
     return np.sqrt(p[0]**2 + ((t - p[1])/p[2])**2)
