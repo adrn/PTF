@@ -9,7 +9,9 @@ import logging
 
 # Third-party dependencies
 import numpy as np
-import matplotlib.pyplot as plt
+
+# Package dependences
+import ptf.analyze.analyze as analyze
 
 # ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=
 
@@ -44,6 +46,7 @@ class PTFLightCurve:
             kwargs["c"] = 'k'
         
         if ax == None:
+            import matplotlib.pyplot as plt
             fig = plt.figure()
             ax = fig.add_subplot(111)
             ax.errorbar(self.mjd, self.mag, self.error, ecolor='0.7', capsize=0, **kwargs)

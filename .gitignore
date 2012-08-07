@@ -5,3 +5,9 @@ lc_merged*.txt
 2011\ Report/
 #*
 *.tar.gz
+*.log
+*.aux
+*.pdf
+*.synctex.gz
+*.o
+*.so

@@ -1,30 +1,50 @@
+%\documentclass{emulateapj}
 \documentclass[12pt,preprint]{aastex}
 \newcounter{address}
 \setcounter{address}{1}
-
+\usepackage{lscape, longtable}
+\usepackage{lmodern}
+\usepackage[T1]{fontenc}
 \usepackage{graphicx}
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{amsfonts}
 \usepackage{subfigure}
 \usepackage{natbib}
-
+\newcommand{\Msun}{\ifmmode {M_{\odot}}\else${M_{\odot}}$\fi}
+\newcommand{\Rsun}{\ifmmode {R_{\odot}}\else${R_{\odot}}$\fi}
+\newcommand{\lapprox }{{\lower0.8ex\hbox{$\buildrel <\over\sim$}}}
+\newcommand{\gapprox }{{\lower0.8ex\hbox{$\buildrel >\over\sim$}}}
+\def\amin{\ifmmode^{\prime}\else$^{\prime}$\fi}
+\def\asec{\ifmmode^{\prime\prime}\else$^{\prime\prime}$\fi}
 \newcommand{\apwsim}{\raisebox{0.2ex}{\scriptsize$\sim$\normalsize}} 
+
+\slugcomment{DRAFT \today}
+\shorttitle{Microlensing \& PTF}
+\shortauthors{Price-Whelan et al.}
+
+\bibliographystyle{apj}
 
 \begin{document}
 
-\title{Title Placeholder}
-\author{
-  Adrian~M.~Price-Whelan\altaffilmark{\ref{col}}, Marcel~Ag\"ueros\altaffilmark{\ref{col}}, Amanda Fournier\altaffilmark{\ref{ucsb}}, Eran Ofek\altaffilmark{\ref{weiz}}, Rachel Street\altaffilmark{\ref{lcogt}}
-}
+\title{Identifying Microlenses in Large, Non-Uniformly Sampled Surveys: The Case
+ of the Palomar Transient Factory}
+\author{Adrian~M.~Price-Whelan\altaffilmark{\ref{col}}, Marcel~A.~Ag\"ueros\altaffilmark{\ref{col}}, Amanda Fournier\altaffilmark{\ref{ucsb}}, Rachel Street\altaffilmark{\ref{lcogt}}, Eran Ofek\altaffilmark{\ref{weiz},\ref{eins}}, David Levitan\altaffilmark{\ref{calt}}, Joshua S.\ Bloom\altaffilmark{\ref{cal}}, S.\ Bradley Cenko\altaffilmark{\ref{cal}}, Mansi M.\ Kasliwal\altaffilmark{\ref{calt}}, Shrinivas R.\ Kulkarni\altaffilmark{\ref{calt}}, Nicholas~M.~Law\altaffilmark{\ref{to},\ref{dun}}, Peter Nugent\altaffilmark{\ref{lbnl}}, Dovi Poznanski\altaffilmark{\ref{cal},\ref{calt},\ref{eins}}, Robert M.\ Quimby\altaffilmark{\ref{calt}}}
 
 \altaffiltext{\theaddress}{\stepcounter{address}\label{col} Department of Astronomy, Columbia University, 550 W 120th St., New York, NY 10027, USA}
 \altaffiltext{\theaddress}{\stepcounter{address}\label{ucsb} Department of Physics, Broida Hall, University of California, Santa Barbara, CA 93106, USA}
-\altaffiltext{\theaddress}{\stepcounter{address}\label{weiz} Benoziyo Center for Astrophysics, Weizmann Institute of Science, 76100 Rehovot, Israel}
 \altaffiltext{\theaddress}{\stepcounter{address}\label{lcogt} Las Cumbres Observatory Global Telescope Network, Inc., 6740 Cortona Dr.\ Suite 102, Santa Barbara, CA 93117, USA}
+\altaffiltext{\theaddress}{\stepcounter{address}\label{weiz} Benoziyo Center for Astrophysics, Weizmann Institute of Science, 76100 Rehovot, Israel}
+\altaffiltext{\theaddress}{\stepcounter{address}\label{calt} Cahill Center for Astrophysics, California Institute of Technology, Pasadena, CA 91125, USA}
+\altaffiltext{\theaddress}{\stepcounter{address}\label{cal} Department of Astronomy, University of California, Berkeley, CA  94720, USA}
+\altaffiltext{\theaddress}{\stepcounter{address}\label{to} Dunlap Institute for Astronomy and Astrophysics, University of Toronto, 50 St.\ George Street, Toronto M5S 3H4, Ontario, Canada}
+\altaffiltext{\theaddress}{\stepcounter{address}\label{lbnl} Computational Cosmology Center, Lawrence Berkeley National Laboratory, 1 Cyclotron Road, Berkeley, CA 94720, USA}
+\altaffiltext{\theaddress}{\stepcounter{address}\label{dun} Dunlap Fellow}
+\altaffiltext{\theaddress}{\stepcounter{address}\label{eins} Einstein Fellow}
+
 
 \begin{abstract}
-	Many current photometric, time-domain surveys are driven by specific goals, such as supernova searches, transiting exoplanet discoveries, or stellar variability studies, which set the cadence with which individual fields get re-imaged. In the case of the Palomar Transient Factory (PTF), several such sub-surveys are being conducted in parallel, leading to an extremely non-uniform sampling gradient over the survey footprint of nearly 20,000 deg$^2$: while the typical 7.26~deg$^2$ PTF field has been imaged 15 times, \apwsim1000~deg$^2$ of the survey has been observed more than 150 times. We use the existing PTF data to study the trade-off between a large survey footprint and irregular sampling when searching for microlensing events, and to examine the probability that such events can be recovered in these data. We conduct Monte Carlo simulations to evaluate our detection efficiency in a hypothetical survey field as a function of both the baseline and number of observations. We also apply variability statistics to systematically differentiate between periodic, transient, and flat light curves. Preliminary results suggest that both recovery and discovery of microlensing events are possible with a careful consideration of photometric systematics. This work can help inform predictions about the observability of microlensing signals in future wide-field time-domain surveys such as that of LSST.
+Many current photometric, time-domain surveys are driven by specific goals, such as supernova searches, transiting exoplanet discoveries, or stellar variability studies, which set the cadence with which individual fields get re-imaged. In the case of the Palomar Transient Factory (PTF), several such sub-surveys are being conducted in parallel, leading to an extremely non-uniform sampling gradient over the survey footprint of nearly 20,000 deg$^2$: while the typical 7.26~deg$^2$ PTF field has been imaged 15 times, \apwsim1000~deg$^2$ of the survey has been observed more than 150 times. We use the existing PTF data to study the trade-off between a large survey footprint and irregular sampling when searching for microlensing events, and to examine the probability that such events can be recovered in these data. We conduct Monte Carlo simulations to evaluate our detection efficiency in a hypothetical survey field as a function of both the baseline and number of observations. We also apply variability statistics to systematically differentiate between periodic, transient, and flat light curves. Preliminary results suggest that both recovery and discovery of microlensing events are possible with a careful consideration of photometric systematics. This work can help inform predictions about the observability of microlensing signals in future wide-field time-domain surveys such as that of LSST.
 	
 \end{abstract}
 
@@ -37,16 +57,73 @@
 }
 
 \section{Introduction}
+Since Einstein first studied gravitational microlensing (cite), the phenomena has been used to study dark objects, probe galactic structure and kinematics, and discover extrasolar planets. Microlensing events were once relatively rare, but with advances in CCD technology and the help of several dedicated microlensing surveys (), $>500$ lensing events are now detected per observing season. 
+
+[MORE MICROLENSING INTRODUCTION]
+
+[QUICK INTRO TO THEORY AND JARGON]
+
+[MOTIVATION FOR PROJECT -- Han, Di Stefano, Di Stefano et al. -- mesolensing and near-field microlensing]
 
 \section{PTF Observations and Data}
+The Palomar Transient Factory is a transient detection system that begins with a wide-field survey camera mounted on the automated 48 inch Oschin Schmidt telescope at Palomar Observatory, CA, uses a real-time data reduction pipeline to identify transients of interest, passes these to a dedicated photometric follow-up telescope, and generates an archive of all detected sources \citep{nick2009,rau2009}.
 
-\section{Simulated microlensing event recovery}
+The PTF camera is the 12K$\times$8K mosaic camera formerly at the Canada-France-Hawaii Telescope. The camera has 11 working chips, 10$^7$ pixels, and a 7.26 deg$^2$ field-of-view \citep{rahmer2008}. Under median seeing conditions (1.1$\arcsec$), observations in Mould $R$ or Sloan Digital Sky Survey (SDSS) $g$ achieve 2.0$\arcsec$ full-width half-maximum images and reach 5$\sigma$ magnitudes of $R \approx 21.0$ and $g \approx 21.3$ mag in a standard 60~s exposure \citep{nick2010}. As of 2012 May, the PTF footprint included $\sim$9800 (2500) deg$^2$ imaged $>$25 ($>$100) times in $R$ and $\sim$2400 (250) deg$^2$ imaged that often in $g$. 
+
+[UPDATE NUMBERS FOR FOOTPRINT, INCLUDE FIGURE?]
+
+
+\section{Microlensing event recovery}
+Microlensing surveys typically use difference image analysis (cite Lupton?) to initially identify transient events and then analyze the candidate light curves to search for microlensing events (cite MACHO, OGLE). This method is essential for studying crowded fields such as the Galactic bulge, and also limits the number of light curves that must be searched for microlensing events, thus saving on computation time. This [method] also provides real-time detection of events so surveys can utilize networks of telescopes to provide follow-up observations of these transients. Our approach is to instead take the preexisting PTF light curve database over the entire survey footprint and develop fast, robust search algorithms to pick out microlensing event candidates from this massive data archive.
+
+In order to develop predictions for event rates and then eventually use observed event rates to infer [] we must understand our microlensing event recovery rate, or \textit{detection efficiency}, $\varepsilon$. The detection efficiency is commonly expressed as a function of microlensing event timescale and is therefore a function of survey parameters, such as cadence and baseline [FIGURE simulated detection efficiency]. [What did MACHO do exactly? What does OGLE do?] The nature of the PTF survey means that different fields are observed with very different sampling patterns [FIGURE showing different sampling]. We must compute the detection efficiency for each field individually.
+
+We compute the detection efficiency with a Monte Carlo simulation over real data. For a particular field of interest, we randomly sample 11,000 light curves from the database with $>25$ ``good'' observations. [define ``good'']. We compute a set of variability statistics for each light curve, we then iterate and add 100 different simulated microlensing events to each light curve and recompute the variability statistics after each iteration [Figures here?]. The parameters for the random microlensing events are chosen as follows: 
+\begin{align}
+	t_0&\sim\mathcal{U}[t_{min}, t_{max}] \\
+	u_0&\sim\mathcal{U}[0, 1] \\
+	\log_{10}t_E&\sim\mathcal{U}[0, 3] 
+\end{align}
+where $\mathcal{U}$ is a uniform distribution.
+
+[How to compute detection efficiency?] [Specifics of our method, e.g. details about my code]
+
+[Parts of the above text will get absorbed into sections below]
+
+\subsection{Selecting candidate microlensing events}
+- Proper statistical modeling is too time consuming, so we first have to define some selection criteria to limit the sample (number of good observations, quality cuts, etc.)
+
+- Discuss $\Delta \chi^2$ method, downfalls (speed, not robust -- how do you define the threshold?)
+
+- Shin et al. paper
+
+- Introduce variability statistics: define them, what they pick out, what they have been used for before
+
+\subsection{Detection efficiency}
+- Previous surveys had fairly uniform time sampling, and smaller areas
+
+- With PTF, fields have vastly different sampling patterns, baselines, and cadences
+
+- We have to consider the efficiency on a field-by-field basis
+
+- Show detection efficiency of each variability statistic
 
 \section{Searching for events in full PTF data set}
+- Describe pipeline for events ... ?
 
 \section{Comparing results to model predictions (?)}
 
 \section{Conclusions and Future Work}
+\subsection{Globular Clusters and Other Overdensities}
+- Do they contribute to the lensing rate?
+
+\acknowledgments
+This paper is based on observations obtained with the Samuel Oschin Telescope as part of the Palomar Transient Factory project, a scientific collaboration between the California Institute of Technology, Columbia University, Las Cumbres Observatory, the Lawrence Berkeley National Laboratory, the National Energy Research Scientific Computing Center, the University of Oxford and the Weizmann Institute of Science.
+
+\clearpage
+\setlength{\baselineskip}{0.6\baselineskip}
+\bibliography{references}
+\setlength{\baselineskip}{1.667\baselineskip}
 
 
 %\bibliographystyle{apj}
