@@ -11,3 +11,4 @@ lc_merged*.txt
 *.synctex.gz
 *.o
 *.so
+*~

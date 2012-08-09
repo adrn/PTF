@@ -43,6 +43,49 @@ def quality_cut(sourcedata, source_id=None, ccd_edge_cutoff=25):
         ccd_edge_cutoff : int
             Define the cutoff for sources near the edge of a CCD. The cut will remove
             all data points where the source is nearer than this limit to the edge.
+            
+        IPAC Flags:
+            # 0 	aircraft/satellite track
+            # 1 	detection by SExtractor (before flattening)
+            # 2 	high dark current
+            # 3 	reserved
+            # 4 	noisy/hot pixel
+            # 5 	ghost
+            # 6 	CCD-bleed
+            # 7 	rad hit
+            # 8 	saturated
+            # 9 	dead/bad pixel
+            # 10 	not-a-number pixel
+            # 11 	dirt on optics (pixel Nsigma below coarse local median)
+            # 12 	halo
+            
+        relPhotFlags:
+            # bit 0 = calibration detection
+            # bit 1 = no relative photometry generated
+            # bit 2 = exposure with high systematic error
+            # bit 3 = saturated
+        
+        SExtractor flags:
+        ----------------
+        
+        1     The object has neighbors, bright and close enough to 
+              significantly bias the photometry, or bad pixels 
+              (more than 10% of the integrated area affected).
+        
+        2     The object was originally blended with another one.
+        
+        4     At least one pixel of the object is saturated 
+              (or very close to).
+        
+        8     The object is truncates (to close to an image boundary).
+        
+        16    Object's aperture data are incomplete or corrupted.
+        
+        32    Object's isophotal data are incomplete or corrupted.
+        
+        64    A memory overflow occurred during deblending.
+        
+        128   A memory overflow occurred during extraction.
     """    
     x_cut1, x_cut2 = ccd_edge_cutoff, globals.ccd_size[0] - ccd_edge_cutoff
     y_cut1, y_cut2 = ccd_edge_cutoff, globals.ccd_size[1] - ccd_edge_cutoff
@@ -52,13 +95,18 @@ def quality_cut(sourcedata, source_id=None, ccd_edge_cutoff=25):
     else:
         src = "(matchedSourceID == {}) &".format(source_id)
     
+    # Saturation limit, 14.3, based on email conversation with David Levitan
+    
     sourcedata = sourcedata.readWhere(src + '(sextractorFlags < 8) & \
                                        (x_image > {}) & (x_image < {}) & \
                                        (y_image > {}) & (y_image < {}) & \
                                        (magErr < 0.3) & \
-                                       (mag > 13.5) & (mag < 22)'.format(x_cut1, x_cut2, y_cut1, y_cut2))
+                                       (mag > 14.3) & (mag < 22)'.format(x_cut1, x_cut2, y_cut1, y_cut2))
     
-    sourcedata = sourcedata[(sourcedata["sextractorFlags"] & 1) == 0]
+    sourcedata = sourcedata[((sourcedata["sextractorFlags"] & 1) == 0) & \
+                            ((sourcedata["ipacFlags"] & 8181) == 0) & \
+                            ((sourcedata["relPhotFlags"] & 4) == 0)]
+    
     sourcedata = sourcedata[np.isfinite(sourcedata["mag"]) & \
                             np.isfinite(sourcedata["mjd"]) & \
                             np.isfinite(sourcedata["magErr"])]
