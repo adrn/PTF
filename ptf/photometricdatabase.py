@@ -204,8 +204,7 @@ class CCD(object):
     
     def light_curve(self, source_id, mag_type="relative", clean=False):
         """ Get a light curve for a given source ID from this chip """
-        # TODO: should this be here?
-
+        
         chip = self.read()
         
         if clean:
