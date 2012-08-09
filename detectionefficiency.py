@@ -148,7 +148,10 @@ def compare_detection_efficiencies_on_field(field, light_curves_per_ccd, events_
     logger.debug(greenText("/// compare_detection_efficiencies_on_field ///"))
     logger.debug("Computing indices {} for {} light curves on each CCD of field {}".format(",".join(indices), light_curves_per_ccd, field))
     
-    file_base = "field{:06d}_Nperccd{}_Nevents{}".format(field.id, light_curves_per_ccd, events_per_light_curve)
+    if u0 == None:
+        file_base = "field{:06d}_Nperccd{}_Nevents{}".format(field.id, light_curves_per_ccd, events_per_light_curve)
+    else:
+        file_base = "field{:06d}_Nperccd{}_Nevents{}_u0{:.3f}".format(field.id, light_curves_per_ccd, events_per_light_curve, u0)
     
     if overwrite and os.path.exists("data/detectionefficiency/{}.pickle".format(file_base)):
         logger.debug("File {} already exists, and you want to overwrite it -- so I'm going to remove it, fine!".format("data/detectionefficiency/{}.pickle".format(file_base)))
@@ -198,17 +201,17 @@ def compare_detection_efficiencies_on_field(field, light_curves_per_ccd, events_
     fig1 = plt.figure(figsize=(20,15))
     ax1 = fig1.add_subplot(111)
     
-    # Styling for lines
-    line_styles = [{"lw" : 3, "ls" : "-.", "color" : "c"}, \
-                   {"lw" : 3, "ls" : ":", "color" : "m"}, \
-                   {"lw" : 3, "ls" : "--", "color" : "g"}, \
+    # Styling for lines: J, K, eta, sigma_mu, delta_chi_squared
+    line_styles = [{"lw" : 2, "ls" : "-.", "color" : "c"}, \
+                   {"lw" : 2, "ls" : ":", "color" : "m"}, \
+                   {"lw" : 3, "ls" : "-", "color" : "k"}, \
                    {"lw" : 1.5, "ls" : "--", "color" : "y"}, \
-                   {"lw" : 2, "ls" : "-", "color" : "k"}]
+                   {"lw" : 3, "ls" : "--", "color" : "k"}]
     
     for ii,index_name in enumerate(indices):
         ax1.semilogx((data["bin_edges"][1:]+data["bin_edges"][:-1])/2, \
                      data[index_name]["detections_per_bin"] / data["total_counts_per_bin"], \
-                     label=r"{}: $\varepsilon$={:.3f}, $F$={}".format(index_to_label[index_name], data[index_name]["total_efficiency"], data[index_name]["num_false_positives"]), \
+                     label=r"{}: $\varepsilon$={:.3f}, $F$={:.1f}%".format(index_to_label[index_name], data[index_name]["total_efficiency"], data[index_name]["num_false_positives"]/(11.*events_per_light_curve*light_curves_per_ccd)*100), \
                      **line_styles[ii])
         
     ax1.legend(loc="upper left")
