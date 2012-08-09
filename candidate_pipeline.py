@@ -53,54 +53,37 @@ def select_candidates_from_ccd(ccd):
     
     chip = ccd.read()
     
-    all_J = chip.sources.col("stetsonJ")
-    all_eta = chip.sources.col("vonNeumannRatio")
+    # Read in sources where eta > 0.
+    good_eta_sources = chip.sources.readWhere("(ngoodobs > 25) & (vonNeumannRatio > 0.)")
     
-    J = all_J[all_J > 0.]
-    med_J = np.median(J)
-    sig_J = np.std(J)
-    J_significance = 3.
+    # Read in the full vonNeumannRatio column to figure out the distribution of values for this parameter
+    all_eta = good_eta_sources["vonNeumannRatio"]
     
-    eta = all_eta[all_eta > 0.]
-    med_eta = np.median(eta)
-    sig_eta = np.std(eta)
+    # Use the values of eta from all light curves to defined selection criteria
+    mean_eta = np.mean(all_eta)
+    sig_eta = np.std(all_eta)
     eta_significance = 2.
+    selected_sources = chip.sources.readWhere("(ngoodobs > 25) & (vonNeumannRatio < {})".format(mean_eta-eta_significance*sig_eta))
     
     exposures = chip.exposures[:]
     
-    sourcedata = pdb.quality_cut(chip.sourcedata)
-    
     light_curves = []
-    for row in chip.sources[:]:
-        if (row["stetsonJ"] > (med_J+J_significance*sig_J)) and \
-           ((med_eta-eta_significance*sig_eta) < row["vonNeumannRatio"] < (med_eta+eta_significance*sig_eta)) and \
-           (row["ngoodobs"] > 25):
+    for row in selected_sources:
+        this_sourcedata = pdb.quality_cut(chip.sourcedata, source_id=row["matchedSourceID"])
+        
+        if len(this_sourcedata) > 25:
+            light_curve = PTFLightCurve(mjd=this_sourcedata["mjd"], mag=this_sourcedata["mag"], error=this_sourcedata["magErr"])
+            var_indices = pa.compute_variability_indices(light_curve, indices=["eta"])
             
-            # TODO: Look for clumps brighter or fainter -- if clump has less than 3 points, throw it out?
-            this_source = sourcedata[sourcedata["matchedSourceID"] == row["matchedSourceID"]]
-            faint_idx, = np.where(this_source["mag"] > (row["referenceMag"] + 4*row["magRMS"]))
-            bright_idx, = np.where(this_source["mag"] < (row["referenceMag"] - 4*row["magRMS"]))
-            
-            if len(faint_idx) < 3:
-                this_source = this_source[this_source["mag"] < (row["referenceMag"] + 4*row["magRMS"])]
-            
-            if len(bright_idx) < 3:
-                this_source = this_source[this_source["mag"] > (row["referenceMag"] - 4*row["magRMS"])]
-            
-            light_curve = PTFLightCurve(mjd=this_source["mjd"], mag=this_source["mag"], error=this_source["magErr"])
-            
-            if len(light_curve.mjd) > 25:
-                # TODO: Light curve object should have more metadata
-                var_indices = pa.compute_variability_indices(light_curve, indices=["j", "k", "eta", "delta_chi_squared", "simga_mu"])
-                
-                if (var_indices["j"] > (med_J+J_significance*sig_J)) and \
-                   ((med_eta-eta_significance*sig_eta) < var_indices["eta"] < (med_eta+eta_significance*sig_eta)):
-                   
-                    light_curve.metadata = np.array(row)
-                    light_curve.exposures = exposures
-                    light_curves.append(light_curve)
+            # Check that after cleaning up bad data, the light curve still passes the cut
+            if (var_indices["eta"] < (mean_eta-eta_significance*sig_eta)): 
+                light_curve.metadata = np.array(row)
+                light_curve.exposures = exposures
+                light_curves.append(light_curve)
     
     ccd.close()
+    
+    # TODO: Left off looking at thus function -- seems to be selecting way too many candidates! Look in to this..
     
     return light_curves
 
@@ -108,7 +91,8 @@ def save_light_curves(light_curves, path="data/candidates/light_curves"):
     """ Takes a list of PTFLightCurve objects and saves them each to .npy files """
     
     for light_curve in light_curves:
-        filename = "field{:06d}_ccd{:02d}_source{:06d}.pickle".format(light_curve.field_id, light_curve.ccd_id, light_curve.source_id)
+        filename = "field{:06d}_ccd{:02d}_source{:06d}.pickle".format(int(light_curve.exposures["fieldID"][0]), int(light_curve.exposures["ccdID"][0]), int(light_curve.metadata["matchedSourceID"]))
+        print filename
         f = open(os.path.join(path, filename), "w")
         pickle.dump(light_curve, f)
         f.close()
@@ -118,19 +102,17 @@ def run_pipeline():
         pipeline on each field.
     """
     logger.debug(greenText("/// Running Pipeline! ///"))
-    
-    R = pdb.Filter("R")
-    import time
-    
+
+    import time    
     # Select out all fields that have been observed many times
     # TODO: for now, I just know 110002 is a good one!
     #fields = [pdb.Field(110001, filter=R), pdb.Field(110002, filter=R), pdb.Field(110003, filter=R), pdb.Field(110004, filter=R)]
-    fields = [pdb.Field(110002, filter=R)]
+    fields = [pdb.Field(3756, filter="R"), pdb.Field(100043, filter="R"), pdb.Field(120001, filter="R")]
     for field in fields:
         for ccd in field.ccds.values():
             a = time.time()
             candidate_light_curves = select_candidates_from_ccd(ccd)
-            print len(candidate_light_curves), time.time() - a
+            logger.info("CCD {}, {} light curves, took {} seconds".format(ccd.id, len(candidate_light_curves), time.time() - a))
             save_light_curves(candidate_light_curves)
 
 if __name__ == "__main__":
