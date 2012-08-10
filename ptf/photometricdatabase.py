@@ -30,7 +30,7 @@ pytable_base_string = os.path.join(match_path, "match_{filter.id:02d}_{field.id:
 filter_map = {"R" : 2, "g" : 1}
 inv_filter_map = {2 : "R", 1 : "g"}
 
-def quality_cut(sourcedata, source_id=None, ccd_edge_cutoff=25):
+def quality_cut(sourcedata, source_id=None, ccd_edge_cutoff=15):
     """ This function accepts a Pytables table object (from the 'sourcedata' table)
         and returns only the rows that pass the given quality cuts.
         
@@ -66,26 +66,17 @@ def quality_cut(sourcedata, source_id=None, ccd_edge_cutoff=25):
             # bit 3 = saturated
         
         SExtractor flags:
-        ----------------
-        
-        1     The object has neighbors, bright and close enough to 
-              significantly bias the photometry, or bad pixels 
-              (more than 10% of the integrated area affected).
-        
-        2     The object was originally blended with another one.
-        
-        4     At least one pixel of the object is saturated 
-              (or very close to).
-        
-        8     The object is truncates (to close to an image boundary).
-        
-        16    Object's aperture data are incomplete or corrupted.
-        
-        32    Object's isophotal data are incomplete or corrupted.
-        
-        64    A memory overflow occurred during deblending.
-        
-        128   A memory overflow occurred during extraction.
+            1     The object has neighbors, bright and close enough to 
+                  significantly bias the photometry, or bad pixels 
+                  (more than 10% of the integrated area affected).
+            2     The object was originally blended with another one.
+            4     At least one pixel of the object is saturated 
+                  (or very close to).
+            8     The object is truncates (to close to an image boundary).
+            16    Object's aperture data are incomplete or corrupted.
+            32    Object's isophotal data are incomplete or corrupted.
+            64    A memory overflow occurred during deblending.
+            128   A memory overflow occurred during extraction.
     """    
     x_cut1, x_cut2 = ccd_edge_cutoff, globals.ccd_size[0] - ccd_edge_cutoff
     y_cut1, y_cut2 = ccd_edge_cutoff, globals.ccd_size[1] - ccd_edge_cutoff
@@ -96,20 +87,17 @@ def quality_cut(sourcedata, source_id=None, ccd_edge_cutoff=25):
         src = "(matchedSourceID == {}) &".format(source_id)
     
     # Saturation limit, 14.3, based on email conversation with David Levitan
-    
     sourcedata = sourcedata.readWhere(src + '(sextractorFlags < 8) & \
                                        (x_image > {}) & (x_image < {}) & \
                                        (y_image > {}) & (y_image < {}) & \
-                                       (magErr < 0.3) & \
+                                       (relPhotFlags < 4) & \
+                                       ( (ipacFlags == 2) | (ipacFlags == 0) ) & \
                                        (mag > 14.3) & (mag < 22)'.format(x_cut1, x_cut2, y_cut1, y_cut2))
     
-    sourcedata = sourcedata[((sourcedata["sextractorFlags"] & 1) == 0) & \
-                            ((sourcedata["ipacFlags"] & 8181) == 0) & \
-                            ((sourcedata["relPhotFlags"] & 4) == 0)]
-    
-    sourcedata = sourcedata[np.isfinite(sourcedata["mag"]) & \
-                            np.isfinite(sourcedata["mjd"]) & \
-                            np.isfinite(sourcedata["magErr"])]
+    # implied...
+    #sourcedata = sourcedata[np.isfinite(sourcedata["mag"]) & \
+    #                        np.isfinite(sourcedata["mjd"]) & \
+    #                        np.isfinite(sourcedata["magErr"])]
                             
     return sourcedata
 

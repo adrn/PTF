@@ -69,8 +69,9 @@ def simulate_events_compute_indices(light_curves, events_per_light_curve=100, in
     """ """
     var_indices_with_events = []
     
-    # For each light curve, add 100 different microlensing events and recompute indices
+    # For each light curve, add [100] different microlensing events and recompute indices
     for light_curve in (SimulatedLightCurve(lc.mjd, mag=lc.mag, error=lc.error) for lc in light_curves):
+        reference_mag = np.median(light_curve.mag)
         for event_id in range(events_per_light_curve):
             # Reset the simulated light curve back to the original data, e.g. erase any previously
             #   added microlensing events
@@ -87,10 +88,10 @@ def simulate_events_compute_indices(light_curves, events_per_light_curve=100, in
                 lc_var_indices = analyze.compute_variability_indices(light_curve, indices, return_tuple=True)
             except:
                 break
-            var_indices_with_events.append(lc_var_indices + (light_curve.tE, event_added))
+            var_indices_with_events.append(lc_var_indices + (light_curve.tE, light_curve.u0, reference_mag, event_added))
     
-    names = indices + ["tE", "event_added"]
-    dtypes = [float]*len(indices) + [float,bool]
+    names = indices + ["tE", "u0", "m", "event_added"]
+    dtypes = [float]*len(indices) + [float,float,float,bool]
     var_indices_with_events = np.array(var_indices_with_events, dtype=zip(names,dtypes))
     
     return var_indices_with_events
@@ -138,7 +139,7 @@ def compare_detection_efficiencies(light_curves, events_per_light_curve=100, ind
     
     return data
 
-def compare_detection_efficiencies_on_field(field, light_curves_per_ccd, events_per_light_curve, overwrite=False, indices=["j","k","eta","sigma_mu","delta_chi_squared"], u0=None):
+def compare_detection_efficiencies_on_field(field, light_curves_per_ccd, events_per_light_curve, overwrite=False, indices=["j","k","eta","sigma_mu","delta_chi_squared"], u0s=[], limiting_mags=[]):
     """ Compare the detection efficiencies of various variability statistics using the
         light curves from an entire PTF field.
     """
@@ -148,77 +149,125 @@ def compare_detection_efficiencies_on_field(field, light_curves_per_ccd, events_
     logger.debug(greenText("/// compare_detection_efficiencies_on_field ///"))
     logger.debug("Computing indices {} for {} light curves on each CCD of field {}".format(",".join(indices), light_curves_per_ccd, field))
     
-    if u0 == None:
-        file_base = "field{:06d}_Nperccd{}_Nevents{}".format(field.id, light_curves_per_ccd, events_per_light_curve)
-    else:
-        file_base = "field{:06d}_Nperccd{}_Nevents{}_u0{:.3f}".format(field.id, light_curves_per_ccd, events_per_light_curve, u0)
+    file_base = "field{field_id:06d}_Nperccd{lc_per_ccd}_Nevents{events_per_lc}"
     
-    if overwrite and os.path.exists("data/detectionefficiency/{}.pickle".format(file_base)):
-        logger.debug("File {} already exists, and you want to overwrite it -- so I'm going to remove it, fine!".format("data/detectionefficiency/{}.pickle".format(file_base)))
-        os.remove("data/detectionefficiency/{}.pickle".format(file_base))
+    # If u0 is specified, only add microlensing events with this impact parameter, but vary other parameters
+    if len(u0s) > 0:
+        file_base += "_u0{u0:.2f}"
     
-    if not os.path.exists("data/detectionefficiency/{}.pickle".format(file_base)):
-        logger.debug("File {} doesn't exist...generating data...".format("data/detectionefficiency/{}.pickle".format(file_base)))
+    # If limiting_mag is specified, only select light curves brighter than this limiting magnitude
+    if len(limiting_mags) > 0:
+        file_base += "_m{limiting_mag[0]:.1f}-{limiting_mag[1]:.1f}"
+    
+    for ii,limiting_mag in enumerate(limiting_mags[:-1]):
+        limiting_mag_1 = limiting_mag
+        limiting_mag_2 = limiting_mags[ii+1]
         
+        logger.debug("Starting m={:.2f}-{:.2f}".format(limiting_mag1,limiting_mag2))
+        # For a given limiting magnitude, we can use the same light curves we selected over and over, since that's a bottleneck
         light_curves = []
-        for ccdid, ccd in field.ccds.items():
-            light_curve_batch = []
+        for u0 in u0s:
+            logger.debug("Starting u0={:.2f}".format(u0))
+            formatted_file_base = file_base.format(field_id=field.id, lc_per_ccd=light_curves_per_ccd, events_per_lc=events_per_light_curve, u0=u0, limiting_mag=(limiting_mag1,limiting_mag2))
             
-            chip = ccd.read()
-            # Read in all of the source IDs for this chip
-            source_ids = chip.sources.col("matchedSourceID")
+            if overwrite and os.path.exists("data/detectionefficiency/{}.pickle".format(formatted_file_base)):
+                logger.debug("File {} already exists, and you want to overwrite it -- so I'm going to remove it, fine!".format("data/detectionefficiency/{}.pickle".format(formatted_file_base)))
+                os.remove("data/detectionefficiency/{}.pickle".format(formatted_file_base))
             
-            # Shuffle them about / randomize the order
-            np.random.shuffle(source_ids)
-            
-            for sid in source_ids:
-                # Get a LightCurve object for this source id on this ccd
-                lc = field.ccds[0].light_curve(sid, clean=True)
+            if not os.path.exists("data/detectionefficiency/{}.pickle".format(formatted_file_base)):
+                logger.debug("File {} doesn't exist...generating data...".format("data/detectionefficiency/{}.pickle".format(formatted_file_base)))
                 
-                # If the light curve has more than 25 observations, include it
-                # HACK
-                if len(lc.mjd) > 25: light_curve_batch.append(lc)
-                if len(light_curve_batch) >= light_curves_per_ccd: break
-            
-            logger.debug("Adding another batch of {} light curves...".format(len(light_curve_batch)))
-            light_curves += light_curve_batch
-            ccd.close()
-        
-        logger.debug("All {} light curves loaded, about to run simulation...".format(len(light_curves)))
-        data = compare_detection_efficiencies(light_curves, events_per_light_curve=events_per_light_curve, indices=indices, u0=u0)
-        
-        logger.debug("Done running detection efficiency simulation, writing to file...")
-        f = open("data/detectionefficiency/{}.pickle".format(file_base), "w")
-        pickle.dump(data, f)
-        f.close()
-    
-    logger.debug("Opening existing data file...")
-    f = open("data/detectionefficiency/{}.pickle".format(file_base), "r")
-    data = pickle.load(f)
-    f.close()
+                if len(light_curves) == 0:
+                    for ccdid, ccd in field.ccds.items():
+                        light_curve_batch = []
+                        
+                        chip = ccd.read()
+                        # Read in all of the source IDs for this chip
+                        if limiting_mag != None:
+                            sources = chip.sources.readWhere("(referenceMag >= {:.3f}) & (referenceMag < {:.3f}) & (ngoodobs > 25)".format(limiting_mag1, limiting_mag2)) #["matchedSourceID"]
+                        else:
+                            sources = chip.sources[:] #.col("matchedSourceID")
+                        
+                        # Shuffle them about / randomize the order
+                        np.random.shuffle(sources)
+                        
+                        for source in sources:
+                            # Get a LightCurve object for this source id on this ccd
+                            lc = field.ccds[0].light_curve(source["matchedSourceID"], clean=True)
+                            
+                            # If the light curve has more than 25 observations, include it
+                            if len(lc.mjd) > 25: light_curve_batch.append(lc)
+                            if len(light_curve_batch) >= light_curves_per_ccd: break
+                        
+                        logger.debug("Adding another batch of {} light curves...".format(len(light_curve_batch)))
+                        light_curves += light_curve_batch
+                
+                    logger.debug("All {} light curves loaded, about to run simulation...".format(len(light_curves)))
+                else:
+                    logger.debug("Light already curves loaded, starting simulation...")
+                
+                data = compare_detection_efficiencies(light_curves, events_per_light_curve=events_per_light_curve, indices=indices, u0=u0)
+                
+                logger.debug("Done running detection efficiency simulation, writing to file...")
+                f = open("data/detectionefficiency/{}.pickle".format(formatted_file_base), "w")
+                pickle.dump(data, f)
+                f.close()
     
     # do plotting
-    fig1 = plt.figure(figsize=(20,15))
-    ax1 = fig1.add_subplot(111)
     
     # Styling for lines: J, K, eta, sigma_mu, delta_chi_squared
-    line_styles = [{"lw" : 2, "ls" : "-.", "color" : "c"}, \
-                   {"lw" : 2, "ls" : ":", "color" : "m"}, \
-                   {"lw" : 3, "ls" : "-", "color" : "k"}, \
-                   {"lw" : 1.5, "ls" : "--", "color" : "y"}, \
-                   {"lw" : 3, "ls" : "--", "color" : "k"}]
+    line_styles = { "j" : {"lw" : 1, "ls" : "-", "color" : "r", "alpha" : 0.5}, \
+                   "k" : {"lw" : 1, "ls" : "-", "color" : "g", "alpha" : 0.5}, \
+                   "eta" : {"lw" : 3, "ls" : "-", "color" : "k"}, \
+                   "sigma_mu" : {"lw" : 1, "ls" : "-", "color" : "b", "alpha" : 0.5}, \
+                   "delta_chi_squared" : {"lw" : 3, "ls" : "--", "color" : "k"}}
     
-    for ii,index_name in enumerate(indices):
-        ax1.semilogx((data["bin_edges"][1:]+data["bin_edges"][:-1])/2, \
-                     data[index_name]["detections_per_bin"] / data["total_counts_per_bin"], \
-                     label=r"{}: $\varepsilon$={:.3f}, $F$={:.1f}%".format(index_to_label[index_name], data[index_name]["total_efficiency"], data[index_name]["num_false_positives"]/(11.*events_per_light_curve*light_curves_per_ccd)*100), \
-                     **line_styles[ii])
-        
-    ax1.legend(loc="upper left")
-    ax1.set_ylim(0., 1.0)
     
+    #fig = plt.figure(figsize=(30,30))
+    fig, axes = plt.subplots(5, 5, sharex=True, sharey=True, figsize=(30,30))
+    
+    for ii, limiting_mag in enumerate(limiting_mags):
+        for jj, u0 in enumerate(u0s):
+            formatted_file_base = file_base.format(field_id=field.id, lc_per_ccd=light_curves_per_ccd, events_per_lc=events_per_light_curve, u0=u0, limiting_mag=limiting_mag)
+            
+            logger.debug("Opening existing data file...")
+            f = open("data/detectionefficiency/{}.pickle".format(formatted_file_base), "r")
+            data = pickle.load(f)
+            f.close()
+            
+            ax = axes[ii, jj]
+            
+            for index_name in ["eta", "delta_chi_squared", "j", "k", "sigma_mu"]:
+                ax.semilogx((data["bin_edges"][1:]+data["bin_edges"][:-1])/2, \
+                             data[index_name]["detections_per_bin"] / data["total_counts_per_bin"], \
+                             label=r"{}".format(index_to_label[index_name]), \
+                             **line_styles[index_name])
+                #label=r"{}: $\varepsilon$={:.3f}, $F$={:.1f}%".format(index_to_label[index_name], data[index_name]["total_efficiency"], data[index_name]["num_false_positives"]/(11.*events_per_light_curve*light_curves_per_ccd)*100), \
+            
+            ax.set_ylim(0., 1.0)
+            
+            if ii == 0:
+                ax.set_title("$u_0$={:.2f}".format(u0), size=36, y=1.1)
+                
+            if jj == 4:
+                ax.set_ylabel("{:.1f}<M<{:.1f}".format(limiting_mag-1.5, limiting_mag), size=36, rotation="horizontal")
+                ax.yaxis.set_label_position("right")
+            
+            plt.setp(ax.get_xticklabels(), visible=False)
+            plt.setp(ax.get_yticklabels(), visible=False)
+            if jj == 0 and ii == 4:
+                ax.set_xlabel(r"$t_E$", size=34)
+                plt.setp(ax.get_xticklabels(), visible=True, size=24)
+                plt.setp(ax.get_yticklabels(), visible=True, size=24)
+            
+            if jj == 4 and ii == 4:
+                legend = ax.legend(loc="upper right")
+                legend_text  = legend.get_texts()
+                plt.setp(legend_text, fontsize=36)
+    
+    fig.subplots_adjust(hspace=0.04, wspace=0.04)
     logger.debug("Saving figure and cleaning up!")
-    fig1.savefig("data/detectionefficiency/{}.png".format(file_base))
+    fig.savefig("data/detectionefficiency/field{field_id:06d}_Nperccd{lc_per_ccd}_Nevents{events_per_lc}.png".format(field_id=field.id, lc_per_ccd=light_curves_per_ccd, events_per_lc=events_per_light_curve))
 
 def test_compare_detection_efficiencies():
     field = pdb.Field(110002, filter="R")
@@ -260,8 +309,10 @@ if __name__ == "__main__":
                     help="The number of light curves to select from each CCD in a field")
     parser.add_argument("--test", dest="test", action="store_true", default=False,
                     help="Run tests")
-    parser.add_argument("--u0", dest="u0", type=float, default=None,
+    parser.add_argument("--u0", dest="u0", nargs="+", type=float, default=None,
                     help="Only add microlensing events with the specified impact parameter.")
+    parser.add_argument("--mag", dest="limiting_mag", nargs="+", type=float, default=None,
+                    help="Specify the magnitude bin edges, e.g. 6 bin edges specifies 5 bins.")
     
     args = parser.parse_args()
     
@@ -281,4 +332,4 @@ if __name__ == "__main__":
         sys.exit(0)
     
     field = pdb.Field(args.field_id, filter="R")
-    compare_detection_efficiencies_on_field(field, events_per_light_curve=args.N, light_curves_per_ccd=args.limit, overwrite=args.overwrite, u0=args.u0)
+    compare_detection_efficiencies_on_field(field, events_per_light_curve=args.N, light_curves_per_ccd=args.limit, overwrite=args.overwrite, u0s=args.u0, limiting_mags=args.limiting_mag)
