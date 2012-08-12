@@ -100,14 +100,15 @@ class PTFLightCurve:
         elif os.path.exists(filename) and overwrite:
             os.remove(filename)
         
-        xx, ext = os.path.split(filename)
+        # TODO: This is broken!
+        xx, ext = os.path.splitext(filename)
         
         if ext == ".txt":
             np.savetxt(filename, np.transpose((self.mjd, self.mag, self.error)), fmt="%.5f\t%.5f\t%.5f")
         elif ext == ".pickle":
             import cPickle as pickle
             
-            f = open(filename)
+            f = open(filename, "w")
             pickle.dump(self, f)
             f.close()
         else:

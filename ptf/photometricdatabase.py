@@ -30,7 +30,7 @@ pytable_base_string = os.path.join(match_path, "match_{filter.id:02d}_{field.id:
 filter_map = {"R" : 2, "g" : 1}
 inv_filter_map = {2 : "R", 1 : "g"}
 
-def quality_cut(sourcedata, source_id=None, ccd_edge_cutoff=15):
+def quality_cut(sourcedata, source_id=None, ccd_edge_cutoff=15, where=[]):
     """ This function accepts a Pytables table object (from the 'sourcedata' table)
         and returns only the rows that pass the given quality cuts.
         
@@ -43,6 +43,8 @@ def quality_cut(sourcedata, source_id=None, ccd_edge_cutoff=15):
         ccd_edge_cutoff : int
             Define the cutoff for sources near the edge of a CCD. The cut will remove
             all data points where the source is nearer than this limit to the edge.
+        where : list
+            Additional where conditions for the search
             
         IPAC Flags:
             # 0 	aircraft/satellite track
@@ -86,13 +88,18 @@ def quality_cut(sourcedata, source_id=None, ccd_edge_cutoff=15):
     else:
         src = "(matchedSourceID == {}) &".format(source_id)
     
+    if len(where) > 0:
+        where_string = " & " + " & ".join(where)
+    else:
+        where_string = ""
+    
     # Saturation limit, 14.3, based on email conversation with David Levitan
-    sourcedata = sourcedata.readWhere(src + '(sextractorFlags < 8) & \
+    sourcedata = sourcedata.readWhere(src + '(sextractorFlags == 0) & \
                                        (x_image > {}) & (x_image < {}) & \
                                        (y_image > {}) & (y_image < {}) & \
                                        (relPhotFlags < 4) & \
                                        ( (ipacFlags == 2) | (ipacFlags == 0) ) & \
-                                       (mag > 14.3) & (mag < 22)'.format(x_cut1, x_cut2, y_cut1, y_cut2))
+                                       (mag > 14.3) & (mag < 22)'.format(x_cut1, x_cut2, y_cut1, y_cut2) + where_string)
     
     # implied...
     #sourcedata = sourcedata[np.isfinite(sourcedata["mag"]) & \
@@ -237,16 +244,21 @@ class CCD(object):
     
     def close(self):
         self._file.close()
+        self._file = None
     
-    def light_curve(self, source_id, mag_type="relative", clean=False):
+    def light_curve(self, source_id, mag_type="relative", clean=False, where=[], barebones=False):
         """ Get a light curve for a given source ID from this chip """
         
         chip = self.read()
         
         if clean:
-            sourcedata = quality_cut(chip.sourcedata, source_id=source_id)
+            sourcedata = quality_cut(chip.sourcedata, source_id=source_id, where=where)
         else:
-            sourcedata = chip.sourcedata.readWhere('matchedSourceID == {}'.format(source_id))
+            if len(where) > 0:
+                where_string = " & " + " & ".join(where)
+            else:
+                where_string = ""
+            sourcedata = chip.sourcedata.readWhere('(matchedSourceID == {})'.format(source_id) + where_string)
             
         mjd = sourcedata["mjd"]
         
@@ -257,7 +269,10 @@ class CCD(object):
             mag = sourcedata["mag_auto"]/1000.0 + sourcedata["absphotzp"]
             mag_err = sourcedata["magerr_auto"]/10000.0
         
-        return PTFLightCurve(mjd=mjd, mag=mag, error=mag_err, metadata=sourcedata)
+        if barebones:
+            return PTFLightCurve(mjd=mjd, mag=mag, error=mag_err)
+        else:
+            return PTFLightCurve(mjd=mjd, mag=mag, error=mag_err, metadata=sourcedata)
         
 
 # ==================================================================================================
