@@ -101,10 +101,9 @@ def quality_cut(sourcedata, source_id=None, ccd_edge_cutoff=15, where=[]):
                                        ( (ipacFlags == 2) | (ipacFlags == 0) ) & \
                                        (mag > 14.3) & (mag < 22)'.format(x_cut1, x_cut2, y_cut1, y_cut2) + where_string)
     
-    # implied...
-    #sourcedata = sourcedata[np.isfinite(sourcedata["mag"]) & \
-    #                        np.isfinite(sourcedata["mjd"]) & \
-    #                        np.isfinite(sourcedata["magErr"])]
+    sourcedata = sourcedata[np.isfinite(sourcedata["mag"]) & \
+                            np.isfinite(sourcedata["mjd"]) & \
+                            np.isfinite(sourcedata["magErr"])]
                             
     return sourcedata
 
@@ -130,6 +129,9 @@ class Filter(object):
         
     def __repr__(self):
         return "<Filter: id={}, name={}>".format(self.id, self.name)
+    
+    def __str__(self):
+        return self.name
 
 class Field(object):
     """ Represents PTF Field """
@@ -175,6 +177,10 @@ class Field(object):
         
         if len(self.ccds) == 0:
             logging.debug("No CCD data found for: {}".format(self))
+        
+        this_field = all_fields[all_fields["id"] == self.id]
+        self.ra = this_field["ra"]
+        self.dec = this_field["dec"]
     
     @property
     def number_of_exposures(self):
@@ -294,52 +300,7 @@ def convert_all_fields_txt(txt_filename="ptf_allfields.txt", npy_filename="all_f
 
     np.save(npy_filename, all_fields)
     
-    return True    
-
-def select_most_observed_fields(minimum_num_observations=25, limit=0):
-    """ Return a list of PTFField objects for fields with more than 
-        minimum_num_observations observations.
-        
-        There are 16598 fields in total.
-    """
-    
-    filter_R = Filter("R")
-    field = None
-    fields = []
-    for row in all_fields:
-        if field is not None: field.close()
-        field = Field(row["id"], filter=filter_R)
-
-        if sum(np.array(field.number_of_exposures.values()) > minimum_num_observations) > 0:
-            fields.append(field)
-        
-        if limit > 0:
-            if len(fields) >= limit: break
-    
-    return fields
-
-'''
-def get_raw_light_curve(source_id, filter_id=2, field_id=None, ccd_id=None):
-    """ Given a source_id, return a PTFLightCurve object for the 
-        raw light curve. 
-        
-        If you don't specify field_id or ccd_id, it could take some
-        time because it doesn't know where to look! It has to scan
-        through every field table.
-    """
-    
-    if field_id == None or ccd_id == None:
-        # Do long search
-        raise NotImplementedError()
-
-    field = PTFField(field_id, filter_id=filter_id)
-    ccd = field.ccds[ccd_id]
-    chip = ccd.read()
-    lc_data = chip.sourcedata.readWhere("matchedSourceID == {}".format(source_id))
-    ccd.close()
-    
-    return PTFLightCurve(mjd=lc_data["mjd"], mag=lc_data["mag"], error=lc_data["magErr"])
-'''
+    return True
 
 # ==================================================================================================
 #   Test functions
@@ -359,10 +320,6 @@ def test_ptffield():
     print field_110001.number_of_exposures
     print "Baseline per ccd:"
     print field_110001.baseline
-
-def test_select_most_observed_fields():
-    for field in select_most_observed_fields(300):
-        print field.id
 
 def time_compute_var_indices():
     # Time computing variability indices for all light curves on a chip
