@@ -37,7 +37,19 @@ class PTFLightCurve:
             self.exposures = np.array(exposures)
         else:
             self.exposures = None
-            
+    
+    def shuffle(self):
+        """ Randomly move around the magnitude values in the light curve to shuffle up
+            the data points, but keep the mjd values fixed
+        """
+        idx = np.arange(len(self.mjd), dtype=int)
+        
+        np.random.shuffle(idx)
+        self.mag = self.mag[idx]
+        
+        np.random.shuffle(idx)
+        self.error = self.mag[idx]
+    
     @property
     def field_id(self):
         if self.exposures != None:
