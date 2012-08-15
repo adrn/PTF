@@ -13,10 +13,10 @@ import cPickle as pickle
 
 # Create logger
 logger = logging.getLogger(__name__)
-#ch = logging.StreamHandler()
-#formatter = logging.Formatter("%(name)s / %(levelname)s / %(message)s")
-#ch.setFormatter(formatter)
-#logger.addHandler(ch)
+ch = logging.StreamHandler()
+formatter = logging.Formatter("%(name)s / %(levelname)s / %(message)s")
+ch.setFormatter(formatter)
+logger.addHandler(ch)
 
 # Third-party
 from apwlib.globals import greenText
@@ -232,6 +232,10 @@ def compare_detection_efficiencies_on_field(field, light_curves_per_ccd, events_
                     good_source_ids.append(source_id)
                     count += 1
                     if count >= light_curves_per_ccd: break
+                
+                if len(good_source_ids) == 0:
+                    logger.error("No good sources selected from this CCD for mag range {:.2f}-{:.2f}!".format(limiting_mag1, limiting_mag2))
+                    continue
                 
                 # HACK: This is super hacky...
                 # ----------------------------------------------

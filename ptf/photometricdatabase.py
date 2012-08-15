@@ -13,10 +13,17 @@ import numpy as np
 import apwlib.geometry as g
 from apwlib.globals import redText, greenText, yellowText
 
+# Create logger for this module
+logger = logging.getLogger(__name__)
+ch = logging.StreamHandler()
+formatter = logging.Formatter("%(name)s / %(levelname)s / %(message)s")
+ch.setFormatter(formatter)
+logger.addHandler(ch)
+
 try:
     import tables
 except ImportError:
-    logging.warn("PyTables not found! Some functionality won't work.\nTry running with: /scr4/dlevitan/sw/epd-7.1-1-rh5-x86_64/bin/python instead.")
+    logger.warning("PyTables not found! Some functionality won't work.\nTry running with: /scr4/dlevitan/sw/epd-7.1-1-rh5-x86_64/bin/python instead.")
 
 # PTF
 import globals
@@ -139,7 +146,7 @@ class Field(object):
     def __repr__(self):
         return "<Field: id={}, filter={}>".format(self.id, self.filter.id)
     
-    def __init__(self, field_id, filter):
+    def __init__(self, field_id, filter, number_of_exposures=None):
         """ Create a field object given a PTF Field ID
             
             Parameters
@@ -148,7 +155,8 @@ class Field(object):
                 The PTF Field ID for a field.
             filter : Filter
                 A PTF Filter object (e.g. R = 2, g = 1)
-            
+            number_of_exposures : int (optional)
+                The number of exposures this field has in the specified filter.
         """
         
         # Validate Field ID
@@ -166,6 +174,12 @@ class Field(object):
         else:
             raise ValueError(redText("filter") + " parameter must be Filter object")
         
+        # Validate number_of_exposures
+        if number_of_exposures != None:
+            self._num_exp = int(number_of_exposures)
+        else:
+            self._num_exp = None
+        
         self.ccds = dict()
         
         # Create new CCD objects for this field
@@ -173,26 +187,45 @@ class Field(object):
             try:
                 self.ccds[ccd_id] = CCD(ccd_id, field=self, filter=self.filter)
             except ValueError:
-                logging.debug("CCD {} not found for Field {}.".format(ccd_id, self))
+                logger.debug("CCD {} not found for Field {}.".format(ccd_id, self))
         
         if len(self.ccds) == 0:
-            logging.debug("No CCD data found for: {}".format(self))
+            logger.debug("No CCD data found for: {}".format(self))
         
         this_field = all_fields[all_fields["id"] == self.id]
-        self.ra = this_field["ra"]
-        self.dec = this_field["dec"]
+        try:
+            self.ra = g.RA.fromDegrees(this_field["ra"][0])
+            self.dec = g.Dec.fromDegrees(this_field["dec"][0])
+            
+            if self.dec.degrees < -40: raise ValueError()
+        except IndexError:
+            logger.warning("Field {} not found in field list, with {} observations!".format(self, self._num_exp))
+        except ValueError:
+            logger.warning("Field {} has wonky coordinates: {}, {}".format(self, self.ra, self.dec))
+            del self.ra, self.dec
     
     @property
     def number_of_exposures(self):
+        """ If the number is specified when the field is instantiated, it simply returns that
+            number. Otherwise, it returns the median number of exposures for all CCDs in this field.
+        """
+        if self._num_exp == None:
+            return int(np.median([len(exp) for exp in self.exposures]))
+        else:
+            return self._num_exp
+    
+    @property
+    def exposures(self):
         """ To get the number of observations, this must be run on navtara so the
             script has access to the PTF Photometric Database. 
         """
-        observations_per_ccd = dict()
+        exposures_per_ccd = dict()
         for ccdid,ccd in self.ccds.items():
             chip = ccd.read()
-            observations_per_ccd[ccdid] = chip.exposures.nrows
+            exposures_per_ccd[ccdid] = chip.exposures[:]
+            ccd.close()
         
-        return observations_per_ccd
+        return exposures_per_ccd
     
     @property
     def baseline(self):
@@ -204,6 +237,7 @@ class Field(object):
             chip = ccd.read()
             mjds = np.sort(chip.exposures.col("obsMJD"))
             baseline_per_ccd[ccdid] = mjds[-1]-mjds[0]
+            ccd.close()
         
         return baseline_per_ccd
     
