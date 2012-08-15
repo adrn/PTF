@@ -37,7 +37,19 @@ class PTFLightCurve:
             self.exposures = np.array(exposures)
         else:
             self.exposures = None
-            
+    
+    def shuffle(self):
+        """ Randomly move around the magnitude values in the light curve to shuffle up
+            the data points, but keep the mjd values fixed
+        """
+        idx = np.arange(len(self.mjd), dtype=int)
+        
+        np.random.shuffle(idx)
+        self.mag = self.mag[idx]
+        
+        np.random.shuffle(idx)
+        self.error = self.mag[idx]
+    
     @property
     def field_id(self):
         if self.exposures != None:
@@ -100,14 +112,15 @@ class PTFLightCurve:
         elif os.path.exists(filename) and overwrite:
             os.remove(filename)
         
-        xx, ext = os.path.split(filename)
+        # TODO: This is broken!
+        xx, ext = os.path.splitext(filename)
         
         if ext == ".txt":
             np.savetxt(filename, np.transpose((self.mjd, self.mag, self.error)), fmt="%.5f\t%.5f\t%.5f")
         elif ext == ".pickle":
             import cPickle as pickle
             
-            f = open(filename)
+            f = open(filename, "w")
             pickle.dump(self, f)
             f.close()
         else:

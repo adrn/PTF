@@ -13,10 +13,17 @@ import numpy as np
 import apwlib.geometry as g
 from apwlib.globals import redText, greenText, yellowText
 
+# Create logger for this module
+logger = logging.getLogger(__name__)
+ch = logging.StreamHandler()
+formatter = logging.Formatter("%(name)s / %(levelname)s / %(message)s")
+ch.setFormatter(formatter)
+logger.addHandler(ch)
+
 try:
     import tables
 except ImportError:
-    logging.warn("PyTables not found! Some functionality won't work.\nTry running with: /scr4/dlevitan/sw/epd-7.1-1-rh5-x86_64/bin/python instead.")
+    logger.warning("PyTables not found! Some functionality won't work.\nTry running with: /scr4/dlevitan/sw/epd-7.1-1-rh5-x86_64/bin/python instead.")
 
 # PTF
 import globals
@@ -30,7 +37,7 @@ pytable_base_string = os.path.join(match_path, "match_{filter.id:02d}_{field.id:
 filter_map = {"R" : 2, "g" : 1}
 inv_filter_map = {2 : "R", 1 : "g"}
 
-def quality_cut(sourcedata, source_id=None, ccd_edge_cutoff=25):
+def quality_cut(sourcedata, source_id=None, ccd_edge_cutoff=15, where=[]):
     """ This function accepts a Pytables table object (from the 'sourcedata' table)
         and returns only the rows that pass the given quality cuts.
         
@@ -43,6 +50,8 @@ def quality_cut(sourcedata, source_id=None, ccd_edge_cutoff=25):
         ccd_edge_cutoff : int
             Define the cutoff for sources near the edge of a CCD. The cut will remove
             all data points where the source is nearer than this limit to the edge.
+        where : list
+            Additional where conditions for the search
             
         IPAC Flags:
             # 0 	aircraft/satellite track
@@ -66,26 +75,17 @@ def quality_cut(sourcedata, source_id=None, ccd_edge_cutoff=25):
             # bit 3 = saturated
         
         SExtractor flags:
-        ----------------
-        
-        1     The object has neighbors, bright and close enough to 
-              significantly bias the photometry, or bad pixels 
-              (more than 10% of the integrated area affected).
-        
-        2     The object was originally blended with another one.
-        
-        4     At least one pixel of the object is saturated 
-              (or very close to).
-        
-        8     The object is truncates (to close to an image boundary).
-        
-        16    Object's aperture data are incomplete or corrupted.
-        
-        32    Object's isophotal data are incomplete or corrupted.
-        
-        64    A memory overflow occurred during deblending.
-        
-        128   A memory overflow occurred during extraction.
+            1     The object has neighbors, bright and close enough to 
+                  significantly bias the photometry, or bad pixels 
+                  (more than 10% of the integrated area affected).
+            2     The object was originally blended with another one.
+            4     At least one pixel of the object is saturated 
+                  (or very close to).
+            8     The object is truncates (to close to an image boundary).
+            16    Object's aperture data are incomplete or corrupted.
+            32    Object's isophotal data are incomplete or corrupted.
+            64    A memory overflow occurred during deblending.
+            128   A memory overflow occurred during extraction.
     """    
     x_cut1, x_cut2 = ccd_edge_cutoff, globals.ccd_size[0] - ccd_edge_cutoff
     y_cut1, y_cut2 = ccd_edge_cutoff, globals.ccd_size[1] - ccd_edge_cutoff
@@ -95,17 +95,18 @@ def quality_cut(sourcedata, source_id=None, ccd_edge_cutoff=25):
     else:
         src = "(matchedSourceID == {}) &".format(source_id)
     
-    # Saturation limit, 14.3, based on email conversation with David Levitan
+    if len(where) > 0:
+        where_string = " & " + " & ".join(where)
+    else:
+        where_string = ""
     
-    sourcedata = sourcedata.readWhere(src + '(sextractorFlags < 8) & \
+    # Saturation limit, 14.3, based on email conversation with David Levitan
+    sourcedata = sourcedata.readWhere(src + '(sextractorFlags == 0) & \
                                        (x_image > {}) & (x_image < {}) & \
                                        (y_image > {}) & (y_image < {}) & \
-                                       (magErr < 0.3) & \
-                                       (mag > 14.3) & (mag < 22)'.format(x_cut1, x_cut2, y_cut1, y_cut2))
-    
-    sourcedata = sourcedata[((sourcedata["sextractorFlags"] & 1) == 0) & \
-                            ((sourcedata["ipacFlags"] & 8181) == 0) & \
-                            ((sourcedata["relPhotFlags"] & 4) == 0)]
+                                       (relPhotFlags < 4) & \
+                                       ( (ipacFlags == 2) | (ipacFlags == 0) ) & \
+                                       (mag > 14.3) & (mag < 22)'.format(x_cut1, x_cut2, y_cut1, y_cut2) + where_string)
     
     sourcedata = sourcedata[np.isfinite(sourcedata["mag"]) & \
                             np.isfinite(sourcedata["mjd"]) & \
@@ -135,6 +136,9 @@ class Filter(object):
         
     def __repr__(self):
         return "<Filter: id={}, name={}>".format(self.id, self.name)
+    
+    def __str__(self):
+        return self.name
 
 class Field(object):
     """ Represents PTF Field """
@@ -142,7 +146,7 @@ class Field(object):
     def __repr__(self):
         return "<Field: id={}, filter={}>".format(self.id, self.filter.id)
     
-    def __init__(self, field_id, filter):
+    def __init__(self, field_id, filter, number_of_exposures=None):
         """ Create a field object given a PTF Field ID
             
             Parameters
@@ -151,7 +155,8 @@ class Field(object):
                 The PTF Field ID for a field.
             filter : Filter
                 A PTF Filter object (e.g. R = 2, g = 1)
-            
+            number_of_exposures : int (optional)
+                The number of exposures this field has in the specified filter.
         """
         
         # Validate Field ID
@@ -169,6 +174,12 @@ class Field(object):
         else:
             raise ValueError(redText("filter") + " parameter must be Filter object")
         
+        # Validate number_of_exposures
+        if number_of_exposures != None:
+            self._num_exp = int(number_of_exposures)
+        else:
+            self._num_exp = None
+        
         self.ccds = dict()
         
         # Create new CCD objects for this field
@@ -176,22 +187,45 @@ class Field(object):
             try:
                 self.ccds[ccd_id] = CCD(ccd_id, field=self, filter=self.filter)
             except ValueError:
-                logging.debug("CCD {} not found for Field {}.".format(ccd_id, self))
+                logger.debug("CCD {} not found for Field {}.".format(ccd_id, self))
         
         if len(self.ccds) == 0:
-            logging.debug("No CCD data found for: {}".format(self))
+            logger.debug("No CCD data found for: {}".format(self))
+        
+        this_field = all_fields[all_fields["id"] == self.id]
+        try:
+            self.ra = g.RA.fromDegrees(this_field["ra"][0])
+            self.dec = g.Dec.fromDegrees(this_field["dec"][0])
+            
+            if self.dec.degrees < -40: raise ValueError()
+        except IndexError:
+            logger.warning("Field {} not found in field list, with {} observations!".format(self, self._num_exp))
+        except ValueError:
+            logger.warning("Field {} has wonky coordinates: {}, {}".format(self, self.ra, self.dec))
+            del self.ra, self.dec
     
     @property
     def number_of_exposures(self):
+        """ If the number is specified when the field is instantiated, it simply returns that
+            number. Otherwise, it returns the median number of exposures for all CCDs in this field.
+        """
+        if self._num_exp == None:
+            return int(np.median([len(exp) for exp in self.exposures]))
+        else:
+            return self._num_exp
+    
+    @property
+    def exposures(self):
         """ To get the number of observations, this must be run on navtara so the
             script has access to the PTF Photometric Database. 
         """
-        observations_per_ccd = dict()
+        exposures_per_ccd = dict()
         for ccdid,ccd in self.ccds.items():
             chip = ccd.read()
-            observations_per_ccd[ccdid] = chip.exposures.nrows
+            exposures_per_ccd[ccdid] = chip.exposures[:]
+            ccd.close()
         
-        return observations_per_ccd
+        return exposures_per_ccd
     
     @property
     def baseline(self):
@@ -203,6 +237,7 @@ class Field(object):
             chip = ccd.read()
             mjds = np.sort(chip.exposures.col("obsMJD"))
             baseline_per_ccd[ccdid] = mjds[-1]-mjds[0]
+            ccd.close()
         
         return baseline_per_ccd
     
@@ -249,16 +284,21 @@ class CCD(object):
     
     def close(self):
         self._file.close()
+        self._file = None
     
-    def light_curve(self, source_id, mag_type="relative", clean=False):
+    def light_curve(self, source_id, mag_type="relative", clean=False, where=[], barebones=False):
         """ Get a light curve for a given source ID from this chip """
         
         chip = self.read()
         
         if clean:
-            sourcedata = quality_cut(chip.sourcedata, source_id=source_id)
+            sourcedata = quality_cut(chip.sourcedata, source_id=source_id, where=where)
         else:
-            sourcedata = chip.sourcedata.readWhere('matchedSourceID == {}'.format(source_id))
+            if len(where) > 0:
+                where_string = " & " + " & ".join(where)
+            else:
+                where_string = ""
+            sourcedata = chip.sourcedata.readWhere('(matchedSourceID == {})'.format(source_id) + where_string)
             
         mjd = sourcedata["mjd"]
         
@@ -269,7 +309,10 @@ class CCD(object):
             mag = sourcedata["mag_auto"]/1000.0 + sourcedata["absphotzp"]
             mag_err = sourcedata["magerr_auto"]/10000.0
         
-        return PTFLightCurve(mjd=mjd, mag=mag, error=mag_err, metadata=sourcedata)
+        if barebones:
+            return PTFLightCurve(mjd=mjd, mag=mag, error=mag_err)
+        else:
+            return PTFLightCurve(mjd=mjd, mag=mag, error=mag_err, metadata=sourcedata)
         
 
 # ==================================================================================================
@@ -291,52 +334,7 @@ def convert_all_fields_txt(txt_filename="ptf_allfields.txt", npy_filename="all_f
 
     np.save(npy_filename, all_fields)
     
-    return True    
-
-def select_most_observed_fields(minimum_num_observations=25, limit=0):
-    """ Return a list of PTFField objects for fields with more than 
-        minimum_num_observations observations.
-        
-        There are 16598 fields in total.
-    """
-    
-    filter_R = Filter("R")
-    field = None
-    fields = []
-    for row in all_fields:
-        if field is not None: field.close()
-        field = Field(row["id"], filter=filter_R)
-
-        if sum(np.array(field.number_of_exposures.values()) > minimum_num_observations) > 0:
-            fields.append(field)
-        
-        if limit > 0:
-            if len(fields) >= limit: break
-    
-    return fields
-
-'''
-def get_raw_light_curve(source_id, filter_id=2, field_id=None, ccd_id=None):
-    """ Given a source_id, return a PTFLightCurve object for the 
-        raw light curve. 
-        
-        If you don't specify field_id or ccd_id, it could take some
-        time because it doesn't know where to look! It has to scan
-        through every field table.
-    """
-    
-    if field_id == None or ccd_id == None:
-        # Do long search
-        raise NotImplementedError()
-
-    field = PTFField(field_id, filter_id=filter_id)
-    ccd = field.ccds[ccd_id]
-    chip = ccd.read()
-    lc_data = chip.sourcedata.readWhere("matchedSourceID == {}".format(source_id))
-    ccd.close()
-    
-    return PTFLightCurve(mjd=lc_data["mjd"], mag=lc_data["mag"], error=lc_data["magErr"])
-'''
+    return True
 
 # ==================================================================================================
 #   Test functions
@@ -356,10 +354,6 @@ def test_ptffield():
     print field_110001.number_of_exposures
     print "Baseline per ccd:"
     print field_110001.baseline
-
-def test_select_most_observed_fields():
-    for field in select_most_observed_fields(300):
-        print field.id
 
 def time_compute_var_indices():
     # Time computing variability indices for all light curves on a chip
