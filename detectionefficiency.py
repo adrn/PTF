@@ -83,7 +83,7 @@ def simulate_events_worker(sim_light_curve, tE, u0, reference_mag, indices):
         logger.warning("Failed to compute variability indices for simulated light curve!")
     
 
-def simulate_events_compute_indices(light_curve, events_per_light_curve=100, indices=["j","k","eta","sigma_mu","delta_chi_squared"], u0=None):
+def simulate_events_compute_indices(light_curve, events_per_light_curve, indices, u0=None):
     """ """
     #logger.debug("\t\tsimulate_events_compute_indices")
     
@@ -131,8 +131,12 @@ def compute_detection_efficiency(var_indices, var_indices_with_events, indices):
                 bin_edges=tE_bin_edges)
     
     for index_name in indices:
-        mu, sigma = np.mean(var_indices[index_name]), np.std(var_indices[index_name])
-        idx = (var_indices_with_events[index_name] > (mu+2.*sigma)) | (var_indices_with_events[index_name] < (mu-2.*sigma))
+        if index_name == "con":
+            idx = var_indices_with_events[index_name] >= 1
+        else:
+            mu, sigma = np.mean(var_indices[index_name]), np.std(var_indices[index_name])
+            idx = (var_indices_with_events[index_name] > (mu+2.*sigma)) | (var_indices_with_events[index_name] < (mu-2.*sigma))
+            
         detections_per_bin, tE_bin_edges = np.histogram(var_indices_with_events[idx]["tE"], bins=timescale_bins)
         
         total_efficiency = sum(var_indices_with_events[idx & events_added_idx]["event_added"]) / sum(events_added_idx)
@@ -237,6 +241,8 @@ def compare_detection_efficiencies_on_field(field, light_curves_per_ccd, events_
                     logger.error("No good sources selected from this CCD for mag range {:.2f}-{:.2f}!".format(limiting_mag1, limiting_mag2))
                     continue
                 
+                logger.info("\t\t{} good light curves selected".format(count))
+                
                 # HACK: This is super hacky...
                 # ----------------------------------------------
                 while count < light_curves_per_ccd:
@@ -264,8 +270,6 @@ def compare_detection_efficiencies_on_field(field, light_curves_per_ccd, events_
                 # ----------------------------------------------   
                     
                 
-                logger.info("\t\t{} good light curves used".format(count))
-                
             ccd.close()
         
         f = open(pickle_filename, "w")
@@ -286,7 +290,8 @@ def compare_detection_efficiencies_on_field(field, light_curves_per_ccd, events_
                    "k" : {"lw" : 1, "ls" : "-", "color" : "g", "alpha" : 0.5}, \
                    "eta" : {"lw" : 3, "ls" : "-", "color" : "k"}, \
                    "sigma_mu" : {"lw" : 1, "ls" : "-", "color" : "b", "alpha" : 0.5}, \
-                   "delta_chi_squared" : {"lw" : 3, "ls" : "--", "color" : "k"}}
+                   "delta_chi_squared" : {"lw" : 3, "ls" : "--", "color" : "k"}, 
+                   "con" : {"lw" : 3, "ls" : ":", "color" : "k"}}
     
     num_u0_bins = len(u0s)
     num_mag_bins = len(limiting_mags)-1
@@ -298,7 +303,7 @@ def compare_detection_efficiencies_on_field(field, light_curves_per_ccd, events_
             data = compute_detection_efficiency(selection_indices, var_indices_with_events[limiting_mag_pair][u0], indices)
             
             ax = axes[ii, jj]
-            for index_name in ["eta", "delta_chi_squared", "j", "k", "sigma_mu"]:
+            for index_name in indices:
                 ax.semilogx((data["bin_edges"][1:]+data["bin_edges"][:-1])/2, \
                              data[index_name]["detections_per_bin"] / data["total_counts_per_bin"], \
                              label=r"{}".format(index_to_label[index_name]), \
@@ -471,5 +476,10 @@ if __name__ == "__main__":
     
     np.random.seed(42)
     field = pdb.Field(args.field_id, filter="R")
-    compare_detection_efficiencies_on_field(field, events_per_light_curve=args.N, light_curves_per_ccd=args.limit, overwrite=args.overwrite, u0s=args.u0, limiting_mags=args.limiting_mag)
-    example_light_curves(field, u0s=args.u0, limiting_mags=args.limiting_mag)
+    compare_detection_efficiencies_on_field(field, indices=["eta","delta_chi_squared", "con","j","k","sigma_mu"], \
+                                            events_per_light_curve=args.N,
+                                            light_curves_per_ccd=args.limit,
+                                            overwrite=args.overwrite,
+                                            u0s=args.u0,
+                                            limiting_mags=args.limiting_mag)
+    #example_light_curves(field, u0s=args.u0, limiting_mags=args.limiting_mag)
