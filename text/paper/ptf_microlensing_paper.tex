@@ -70,32 +70,26 @@ Since Einstein first studied gravitational microlensing (cite), the phenomena ha
 \section{PTF Observations and Data}
 The Palomar Transient Factory is a transient detection system that begins with a wide-field survey camera mounted on the automated 48 inch Oschin Schmidt telescope at Palomar Observatory, CA, uses a real-time data reduction pipeline to identify transients of interest, passes these to a dedicated photometric follow-up telescope, and generates an archive of all detected sources \citep{nick2009,rau2009}.
 
-The PTF camera is the 12K$\times$8K mosaic camera formerly at the Canada-France-Hawaii Telescope. The camera has 11 working chips, 10$^7$ pixels, and a 7.26 deg$^2$ field-of-view \citep{rahmer2008}. Under median seeing conditions (1.1$\arcsec$), observations in Mould $R$ or Sloan Digital Sky Survey (SDSS) $g$ achieve 2.0$\arcsec$ full-width half-maximum images and reach 5$\sigma$ magnitudes of $R \approx 21.0$ and $g \approx 21.3$ mag in a standard 60~s exposure \citep{nick2010}. As of August 9, 2012, the PTF footprint included $\apwsim$10,100 (2600) deg$^2$ imaged $>$25 ($>$100) times in $R$ and $\apwsim$2200 (170) deg$^2$ imaged that often in $g$ (\figurename~\ref{fig:survey_footprint}).
+The PTF camera is the 12K$\times$8K mosaic camera formerly at the Canada-France-Hawaii Telescope. The camera has 11 working chips, 10$^7$ pixels, and a 7.26 deg$^2$ field-of-view \citep{rahmer2008}. Under median seeing conditions (1.1$\arcsec$), observations in Mould $R$ or Sloan Digital Sky Survey (SDSS) $g$ achieve 2.0$\arcsec$ full-width half-maximum images and reach 5$\sigma$ magnitudes of $R \approx 21.0$ and $g \approx 21.3$ mag in a standard 60~s exposure \citep{nick2010}. As of August 9, 2012, the PTF footprint included $\apwsim$10,100 (2600) deg$^2$ imaged $>$25 ($>$100) times in $R$ and $\apwsim$2200 (170) deg$^2$ imaged that often in $g$ (\figurename~\ref{fig:survey_footprint})\footnote{For an interactive visualization of the PTF survey coverage, see: [TODO: url]}.
 
 \section{Microlensing event recovery}
-Microlensing surveys typically use difference image analysis (DIA;cite Lupton?) to identify transient events and then analyze light curves of these transient sources to search for microlensing events (cite MACHO, OGLE). This method is essential for studying crowded fields such as the Galactic bulge where photometry is difficult (cite or figure?), but also limits the number of light curves that must be searched for microlensing events, thus saving on computation time. Pre-selection with DIA also enables fast, real-time detection of events so dedicated microlensing surveys can obtain high-cadence follow-up observations of transient sources. Our approach is to instead take the preexisting PTF light curve database over the entire survey footprint and develop fast, robust search algorithms to pick out microlensing event candidates from this massive data archive. 
+Microlensing surveys typically use difference image analysis (cite Lupton?) to identify transient events in raw imaging data. Light curves of any transient sources are then analyzed and further pruned using a variety of selection methods to search for microlensing event candidates (cite MACHO, OGLE). Using difference imaging is essential for studying crowded fields such as the Galactic bulge where photometry is difficult (cite or figure?), and also limits the number of light curves that must be searched for microlensing events, thus saving on computation time. Pre-selection with difference imaging also enables fast, real-time detection of events, allowing dedicated microlensing surveys to obtain high-cadence follow-up observations of interesting sources. Such surveys also have the advantage of relatively uniform time sampling of the survey footprint over an observing season.
 
-The average number of light curves per PTF field with $>$25 ``good'' observations is $\apwsim 50,000$, with $\apwsim64,000,000$  ``good'' light curves in total. By our estimates, utilizing all cores on an 8-core 2.0 GHz compute, it would take [TODO: estimate this number] to fit even the simplest 5-parameter microlensing event model to each of these light curves using \inlinecode{ANSI-C} wrapped in \inlinecode{Python}. Previous studies have had the advantage of pre-selecting candidates via difference image analysis, automatically limiting their sample to $\apwsim$thousands of light curves. Past work has also utilized a variety of selection techniques for flagging candidate microlensing light curves after these steps, however most of these methods still rely on fitting a point-source, point-lens microlensing model to each light curve and performing some selection based on the $\chi^2$ value of this fit (cite Sumi et al. 2006, MACHO work, ?). More recent work has begun to apply machine learning algorithms to the general light curve classification problem (cite Joey Richards), however this is still a work in progress. We set out to find a fast, robust selection method for identifying microlensing events in big data archives by using a set of variability statistics previously applied to finding variable stars in general (Shin M.-S. et al. ).
+The PTF survey footprint (\figurename~\ref{fig:survey_footprint}) is not uniformly sampled -- spatially or temporally. Each field has a unique sampling pattern determined by (1) the sub-surveys within PTF, (2) the time of year, as some low-declination fields can only be imaged during part of the year, or (3) the priority of the field, which could  change at any time. As a result, PTF light curves often contain gaps, regions of high-cadence observations, and regions of low-cadence observations, leading to a massive data set of irregularly-sampled, time-domain photometry. \figurename~\ref{fig:sampling} shows six randomly-selected light curves (with their magnitudes removed) and demonstrates the varying cadences and coverage fractions that different fields may have over the same one-year baseline.
 
-[Describe variability indices?]
+--
 
-In order to develop predictions for event rates and then eventually use observed event rates to infer [] we must understand our microlensing event recovery rate, or \textit{detection efficiency}, $\varepsilon$. The detection efficiency is commonly expressed as a function of microlensing event timescale and is therefore a function of survey parameters, such as cadence and baseline [FIGURE simulated detection efficiency]. [What did MACHO do exactly? What does OGLE do?] The nature of the PTF survey means that different fields are observed with very different sampling patterns [FIGURE showing different sampling]. We must compute the detection efficiency for each field individually.
+Previous work has used a variety of survey-specific selection methods (as described in \citealt{alcock2000, wyrzykowski2009, hamadache2009, sumi2011}), but the general idea is to \begin{enumerate}
+	\item detect transient events using difference image analysis, 
+	\item require that any selected light curves have some number of consecutive points brighter than some threshold,
+	\item require that a microlensing model fit best describes the data using some cut on $\chi^2$,
+	\item require that the model event parameters have reasonable values.
+\end{enumerate}
+Applying the second cut above to irregularly sampled data is more challenging and more computationally expensive because we must account for gaps in our data; it isn't obvious that this same selection procedure will be as successful for the PTF data. Motivated by work on identifying and classifying general variability in light curve data (Shin M.-S. et al., other?), we set out to compare the \textit{detection efficiency} of performing microlensing event selection with a set of variability statistics.
 
-We compute the detection efficiency with a Monte Carlo simulation over real data. For a particular field of interest, we randomly sample 11,000 light curves from the database with $>25$ ``good'' observations. [define ``good'']. We compute a set of variability statistics for each light curve, we then iterate and add 100 different simulated microlensing events to each light curve and recompute the variability statistics after each iteration [Figures here?]. The parameters for the random microlensing events are chosen as follows: 
-\begin{align}
-	t_0&\sim\mathcal{U}[t_{min}, t_{max}] \\
-	u_0&\sim\mathcal{U}[0, 1] \\
-	\log_{10}t_E&\sim\mathcal{U}[0, 3] 
-\end{align}
-where $\mathcal{U}$ is a uniform distribution.
+\subsection{Event Selection} \label{sec:event_selection}
+[Describe the different selection methods]
 
-% Talk about hypothetical selection criteria, and the things we have to consider for detection efficiency (possible selection criteria, optimizing selection method, selecting candidates)
-
-[How to compute detection efficiency?] [Specifics of our method, e.g. details about my code]
-
-[Parts of the above text will get absorbed into sections below]
-
-\subsection{Selecting candidate microlensing events}
 - Proper statistical modeling is too time consuming, so we first have to define some selection criteria to limit the sample (number of good observations, quality cuts, etc.)
 
 - Discuss $\Delta \chi^2$ method, downfalls (speed, not robust -- how do you define the threshold?). Show a plot of distribution of $\Delta \chi^2$ with and without simulated events, e.g. the distribution doesn't separate well, then show $\eta$ and how the peak of the distribution moves.
@@ -104,7 +98,13 @@ where $\mathcal{U}$ is a uniform distribution.
 
 - Introduce variability statistics: define them, what they pick out, what they have been used for before
 
-\subsection{Detection efficiency}
+\subsection{Detection Efficiency}
+The probability of detecting any given microlensing event depends on the parameters of the event, the survey properties (observing strategy, limiting magnitude, weather), and the nature of the stellar field (crowding). To compute the detection efficiency, $\varepsilon$, for a given selection criterium, we run Monte Carlo simulations to artificially add microlensing events to real data and evaluate how often these events are recovered by the cut. This analysis must be done on a field-by-field basis, however we can compare our selection methods on a sub-sample of representative cases.
+
+For a particular field, we randomly sample 1,000 light curves from each chip with $>25$ ``good'' observations (good observations are those that have no IPAC or SExtractor flags set [is there some IPAC paper to cite here?]). With this sample, we compute the set of variability statistics (\S\ref{sec:event_selection}), then iterate to add different simulated microlensing events to each light curve. We use a random number generator to only add events during $\apwsim 50\%$ of the iterations, which allows us to later quantify the false positive rate of our selection methods. For each iteration we recompute the variability statistics and store the event parameters. For each simulated event, the peak time, $t_0$, is drawn from a uniform distribution between the minimum and maximum observation times, the impact parameter, $u_0$, is drawn from a uniform distribution between 0 and 1, and the event timescale, $t_E$, is drawn from a log-uniform distribution between 1 and 1000 days. 
+
+We apply our selection criteria to each simulated light curve using the variability statistics computed for the initial light curves (from \textit{before} we add simulated events), and then bin the selected data by the event timescale. 
+
 - Previous surveys had fairly uniform time sampling, and smaller areas
 
 - With PTF, fields have vastly different sampling patterns, baselines, and cadences
@@ -112,6 +112,47 @@ where $\mathcal{U}$ is a uniform distribution.
 - We have to consider the efficiency on a field-by-field basis
 
 - Show detection efficiency of each variability statistic
+
+
+%The parameters for the random microlensing events are chosen as follows: 
+%\begin{align}
+%	t_0&\sim\mathcal{U}[t_{min}, t_{max}] \\
+%	u_0&\sim\mathcal{U}[0, 1] \\
+%	\log_{10}t_E&\sim\mathcal{U}[0, 3] 
+%\end{align}
+%where $\mathcal{U}$ is a uniform distribution.
+
+
+
+% Below here is old text that needs a home!
+
+
+
+%The PTF database (as of August 2012) contains $\apwsim64,000,000$  ``good'' light curves (light curves with $>25$ exposures with low systematics), or an average of $\apwsim60,000$ light curves per field with $>25$ exposures.  By our estimates, utilizing all cores on an 8-core 2.0 GHz computer, it would take $\apwsim 2$ weeks to perform this cut on the entire dataset using \inlinecode{ANSI-C} code wrapped in \inlinecode{Python}. 
+%
+%- Previous work did this (describe OGLE paper's selection)
+%- When we applied this to our data, we found the selection criteria performed even worse
+%- Motivated by statistical work on identifying variability in light curve databases, we sought to find a better selection method
+%
+%Our approach for finding microlensing events is to use the preexisting PTF light curve database over the entire survey footprint and develop fast, robust search algorithms to pick out candidates from this data archive. The average number of light curves per PTF field with $>$25 ``good'' observations is $\apwsim 50,000$, with $\apwsim64,000,000$  ``good'' light curves in total. By our estimates, utilizing all cores on an 8-core 2.0 GHz compute, it would take [TODO: estimate this number] to fit even the simplest 5-parameter microlensing event model to each of these light curves using \inlinecode{ANSI-C} wrapped in \inlinecode{Python}. Previous studies have had the advantage of pre-selecting candidates via difference image analysis, automatically limiting their sample to $\apwsim$thousands of light curves. Past work has also utilized a variety of selection techniques for flagging candidate microlensing light curves after these steps, however most of these methods still rely on fitting a point-source, point-lens microlensing model to each light curve and performing some selection based on the $\chi^2$ value of this fit (cite Sumi et al. 2006, MACHO work, ?). More recent work has begun to apply machine learning algorithms to the general light curve classification problem (cite Joey Richards), however this is still a work in progress. We set out to find a fast, robust selection method for identifying microlensing events in big data archives by using a set of variability statistics previously applied to finding variable stars in general (Shin M.-S. et al. ).
+%
+%[Describe variability indices?]
+%
+%In order to develop predictions for event rates and then eventually use observed event rates to infer [] we must understand our microlensing event recovery rate, or \textit{detection efficiency}, $\varepsilon$. The detection efficiency is commonly expressed as a function of microlensing event timescale and is therefore a function of survey parameters, such as cadence and baseline [FIGURE simulated detection efficiency]. [What did MACHO do exactly? What does OGLE do?] The nature of the PTF survey means that different fields are observed with very different sampling patterns [FIGURE showing different sampling]. We must compute the detection efficiency for each field individually.
+%
+%We compute the detection efficiency with a Monte Carlo simulation over real data. For a particular field of interest, we randomly sample 11,000 light curves from the database with $>25$ ``good'' observations. [define ``good'']. We compute a set of variability statistics for each light curve, we then iterate and add 100 different simulated microlensing events to each light curve and recompute the variability statistics after each iteration [Figures here?]. The parameters for the random microlensing events are chosen as follows: 
+%\begin{align}
+%	t_0&\sim\mathcal{U}[t_{min}, t_{max}] \\
+%	u_0&\sim\mathcal{U}[0, 1] \\
+%	\log_{10}t_E&\sim\mathcal{U}[0, 3] 
+%\end{align}
+%where $\mathcal{U}$ is a uniform distribution.
+%
+%% Talk about hypothetical selection criteria, and the things we have to consider for detection efficiency (possible selection criteria, optimizing selection method, selecting candidates)
+%
+%[How to compute detection efficiency?] [Specifics of our method, e.g. details about my code]
+
+[Parts of the above text will get absorbed into sections below]
 
 \section{Searching for events in full PTF data set}
 - Describe pipeline for events ... ?
@@ -123,7 +164,7 @@ where $\mathcal{U}$ is a uniform distribution.
 - Do they contribute to the lensing rate?
 
 \acknowledgments
-This paper is based on observations obtained with the Samuel Oschin Telescope as part of the Palomar Transient Factory project, a scientific collaboration between the California Institute of Technology, Columbia University, Las Cumbres Observatory, the Lawrence Berkeley National Laboratory, the National Energy Research Scientific Computing Center, the University of Oxford and the Weizmann Institute of Science.
+This paper is based on observations obtained with the Samuel Oschin Telescope as part of the Palomar Transient Factory project, a scientific collaboration between the California Institute of Technology, Columbia University, Las Cumbres Observatory, the Lawrence Berkeley National Laboratory, the National Energy Research Scientific Computing Center, the University of Oxford and the Weizmann Institute of Science. Work by A. M. Price-Whelan is supported by a National Science Foundation Graduate Research Fellowship under grant No. <Grant Number>.
 
 \clearpage
 \setlength{\baselineskip}{0.6\baselineskip}
@@ -133,20 +174,20 @@ This paper is based on observations obtained with the Samuel Oschin Telescope as
 
 %\bibliographystyle{apj}
 %\bibliography{apj-jour,refs}
-%
+
 \begin{figure}
 	\centering
-	\caption{Computed detection efficiency as a function of number of observations for a fixed baseline of 365 days. This plot uses entirely simulated light curves.}
-    \includegraphics[width=1.0\textwidth]{figures/detection_efficiency_figure.pdf}
+	\caption{The PTF survey footprint shown in equatorial coordinates. Each field's color corresponds to some minimum number of observations of that field. }
+    \includegraphics[angle=270, scale=0.55]{figures/R_coverage.pdf}
     \label{fig:survey_footprint}
 \end{figure}	
-%
-%\begin{figure}
-%	\centering
-%	\caption{A visualization of the different sampling regimes of six different PTF fields over the same one year baseline. Darker points mean more data (more exposures). Some fields have roughly uniform coverage, where others are very dense during some weeks and not others. }
-%    \includegraphics[width=1.0\textwidth]{figures/ptf_sampling_figure.pdf}
-%    \label{fig:light_curves}
-%\end{figure}
+
+\begin{figure}
+	\centering
+	\caption{A visualization of the different sampling regimes of six different PTF fields over the same one year baseline. Darker points mean more data (more exposures). Some fields have roughly uniform coverage, where others are very dense during some weeks and not others. }
+    \includegraphics[width=1.0\textwidth]{figures/sampling_figure.pdf}
+    \label{fig:sampling}
+\end{figure}
 %
 %\begin{figure}
 %	\centering

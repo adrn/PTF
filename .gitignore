@@ -12,3 +12,8 @@ lc_merged*.txt
 *.o
 *.so
 *~
+*.mp
+*.bbl
+*.blg
+*.top
+*.tui
