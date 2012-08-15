@@ -25,8 +25,6 @@ from matplotlib.patches import Rectangle
 import tables
 
 # Project
-# TODO: add some kind of catch here -- if this import fails, it's probably because I'm trying to
-#           run on the wrong machine...
 import ptf.photometricdatabase as pdb
 from ptf.globals import camera_size_degrees
 
@@ -351,20 +349,20 @@ def fields_to_coverage_plot(fields):
     for field in fields:
         kwargs = dict()
         if field.number_of_exposures >= 100:
-            kwargs["color"] = (252/255., 141/255., 89/255.)
-            kwargs["alpha"] = 0.75
+            kwargs["color"] = (136/255., 86/255., 167/255.)
+            kwargs["alpha"] = 0.8
             if r and field.id > 1000: 
                 kwargs["label"] = r"$\geq$100 observations"
                 r = False
         elif field.number_of_exposures >= 25:
-            kwargs["color"] = (145/255., 191/255., 219/255.)
-            kwargs["alpha"] = 0.75
+            kwargs["color"] = (158/255., 188/255., 218/255.)
+            kwargs["alpha"] = 0.85
             if b and field.id > 1000:
                 kwargs["label"] = r"$\geq$25 observations"
                 b = False
         else:
-            kwargs["color"] = "k"
-            kwargs["alpha"] = 0.25
+            kwargs["color"] = (0.8,0.8,0.8)
+            kwargs["alpha"] = 0.75
             if k and field.id > 1000:
                 kwargs["label"] = "<25 observations"
                 k = False
@@ -417,9 +415,11 @@ if __name__ == "__main__":
         # Make survey coverage plots
         R_cov_plot = fields_to_coverage_plot(R_info.fields(1))
         R_cov_plot.save("plots/survey_coverage/R_coverage.pdf", title="PTF R-band survey coverage")
+        R_cov_plot.save("plots/survey_coverage/R_coverage.png", title="PTF R-band survey coverage")
         
         g_cov_plot = fields_to_coverage_plot(g_info.fields(1))
         g_cov_plot.save("plots/survey_coverage/g_coverage.pdf", title="PTF g-band survey coverage")
+        g_cov_plot.save("plots/survey_coverage/g_coverage.png", title="PTF g-band survey coverage")
     
     if args.dump_json:
         # dump json file for survey coverage site

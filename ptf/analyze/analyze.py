@@ -374,6 +374,19 @@ def test_eta():
     
     print eta(light_curve)
 
+def consecutive_brighter(light_curve):
+    """ Compute the number of consecutive points brighter than 3sigma from the baseline """
+    
+    continuum_mag, noise_sigma = estimate_continuum(light_curve)
+    where_condition = np.where(light_curve.mag < (continuum_mag - (3.*noise_sigma)))[0]
+    
+    n_groups = 0
+    for group in np.array_split(where_condition, np.where(np.diff(where_condition)!=1)[0]+1):
+        if len(group) > 3:
+            n_groups += 1
+    
+    return n_groups
+
 def compute_variability_indices(light_curve, indices=[], return_tuple=False):
     """ Computes variability statistics, such as those explained in M.-S. Shin et al. 2009.
         Valid indices:
@@ -383,6 +396,7 @@ def compute_variability_indices(light_curve, indices=[], return_tuple=False):
             eta : Ratio of mean square successive difference to the sample variance, von Neumann 1941
             continuum : the continuum magnitude
             sigma_mu : the ratio of the root-sample variance to the continuum magnitude
+            con : the number of clusters of 3 or more points brighter than 3-sigma from the baseline
         
         Parameters
         ----------
@@ -421,6 +435,9 @@ def compute_variability_indices(light_curve, indices=[], return_tuple=False):
     
     if "sigma_mu" in indices:
         idx_dict["sigma_mu"] = np.std(light_curve.mag) / continuum_mag[0]
+    
+    if "con" in indices:
+        idx_dict["con"] = consecutive_brighter(light_curve)
     
     if return_tuple:
         return tuple([idx_dict[idx] for idx in indices])
