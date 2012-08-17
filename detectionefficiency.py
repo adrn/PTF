@@ -149,10 +149,7 @@ def compute_detection_efficiency(var_indices, var_indices_with_events, indices):
     return data
 
 def compare_detection_efficiencies_on_field(field, light_curves_per_ccd, events_per_light_curve, overwrite=False, indices=["j","k","eta","sigma_mu","delta_chi_squared"], u0s=[], limiting_mags=[]):
-    
-    # TODO:
-    #   - Document the new code!
-    #   - Clean up / delete old stuff
+    """ TODO: document """   
     
     if u0s == None or len(u0s) == 0:
         u0s = [None]
@@ -163,6 +160,12 @@ def compare_detection_efficiencies_on_field(field, light_curves_per_ccd, events_
     file_base = "field{:06d}_Nperccd{}_Nevents{}_u0_{}_m{}".format(field.id, light_curves_per_ccd, events_per_light_curve, "-".join(map(str,u0s)), "-".join(map(str,limiting_mags))) + ".{ext}"
     pickle_filename = os.path.join("data", "detectionefficiency", file_base.format(ext="pickle"))
     plot_filename = os.path.join("plots", "detectionefficiency", file_base.format(ext="png"))
+    
+    if not os.path.exists(os.path.dirname(pickle_filename)):
+        os.mkdir(os.path.dirname(pickle_filename))
+    
+    if not os.path.exists(os.path.dirname(plot_filename)):
+        os.mkdir(os.path.dirname(plot_filename))
     
     if os.path.exists(pickle_filename) and overwrite:
         logger.debug("Data file exists, but you want to overwrite it!")
@@ -295,14 +298,18 @@ def compare_detection_efficiencies_on_field(field, light_curves_per_ccd, events_
     
     num_u0_bins = len(u0s)
     num_mag_bins = len(limiting_mags)-1
-    fig, axes = plt.subplots(num_u0_bins, num_mag_bins, sharex=True, sharey=True, figsize=(30,30))
+    fig, axes = plt.subplots(num_u0_bins, num_mag_bins, sharex=True, sharey=True, figsize=(15,15))
     
     for ii, limiting_mag_pair in enumerate(sorted(var_indices.keys())):
         selection_indices = var_indices[limiting_mag_pair]
         for jj, u0 in enumerate(sorted(var_indices_with_events[limiting_mag_pair].keys())):
             data = compute_detection_efficiency(selection_indices, var_indices_with_events[limiting_mag_pair][u0], indices)
             
-            ax = axes[ii, jj]
+            try:
+                ax = axes[ii, jj]
+            except:
+                ax = axes
+
             for index_name in indices:
                 ax.semilogx((data["bin_edges"][1:]+data["bin_edges"][:-1])/2, \
                              data[index_name]["detections_per_bin"] / data["total_counts_per_bin"], \
@@ -316,7 +323,8 @@ def compare_detection_efficiencies_on_field(field, light_curves_per_ccd, events_
             ax.tick_params(which='minor', length=5, width=1)
             
             if ii == 0:
-                ax.set_title("$u_0$={:.2f}".format(u0), size=36, y=1.1)
+                try: ax.set_title("$u_0$={:.2f}".format(u0), size=36, y=1.1)
+                except: pass
                 
             if jj == (num_mag_bins-1):
                 ax.set_ylabel("{:.1f}<R<{:.1f}".format(*limiting_mag_pair), size=32, rotation="horizontal")
