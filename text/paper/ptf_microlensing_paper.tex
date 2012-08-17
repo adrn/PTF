@@ -72,7 +72,7 @@ The Palomar Transient Factory is a transient detection system that begins with a
 
 The PTF camera is the 12K$\times$8K mosaic camera formerly at the Canada-France-Hawaii Telescope. The camera has 11 working chips, 10$^7$ pixels, and a 7.26 deg$^2$ field-of-view \citep{rahmer2008}. Under median seeing conditions (1.1$\arcsec$), observations in Mould $R$ or Sloan Digital Sky Survey (SDSS) $g$ achieve 2.0$\arcsec$ full-width half-maximum images and reach 5$\sigma$ magnitudes of $R \approx 21.0$ and $g \approx 21.3$ mag in a standard 60~s exposure \citep{nick2010}. As of August 9, 2012, the PTF footprint included $\apwsim$10,100 (2600) deg$^2$ imaged $>$25 ($>$100) times in $R$ and $\apwsim$2200 (170) deg$^2$ imaged that often in $g$ (\figurename~\ref{fig:survey_footprint})\footnote{For an interactive visualization of the PTF survey coverage, see: [TODO: url]}.
 
-\section{Microlensing event recovery}
+\section{Microlensing event recovery} \label{sec:event_recovery}
 Microlensing surveys typically use difference image analysis (cite Lupton?) to identify transient events in raw imaging data. Light curves of any transient sources are then analyzed and further pruned using a variety of selection methods to search for microlensing event candidates (cite MACHO, OGLE). Using difference imaging is essential for studying crowded fields such as the Galactic bulge where photometry is difficult (cite or figure?), and also limits the number of light curves that must be searched for microlensing events, thus saving on computation time. Pre-selection with difference imaging also enables fast, real-time detection of events, allowing dedicated microlensing surveys to obtain high-cadence follow-up observations of interesting sources. Such surveys also have the advantage of relatively uniform time sampling of the survey footprint over an observing season.
 
 The PTF survey footprint (\figurename~\ref{fig:survey_footprint}) is not uniformly sampled -- spatially or temporally. Each field has a unique sampling pattern determined by (1) the sub-surveys within PTF, (2) the time of year, as some low-declination fields can only be imaged during part of the year, or (3) the priority of the field, which could  change at any time. As a result, PTF light curves often contain gaps, regions of high-cadence observations, and regions of low-cadence observations, leading to a massive data set of irregularly-sampled, time-domain photometry. \figurename~\ref{fig:sampling} shows six randomly-selected light curves (with their magnitudes removed) and demonstrates the varying cadences and coverage fractions that different fields may have over the same one-year baseline.
@@ -85,9 +85,25 @@ Previous work has used a variety of survey-specific selection methods (as descri
 	\item require that a microlensing model fit best describes the data using some cut on $\chi^2$,
 	\item require that the model event parameters have reasonable values.
 \end{enumerate}
-Applying the second cut above to irregularly sampled data is more challenging and more computationally expensive because we must account for gaps in our data; it isn't obvious that this same selection procedure will be as successful for the PTF data. Motivated by work on identifying and classifying general variability in light curve data (Shin M.-S. et al., other?), we set out to compare the \textit{detection efficiency} of performing microlensing event selection with a set of variability statistics.
+Applying the second cut above to irregularly sampled data is more challenging and more computationally expensive because we must account for gaps in our data; it isn't obvious that this same selection procedure will be as successful for the PTF data. Motivated by work on identifying and classifying general variability in light curve data \citep{shin2009}[others?], we set out to compare the \textit{detection efficiency} of performing microlensing event selection with a set of variability statistics to previously used methods.
 
 \subsection{Event Selection} \label{sec:event_selection}
+We choose five statistical measures of variability, as compiled by \cite{shin2009}, that have been previously applied to classification of periodic variables, and evaluate their effectiveness in identifying microlensing events. The statistics, or \emph{variability indices}, are $\sigma/\mu$, $Con$, $\eta$, $J$, and $K$ (we choose not to implement the sixth, $AoVM$, because it mainly helps with periodic sources). $\sigma/\mu$ is the ratio of the root-variance to the sample mean, 
+\begin{align}
+	\frac{\sigma}{\mu} = \frac{\sqrt{\sum^N_i (x_i - \mu)^2 / (N-1)}}{\sum^N_i x_i/N},
+\end{align}
+where N is the total number of observations in the light curve. We modify their definition of $Con$ such that it is the number of clusters of three or more consecutive observations that are more than $3\sigma$ brighter than the reference magnitude of the source (e.g., for a single microlensing event in an otherwise flat light curve this value should be $Con=1$). This change allows us to use the performance of $Con$ as a measure of Cut 2 (\S\ref{sec:event_recovery}). $\eta$ is the von Neumann ratio, originally proposed in \cite{von_neumann1941}, and is a ratio of the mean square successive difference over the sample variance:
+\begin{align}
+	\eta = \frac{\delta^2}{\sigma^2} = \frac{\sum^{N-1}_i(x_{i+1} - x_i)^2/(N-1)}{\sigma^2}
+\end{align}
+$\eta$ is small, but still greater than zero, when there is strong serial correlation between successive data points. $J$ and $K$ were suggested by \cite{stetson1996}:
+\begin{align}
+	\delta_i &= \sqrt{\frac{N}{N-1}}\frac{x_i-\mu}{e_i}\\
+	J &= \sum^{N-1}_i sign(\delta_i \delta_{i+1})\sqrt{|\delta_i \delta_{i+1}|}\\
+	K &= \frac{1/N\sum^N_i |\delta_i|}{\sqrt{1/N\sum^N_i\delta_i^2}}
+\end{align}
+where $e_i$ is the photometric error of each data point. $J$ tends to 0 for non-variable stars, but is large when there are significant differences between successive data points in a light curve. $K$ is a measure of the kurtosis or ``peakedness'' of the distribution of points in the light curve. We add one more variability index motivated by Cut 3 (\S\ref{sec:event_recovery}): $\Delta \chi^2$ is defined as the difference in chi-squared between fitting a five-parameter Gaussian model and fitting a linear model to the light curve.
+
 [Describe the different selection methods]
 
 - Proper statistical modeling is too time consuming, so we first have to define some selection criteria to limit the sample (number of good observations, quality cuts, etc.)
