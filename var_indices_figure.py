@@ -16,7 +16,7 @@ import json
 
 # Third-party
 import matplotlib
-matplotlib.use("Agg")
+#matplotlib.use("Agg")
 import matplotlib.cm as cm
 import matplotlib.colors as mc
 import matplotlib.pyplot as plt
@@ -184,43 +184,46 @@ def var_indices_to_json(var_indices, var_indices_with_events, filename=None):
         return blob
 ##############
 
+import scipy.optimize as so
+def find_confidence_interval(x, pdf, confidence_level):
+    return pdf[pdf > x].sum() - confidence_level
+
 class VIFigure(object):
     """ This class represents a variability index (VI) figure where we plot the distributions
         of the variability indices against each other.
     """
     
-    def __init__(self, variability_indices, indices, scatter=True, **figure_kwargs):
-        """ Given a numpy structured array containing variability index values, 
-            initialize a new variability index figure
-            
-            Parameters
-            ----------
-            variability_indices : numpy structured array
-                This must be a numpy structured array with at minimum the following columns:
-                    - one column for each index in 'indices',
-                    - m (the reference magnitude of the source),
-                    - u0 (the impact parameter of any microlensing event),
-                    - tE (the microlensing event timescale)
-            indices : iterable
-                Probably a list of strings, e.g. ['eta', 'j', 'k'] etc.
-            scatter: bool
-                Make a scatter plot. If False, it will make a contour plot instead.
-            
-            figure_kwargs are any keyword arguments that will get passed through to the matplotlib figure function.
-        """
+    def _validate_variability_indices(self, variability_indices):
+        """ Validate any variability indices given to this object """
         
         # Validate input
-        for var_idx in indices:
+        for var_idx in self.indices:
             try:
                 variability_indices[var_idx]
             except ValueError: # e.g. field not found
                 print redText("Variability statistic '{}' not found in the data you provided.".format(var_idx))
                 raise
         
-        self.variability_indices = variability_indices
+        return True
+    
+    def __init__(self, indices, **figure_kwargs):
+        """ Given a numpy structured array containing variability index values, 
+            initialize a new variability index figure
+            
+            Parameters
+            ----------
+            indices : iterable
+                Probably a list of strings, e.g. ['eta', 'j', 'k'] etc.
+            scatter: bool
+                Create a scatter plot instead of a contour plot
+            
+            figure_kwargs are any keyword arguments that will get passed through to the matplotlib figure function.
+        """
+        
         self.indices = indices
         
         self.figure, self._mpl_axes = plt.subplots(len(self.indices), len(self.indices), **figure_kwargs)
+        self._scatter_data_bounds = dict()
         
         # Here I create a dictionary that makes it easier to keep track of where the indices are 
         #   plotted, so I don't have to remember numeric values. To access the axes objects, you
@@ -230,32 +233,194 @@ class VIFigure(object):
         self.axes = dict()
         for ii, x_idx in enumerate(self.indices):
             self.axes[x_idx] = dict()
-            
+
             for jj, y_idx in enumerate(self.indices):
+                if jj < ii: 
+                    self._mpl_axes[jj, ii].set_visible(False)
+                    continue
+                    
                 self.axes[x_idx][y_idx] = self._mpl_axes[jj, ii]
+    
+    def scatter(self, variability_indices, **kwargs):
+        """ Add scatter plots to each subplot with the supplied array of variability indices
+        
+            Parameters
+            ---------
+            variability_indices : numpy structured array
+                This must be a numpy structured array with at minimum the following columns:
+                    - one column for each index in 'indices',
+                    - m (the reference magnitude of the source),
+                    - u0 (the impact parameter of any microlensing event),
+                    - tE (the microlensing event timescale)
+        """
+        self._validate_variability_indices(variability_indices)
+        
+        alpha = kwargs.pop("alpha", 0.1)
+        marker = kwargs.pop("marker", ".")
+        markersize = kwargs.pop("markersize", 2)
+        color = kwargs.pop("color", "#222222")
         
         # Now we will do the initial plotting of the points
-        for x_idx in self.indices:
-            for y_idx in self.indices:
+        for x_idx in self.axes.keys():
+            for y_idx in self.axes[x_idx].keys():
+                this_axis = self.axes[x_idx][y_idx]
+                if x_idx == y_idx: 
+                    # Make a histogram
+                    x_var = variability_indices[x_idx]
+                    neg_x_var = x_var[x_var < 0.0]
+                    pos_x_var = x_var[x_var > 0.0]
+                    log_x_var = np.log10(pos_x_var)
+                    
+                    this_axis.hist(log_x_var, bins=100, color=color)
+                    
+                else:
+                    x_var = variability_indices[x_idx]
+                    y_var = variability_indices[y_idx]
+                    
+                    neg_x_var = x_var[x_var < 0.0]
+                    pos_x_var = x_var[(x_var > 0.0) & (y_var > 0.0)]
+                    log_x_var = np.log10(pos_x_var)
+                    
+                    neg_y_var = y_var[y_var < 0.0]
+                    pos_y_var = y_var[(x_var > 0.0) & (y_var > 0.0)]
+                    log_y_var = np.log10(pos_y_var)
+                    
+                    this_axis.scatter(log_x_var, log_y_var, zorder=-1, alpha=alpha, marker=marker, color=color, s=markersize)
+                    self._scatter_data_bounds[this_axis] = (min(log_x_var), max(log_x_var), min(log_y_var), max(log_y_var))
+    
+    def contour(self, variability_indices, nbins=100, nlevels=2, **kwargs):
+        """ Add contour plots to each subplot with the supplied array of variability indices
+        
+            Parameters
+            ---------
+            variability_indices : numpy structured array
+                This must be a numpy structured array with at minimum the following columns:
+                    - one column for each index in 'indices',
+                    - m (the reference magnitude of the source),
+                    - u0 (the impact parameter of any microlensing event),
+                    - tE (the microlensing event timescale)
+        """ 
+        self._validate_variability_indices(variability_indices)
+        
+        if nlevels > 3: raise ValueError("nlevels must be <=3")
+        
+        alpha = kwargs.pop("alpha", 0.75)
+        colors = kwargs.pop("colors", ["#d44a4c", "#91e685", "#459bd0"])
+        linestyles = kwargs.pop("linestyles", ["-", "-", "-"])
+        
+        # Now we will do the initial plotting of the points
+        for x_idx in self.axes.keys():
+            for y_idx in self.axes[x_idx].keys():
+                if x_idx == y_idx: continue
                 this_axis = self.axes[x_idx][y_idx]
                 
-                if scatter:
-                    this_axis.scatter(self.variability_indices[x_idx], self.variability_indices[y_idx])
-                else:
-                    H, xedges, yedges = np.histogram2d(self.variability_indices[x_idx], self.variability_indices[y_idx], bins=(100,100))
-                    levels = (1E4, 1E3, 1E2, 20)
-                    this_axis.countour(H, levels)
-
-    def color_points_by(self, param):
-        """ Color the points by the specified parameter (can be u0, tE, or m) """
-        # USE ax.collections[0].set_color() to change color of points in scatter plot
+                x_var = variability_indices[x_idx]
+                y_var = variability_indices[y_idx]
+                
+                neg_x_var = x_var[x_var < 0.0]
+                pos_x_var = x_var[(x_var > 0.0) & (y_var > 0.0)]
+                log_x_var = np.log10(pos_x_var)
+                
+                neg_y_var = y_var[y_var < 0.0]
+                pos_y_var = y_var[(x_var > 0.0) & (y_var > 0.0)]
+                log_y_var = np.log10(pos_y_var)
+                
+                H, xedges, yedges = np.histogram2d(log_x_var, log_y_var, bins=(nbins,nbins), normed=True)
+                x_bin_sizes = (xedges[1:] - xedges[:-1]).reshape((1,nbins))
+                y_bin_sizes = (yedges[1:] - yedges[:-1]).reshape((nbins,1))
+                pdf = (H*(x_bin_sizes*y_bin_sizes))
+                
+                level1 = so.brentq(find_confidence_interval, 0., 1., args=(pdf, 0.68))
+                level2 = so.brentq(find_confidence_interval, 0., 1., args=(pdf, 0.95))
+                level3 = so.brentq(find_confidence_interval, 0., 1., args=(pdf, 0.99))
+                levels = [level1,level2,level3][:nlevels]
+                
+                X, Y = 0.5*(xedges[1:]+xedges[:-1]), 0.5*(yedges[1:]+yedges[:-1])
+                #Z = np.log10(H.T+1.)
+                Z = pdf.T
+                #print levels
+                #sys.exit(0)
+                
+                contour = this_axis.contour(X, Y, Z, levels=levels, origin="lower", colors=colors, alpha=alpha)
+                for ii, c in enumerate(contour.collections): 
+                    c.set_linestyle(linestyles[ii])
         
-    def reset_color(self):
-        """ Reset the color of the points to black """
+    def beautify(self):
+        """ 1) Align the x-axis for axes in a column, y-axis for rows
+            2) Get rid of axis labels for all but the outside subplots
+            3) Adjust the subplot spacing
+            4) Add the names of the indices
+        """
+        
+        for ii,row_idx in enumerate(self.indices):
+            for jj,col_idx in enumerate(self.indices):
+                
+                plt.setp(self._mpl_axes[ii,jj].get_xticklabels(), visible=False)
+                plt.setp(self._mpl_axes[ii,jj].get_yticklabels(), visible=False)
+                
+                if ii == len(self.indices)-1:
+                    plt.setp(self._mpl_axes[ii,jj].get_xticklabels(), visible=True)
+                    self._mpl_axes[ii,jj].set_xlabel(r"$\log$"+index_to_label[col_idx], fontsize=28)
+                
+                if jj == 0 and ii > 0:
+                    plt.setp(self._mpl_axes[ii,jj].get_yticklabels(), visible=True)
+                    self._mpl_axes[ii,jj].set_ylabel(r"$\log$"+index_to_label[row_idx], fontsize=28)
+                    
+        
+        self.align_axis_limits()
+        self.figure.subplots_adjust(wspace=0.1, hspace=0.1)
+    
+    def align_axis_limits(self):
+        """ This function will go through and make sure each column shares an x axis and 
+            each row shares a y axis.
+            
+        """
+        
+        pad = 0.1
+        for row in range(len(self.indices)):
+            xlims = []
+            for col in range(len(self.indices)):
+                ax = self._mpl_axes[col,row]
+                try:
+                    xlims.append(self._scatter_data_bounds[ax][:2])
+                except: 
+                    pass
+            
+            xlims = np.array(xlims, dtype=[("l", float), ("r", float)])
+            for col in range(len(self.indices)):
+                try:
+                    this_min = xlims["l"].min()
+                    this_max = xlims["r"].min()
+                    delta = np.fabs(this_max-this_min)
+                    self._mpl_axes[col,row].set_xlim(this_min-pad*delta, this_max+pad*delta)
+                except: 
+                    pass
+        
+        for col in range(len(self.indices)):
+            ylims = []
+            for row in range(len(self.indices)):
+                ax = self._mpl_axes[col,row]
+                try:
+                    ylims.append(self._scatter_data_bounds[ax][2:])
+                except: 
+                    pass
+            
+            ylims = np.array(ylims, dtype=[("b", float), ("t", float)])
+            for row in range(len(self.indices)):
+                if row == col: continue
+                try:
+                    this_min = xlims["b"].min()
+                    this_max = xlims["t"].min()
+                    delta = np.fabs(this_max-this_min)
+                    self._mpl_axes[col,row].set_ylim(this_min-pad*delta, this_max+pad*delta)
+                except: 
+                    pass
+        
+                
     
     def save(self, filename):
         """ Save the figure to the specified filename """
-
+        self.figure.savefig(filename, bbox_inches="tight")
 
 
 def make_var_indices_plots(var_indices, var_indices_with_events, indices, filename_base):
@@ -375,8 +540,8 @@ if __name__ == "__main__":
                     help="The PTF field ID to run on")
     parser.add_argument("--limit", dest="limit", default=None, type=int,
                     help="The number of light curves to select from each CCD in a field")
-    parser.add_argument("--test", dest="test", action="store_true", default=False,
-                    help="Run tests")
+    parser.add_argument("--plot", dest="plot", action="store_true", default=False,
+                    help="Plot and save the figure")
     parser.add_argument("--indices", dest="indices", nargs="+", type=str, default=["eta","delta_chi_squared", "con","j","k","sigma_mu"],
                     help="Specify the variability indices to compute")
     parser.add_argument("--mag", dest="limiting_mag", nargs="+", type=float, default=[None, None],
@@ -399,5 +564,11 @@ if __name__ == "__main__":
                                                light_curves_per_ccd=args.limit,
                                                overwrite=args.overwrite)
     
-    vifigure = VIFigure(var_indices, indices=args.indices, scatter=False, figsize=(15,15))
-    plt.show()
+    if args.plot:
+        vifigure = VIFigure(indices=args.indices, figsize=(22,22))
+        
+        vifigure.scatter(var_indices_with_events, alpha=0.1)
+        vifigure.contour(var_indices, nbins=50)
+        vifigure.beautify()
+        plot_path = os.path.join("plots", "var_indices")
+        vifigure.save(os.path.join(plot_path, "field{}_Nperccd{}_Nevents{}.pdf".format(field.id, args.limit, args.N)))
