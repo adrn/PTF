@@ -256,6 +256,8 @@ class VIFigure(object):
     def save(self, filename):
         """ Save the figure to the specified filename """
 
+
+
 def make_var_indices_plots(var_indices, var_indices_with_events, indices, filename_base):
     """ """
     
@@ -397,17 +399,5 @@ if __name__ == "__main__":
                                                light_curves_per_ccd=args.limit,
                                                overwrite=args.overwrite)
     
-    for ii,mag in enumerate(args.limiting_mag[:-1]):
-        filename_base = "plots/var_indices/field{}_mag{}".format(field.id, mag)
-        
-        idx1 = np.ones_like(var_indices["m"]).astype(bool)
-        idx2 = np.ones_like(var_indices_with_events["m"]).astype(bool)
-        
-        if mag != None:
-            idx1 = idx1 & (var_indices["m"] > mag) & (var_indices["m"] < args.limiting_mag[ii+1])
-            idx2 = idx2 & (var_indices_with_events["m"] > mag) & (var_indices_with_events["m"] < args.limiting_mag[ii+1])
-            
-        make_var_indices_plots(var_indices[idx1], 
-                               var_indices_with_events[idx2],
-                               indices=args.indices,
-                               filename_base=filename_base)
+    vifigure = VIFigure(var_indices, indices=args.indices, scatter=False, figsize=(15,15))
+    plt.show()
