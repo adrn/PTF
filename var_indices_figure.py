@@ -16,7 +16,7 @@ import json
 
 # Third-party
 import matplotlib
-#matplotlib.use("Agg")
+matplotlib.use("Agg")
 import matplotlib.cm as cm
 import matplotlib.colors as mc
 import matplotlib.pyplot as plt
@@ -421,107 +421,6 @@ class VIFigure(object):
     def save(self, filename):
         """ Save the figure to the specified filename """
         self.figure.savefig(filename, bbox_inches="tight")
-
-
-def make_var_indices_plots(var_indices, var_indices_with_events, indices, filename_base):
-    """ """
-    
-    num_indices = len(indices)
-    fig1, axes1 = plt.subplots(num_indices, num_indices, figsize=(20,20))
-    fig2, axes2 = plt.subplots(num_indices, num_indices, figsize=(20,20))
-    
-    var_indices["con"] += 1
-    var_indices_with_events["con"] += 1
-    
-    for ii, row_index in enumerate(indices):
-        for jj, col_index in enumerate(indices):
-            ax_without = axes1[ii, jj]
-            ax_with = axes2[ii, jj]
-            
-            if ii < jj: 
-                ax_without.set_visible(False) 
-                ax_with.set_visible(False) 
-                continue
-            
-            if col_index in ["eta", "con", "k"]:
-                xscale = "log"
-            else:
-                xscale = "symlog"
-            
-            if row_index in ["eta", "con", "k"]:
-                yscale = "log"
-            else:
-                yscale = "symlog"
-            
-            if ii != jj:
-                ax_without.plot(var_indices[col_index], var_indices[row_index], color='black', marker='.', linestyle="none", alpha=0.1, ms=3)
-                ax_without.set_xscale(xscale)
-                ax_without.set_yscale(yscale)
-                
-                ax_with.plot(var_indices_with_events[col_index], var_indices_with_events[row_index], color='black', marker='.', linestyle="none", alpha=0.1, ms=3)
-                ax_with.set_xscale(xscale)
-                ax_with.set_yscale(yscale)
-                
-                xlims_without = (min(var_indices[col_index]), max(var_indices[col_index]))
-                xlims_with = (min(var_indices_with_events[col_index]), max(var_indices_with_events[col_index]))
-                new_xmin = min(xlims_without[0], xlims_with[0])
-                if new_xmin == 0: new_xmin = -0.01
-                new_xmax = max(xlims_without[1], xlims_with[1])
-                new_xlim = (new_xmin - 0.2*np.fabs(new_xmin), new_xmax + 0.2*np.fabs(new_xmax))
-                
-                ax_without.set_xlim(new_xlim)
-                ax_with.set_xlim(new_xlim)
-                
-                #ylims_without = ax_without.get_ylim()
-                #ylims_with = ax_with.get_ylim()
-                ylims_without = (min(var_indices[row_index]), max(var_indices[row_index]))
-                ylims_with = (min(var_indices_with_events[row_index]), max(var_indices_with_events[row_index]))
-                new_ymin = min(ylims_without[0], ylims_with[0])
-                if new_ymin == 0: new_ymin = -0.01
-                new_ymax = max(ylims_without[1], ylims_with[1])
-                new_ylim = (new_ymin - 0.2*np.fabs(new_ymin), new_ymax + 0.2*np.fabs(new_ymax))
-                
-                ax_without.set_ylim(new_ylim)
-                ax_with.set_ylim(new_ylim)
-                
-            else:
-                log_idxs_without = np.log10(var_indices[col_index])
-                log_idxs_with = np.log10(var_indices_with_events[col_index])
-                
-                bins_without = np.logspace(log_idxs_without.min(), log_idxs_without.max(), 100)
-                bins_with = np.logspace(log_idxs_with.min(), log_idxs_with.max(), 100)
-                
-                #ax_without.hist(var_indices[col_index], color='black', alpha=0.5, bins=bins_without, log=True) 
-                #ax_with.hist(var_indices_with_events[col_index], color='black', alpha=0.5, bins=bins_with, log=True) 
-                #ax_without.hist(var_indices[col_index], color='black', alpha=0.5, bins=100, log=True) 
-                #ax_with.hist(var_indices_with_events[col_index], color='black', alpha=0.5, bins=100, log=True) 
-                ax_without.set_xscale("symlog")
-                ax_with.set_xscale("symlog")
-            
-            plt.setp(ax_without.get_xticklabels(), visible=False)
-            plt.setp(ax_without.get_yticklabels(), visible=False)
-            
-            plt.setp(ax_with.get_xticklabels(), visible=False)
-            plt.setp(ax_with.get_yticklabels(), visible=False)
-            
-            if ii == num_indices-1:
-                plt.setp(ax_without.get_xticklabels(), visible=True)
-                ax_without.set_xlabel(col_index)
-                plt.setp(ax_with.get_xticklabels(), visible=True)
-                ax_with.set_xlabel(col_index)
-            
-            if jj == 0:
-                plt.setp(ax_without.get_yticklabels(), visible=True)
-                ax_without.set_ylabel(row_index)
-                plt.setp(ax_with.get_yticklabels(), visible=True)
-                ax_with.set_ylabel(row_index)
-    
-    fig1.subplots_adjust(hspace=0.1, wspace=0.1)
-    fig2.subplots_adjust(hspace=0.1, wspace=0.1)
-    
-    fig1.savefig(filename_base + "_without.png")
-    fig2.savefig(filename_base + "_with.png")
-
 
 if __name__ == "__main__":
     

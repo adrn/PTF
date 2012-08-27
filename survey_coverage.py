@@ -13,6 +13,7 @@ import glob
 import cPickle as pickle
 import logging
 import time, datetime
+import json
 
 # Third-party
 import numpy as np
@@ -222,7 +223,7 @@ def field_list_to_json(fields, filename=None):
     
     if filename != None:
         f = open(filename, "wb")
-        f.write(blog)
+        f.write(blob)
         f.close()
         
         return
