@@ -1,3 +1,4 @@
+import logging
 import copy
 import numpy as np
 from ..ptflightcurve import PTFLightCurve
@@ -15,6 +16,13 @@ def u_t(t, u_0, t_0, t_E):
 
 def A_u(u):
     return (u**2 + 2) / (u*np.sqrt(u**2 + 4))
+    
+def A(t, u0, t0, tE):
+    u = u_t(t, u0, t0, tE)
+    return (u**2 + 2) / (u*np.sqrt(u**2 + 4))
+
+def magnitude_model(t, mag, **p):
+    return mag - 2.5*np.log10(A(t, p["u0"], p["t0"], p["tE"]))
 
 def fluxModel(t, **p):
     return p["F0"]*A_u(u_t(t, p["u0"], p["t0"], p["tE"]))
@@ -42,12 +50,19 @@ class SimulatedLightCurve(PTFLightCurve):
         
         if error != None:
             self.error = np.array(error)
+            if len(self.error) == 1:
+                self.error = np.zeros_like(self.mjd) + error
+            elif len(self.error) != len(self.mjd):
+                raise ValueError("Error array should have same shape as mjd")
         else:
             # TODO: Implement this
             raise NotImplementedError("TODO!")
         
-        if mag != None:
+        if isinstance(mag, np.ndarray) or isinstance(mag, list):
             self.amag = self.mag = np.array(mag)
+        elif isinstance(mag, int) or isinstance(mag, float):
+            self.amag = self.mag = np.zeros(len(mjd)) + mag
+            self._addNoise()
         else:
             if outliers:
                 # Add ~1% outliers
@@ -106,11 +121,10 @@ class SimulatedLightCurve(PTFLightCurve):
         if tE == None: self.tE = 10**np.random.normal(1.3, 0.5)
         else: self.tE = float(tE)
         
-        flux = fluxModel(self.mjd, u0=self.u0, t0=self.t0, tE=self.tE, F0=1.)#self.F0)
-        self.mag = FluxToRMag(flux*RMagToFlux(self.mag))
-        
-        self.amag = self.mag
+        #flux = fluxModel(self.mjd, u0=self.u0, t0=self.t0, tE=self.tE, F0=1.)#self.F0)
+        self.amag = self.mag = magnitude_model(self.mjd, self.mag, u0=self.u0, t0=self.t0, tE=self.tE)
     
     def _addNoise(self):
         """ Add scatter to the light curve """
-        self.mag += np.random.normal(0.0, self.error)
+        if not np.all(self.error == 0.):
+            self.mag += np.random.normal(0.0, self.error)
