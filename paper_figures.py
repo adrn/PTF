@@ -8,7 +8,7 @@ from __future__ import division
 __author__ = "adrn <adrn@astro.columbia.edu>"
 
 # Standard library
-import sys
+import os, sys
 import logging
 import cPickle as pickle
 import time
@@ -153,11 +153,11 @@ def median_maximum_indices_plot(field_id, ccd_id=5):
         chip = ccd.read()
         
         source_ids = chip.sources.readWhere("ngoodobs > 25")["matchedSourceID"]
+        logger.info("{} source ids selected".format(len(source_ids)))
         
         var_indices = []
-        
-        count = 0
         for source_id in source_ids:
+            logger.debug("Source ID: {}".format(source_id))
             light_curve = ccd.light_curve(source_id, clean=True, barebones=True)
             
             if len(light_curve.mjd) > 25:
@@ -168,7 +168,6 @@ def median_maximum_indices_plot(field_id, ccd_id=5):
                     continue
                 
                 var_indices.append(lc_var_indices)
-                count += 1 
         
         var_indices = np.array(var_indices, dtype=zip(indices, [float]*len(indices)))
         
