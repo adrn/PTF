@@ -42,14 +42,14 @@ from apwlib.globals import greenText, yellowText, redText
 import numpy as np
 import emcee
 import matplotlib
-#matplotlib.use("Agg")
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 # Project
 from ptf.simulation.simulatedlightcurve import SimulatedLightCurve
 from ptf.ptflightcurve import PTFLightCurve
 from ptf.globals import index_to_label
-#import ptf.photometricdatabase as pdb
+import ptf.photometricdatabase as pdb
 #import ptf.analyze.analyze as analyze
 
 def A(t, u0, t0, tE):
@@ -127,7 +127,8 @@ def ln_p_tE(tE):
     if tE < 1. or tE > 1000:
         return -np.inf
     else:
-        return -np.log(1000-1.)
+        #return -np.log(1000-1.)
+        return np.log(1/2.17) + np.exp(-0.5*(np.log10(tE)-1.4)**2)
 
 def ln_p_m0(m0, median_mag, mag_rms):
     """ Prior on reference magnitude m0. This will be a Gaussian around 
@@ -143,10 +144,10 @@ def ln_prior(p, mag, mjd):
     p_tE = ln_p_tE(tE)
     p_m0 = ln_p_m0(m0, np.median(mag), np.std(mag))
     
-    logger.debug("Prior on u0: {}".format(p_u0))
-    logger.debug("Prior on t0: {}".format(p_t0))
-    logger.debug("Prior on tE: {}".format(p_tE))
-    logger.debug("Prior on m0: {}".format(p_m0))
+    #logger.debug("Prior on u0: {}".format(p_u0))
+    #logger.debug("Prior on t0: {}".format(p_t0))
+    #logger.debug("Prior on tE: {}".format(p_tE))
+    #logger.debug("Prior on m0: {}".format(p_m0))
     
     return ln_p_u0(u0) + ln_p_t0(t0, mjd.min(), mjd.max()) + ln_p_tE(tE) + ln_p_m0(m0, np.median(mag), np.std(mag))
 
@@ -175,70 +176,94 @@ def test_ln_prior():
     print "Bad tE:", ln_prior([15, 0.3, 50., 0.2], light_curve.mag, light_curve.mjd)
     print "Bad tE:", ln_prior([15, 0.3, 50., 2000.], light_curve.mag, light_curve.mjd)
 
-def fit_model_to_light_curve(light_curve, nwalkers=200, nsamples=250):
+def fit_model_to_light_curve(light_curve, nwalkers=200, nburn_in=100, nsamples=250):
     """ Fit a microlensing model to a given light curve using Emcee
         
     """
     
+    #p0 = np.array([[np.random.normal(np.median(light_curve.mag), np.std(light_curve.mag)),
+    #                np.random.uniform(0., 1.34),
+    #                np.random.normal(light_curve.mjd[np.argmin(light_curve.mag)], 50),
+    #                10**np.random.uniform(0., 3.)] for ii in range(nwalkers)])
     p0 = np.array([[np.random.normal(np.median(light_curve.mag), np.std(light_curve.mag)),
                     np.random.uniform(0., 1.34),
-                    np.random.normal(light_curve.mjd[np.argmin(light_curve.mag)], 50),
-                    10**np.random.uniform(0., 3.)] for ii in range(nwalkers)])
+                    np.random.uniform(light_curve.mjd.min()-10., light_curve.mjd.min()+10.),
+                    10**np.random.uniform(0.3, 3.)] for ii in range(nwalkers)])
     ndim = p0.shape[1]
     
     sampler = emcee.EnsembleSampler(nwalkers, ndim, ln_posterior, 
                                     args=[light_curve.mag, light_curve.mjd, light_curve.error], 
                                     threads=4)
-    pos, prob, state = sampler.run_mcmc(p0, 100)
+    pos, prob, state = sampler.run_mcmc(p0, nburn_in)
     sampler.reset()
     
     sampler.run_mcmc(pos, nsamples)
     
     logger.info("Mean acceptance fraction: {0:.3f}".format(np.mean(sampler.acceptance_fraction)))
     
-    plt.figure()
-    for i,name in enumerate(["m0", "u0", "t0", "tE"]):
-        plt.subplot(2,2,i+1)
-        plt.hist(sampler.flatchain[:,i], 100, color="k", histtype="step")
-        if name != "m0": plt.axvline(getattr(light_curve, name), color='r')
-        plt.title("{}".format(name))
-        plt.ylabel("Posterior Probability")
-    
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    mjd = np.arange(light_curve.mjd.min(), light_curve.mjd.max(), 0.2)
-    for link in sampler.flatchain[-25:]:
-        m0, u0, t0, tE = link
-        s_light_curve = SimulatedLightCurve(mjd=mjd, error=np.zeros_like(mjd), mag=m0)
-        s_light_curve.addMicrolensingEvent(t0=t0, u0=u0, tE=tE)
-        ax.plot(s_light_curve.mjd, s_light_curve.mag, "k-", alpha=0.2)
-    
-    light_curve.plot(ax)
-    ax.set_xlabel("MJD")
-    ax.set_ylabel("R")
-    plt.show()
+    return sampler
 
 if __name__ == "__main__":
-    test = False
     
-    if test:
+    from argparse import ArgumentParser
+
+    parser = ArgumentParser(description="")
+    parser.add_argument("-v", "--verbose", action="store_true", dest="verbose", default=False,
+                    help="Be chatty! (default = False)")
+    parser.add_argument("-q", "--quiet", action="store_true", dest="quiet", default=False,
+                    help="Be quiet! (default = False)")
+    parser.add_argument("--test", action="store_true", dest="test", default=False,
+                    help="Run tests, then exit.")
+    
+    args = parser.parse_args()
+    
+    if args.verbose:
         logger.setLevel(logging.DEBUG)
+    elif args.quiet:
+        logger.setLevel(logging.ERROR)
+    else:
+        logger.setLevel(logging.INFO)
+    
+    if args.test:
         test_magnitude_model()
         test_ln_likelihood()
         test_ln_prior()
         sys.exit(0)
     
-    with open("data/event_fitter/lc1.pickle") as f:
-        lc1 = pickle.load(f)
-    
-    sim_lc1 = SimulatedLightCurve(mjd=lc1.mjd, mag=lc1.mag, error=lc1.error)    
-    sim_lc1.addMicrolensingEvent(u0=1.0, t0=np.mean(sim_lc1.mjd), tE=20)
-    
-    with open("data/event_fitter/lc2.pickle") as f:
-        lc2 = pickle.load(f)
-    
-    sim_lc2 = SimulatedLightCurve(mjd=lc2.mjd, mag=lc2.mag, error=lc2.error)    
-    sim_lc2.addMicrolensingEvent(u0=0.9, t0=np.mean(sim_lc2.mjd), tE=20)
-    
-    fit_model_to_light_curve(sim_lc1, nsamples=1000)
-    fit_model_to_light_curve(sim_lc2, nsamples=1000)
+    field = pdb.Field(100043, "R")
+    for ccd in field.ccds.values():
+        chip = ccd.read()
+        
+        sources = chip.sources.readWhere("(ngoodobs > 25) & (vonNeumannRatio < 1.0) & (vonNeumannRatio > 0)")
+        logger.info("{} sources".format(len(sources)))
+        
+        for source in sources:
+            light_curve = ccd.light_curve(source["matchedSourceID"], clean=True, barebones=True)
+            
+            if len(light_curve.mjd) > 100:
+                logger.debug(source["matchedSourceID"])
+                sampler = fit_model_to_light_curve(light_curve, nwalkers=500, nsamples=1000)
+                
+                plt.clf()
+                for i,name in enumerate(["m0", "u0", "t0", "tE"]):
+                    plt.subplot(2,2,i+1)
+                    plt.hist(sampler.flatchain[:,i], 100, color="k", histtype="step")
+                    plt.title("{}".format(name))
+                    plt.ylabel("Posterior Probability")
+                
+                plt.savefig("plots/event_fitter/field{}_ccd{}_source{}_posterior.png".format(field.id, ccd.id, source["matchedSourceID"]))
+                
+                fig = plt.figure()
+                ax = fig.add_subplot(111)
+                mjd = np.arange(light_curve.mjd.min(), light_curve.mjd.max(), 0.2)
+                for link in sampler.flatchain[-25:]:
+                    m0, u0, t0, tE = link
+                    s_light_curve = SimulatedLightCurve(mjd=mjd, error=np.zeros_like(mjd), mag=m0)
+                    s_light_curve.addMicrolensingEvent(t0=t0, u0=u0, tE=tE)
+                    ax.plot(s_light_curve.mjd, s_light_curve.mag, "k-", alpha=0.2)
+                
+                light_curve.plot(ax)
+                ax.set_xlabel("MJD")
+                ax.set_ylabel("R")
+                fig.savefig("plots/event_fitter/field{}_ccd{}_source{}_fit.png".format(field.id, ccd.id, source["matchedSourceID"]))
+        
