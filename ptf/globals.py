@@ -9,4 +9,4 @@ camera_size_degrees = (camera_size[0]*pix_scale/3600., camera_size[1]*pix_scale/
 ogle_camera_size = (1.225,0.9) #degrees
 
 # Convert variability index to a Latex label
-index_to_label = {"j" : "J", "k" : "K", "sigma_mu" : r"$\sigma/\mu$", "eta" : r"$\eta$", "delta_chi_squared" : r"$\Delta \chi^2$", "con" : "Con"}
+index_to_label = {"j" : "J", "k" : "K", "sigma_mu" : r"$\sigma/\mu$", "eta" : r"$\eta$", "delta_chi_squared" : r"$\Delta \chi^2$", "con" : "Con", "corr" : "Corr"}
