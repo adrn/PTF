@@ -29,6 +29,10 @@ def fluxModel(t, **p):
 
 class SimulatedLightCurve(PTFLightCurve):
     
+    @staticmethod
+    def from_ptflightcurve(ptflightcurve):
+        return SimulatedLightCurve(mjd=ptflightcurve.mjd, mag=ptflightcurve.mag, error=ptflightcurve.error)
+    
     def __init__(self, mjd, mag=None, error=None, outliers=False):
         """ Creates a simulated PTF light curve
         
@@ -102,10 +106,7 @@ class SimulatedLightCurve(PTFLightCurve):
         
         # If u0 is not specified, draw from u0 distribution
         #   - see for example Popowski & Alcock 
-        #   - u0 maximum defined by detection limit of survey, but in our
-        #       case assum the amplifcation should be >1.4. Using eq. 1 from
-        #       Popowski & Alcock, this corresponds to a maximum u0 of ~0.9261
-        if u0 == None: self.u0 = np.random.uniform()*0.9261
+        if u0 == None: self.u0 = np.random.uniform(0., 1.34)
         else: self.u0 = float(u0)
         
         # If t0 is not specified, draw from uniform distribution between days
