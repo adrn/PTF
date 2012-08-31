@@ -64,7 +64,7 @@ def get_var_indices(field, light_curves_per_ccd, events_per_light_curve, indices
         
         # Conditions for reading from the 'sources' table
         #   - Only select sources with enough good observations (>25)
-        wheres = ["(ngoodobs > 25)"]
+        wheres = ["(ngoodobs > 25)", "(vonNeumannRatio > 1)", "(stetsonJ > 0)", "(stetsonJ < 100)"]
         
         for ccd in field.ccds.values():
             logger.info(greenText("Starting with CCD {}".format(ccd.id)))
@@ -328,6 +328,8 @@ class VIFigure(object):
                 H, xedges, yedges = np.histogram2d(log_x_var, log_y_var, bins=(nbins,nbins), normed=True)
                 x_bin_sizes = (xedges[1:] - xedges[:-1]).reshape((1,nbins))
                 y_bin_sizes = (yedges[1:] - yedges[:-1]).reshape((nbins,1))
+                
+                print x_idx, y_idx,d H.shape, x_bin_sizes.shape, y_bin_sizes.shape
                 pdf = (H*(x_bin_sizes*y_bin_sizes))
                 
                 level1 = so.brentq(find_confidence_interval, 0., 1., args=(pdf, 0.68))
@@ -441,7 +443,7 @@ if __name__ == "__main__":
                     help="The number of light curves to select from each CCD in a field")
     parser.add_argument("--plot", dest="plot", action="store_true", default=False,
                     help="Plot and save the figure")
-    parser.add_argument("--indices", dest="indices", nargs="+", type=str, default=["eta","delta_chi_squared", "con","j","k","sigma_mu"],
+    parser.add_argument("--indices", dest="indices", nargs="+", type=str, default=["eta","delta_chi_squared", "con","j","k","sigma_mu", "corr"],
                     help="Specify the variability indices to compute")
     parser.add_argument("--mag", dest="limiting_mag", nargs="+", type=float, default=[None, None],
                     help="Specify the magnitude bin edges, e.g. 6 bin edges specifies 5 bins.")
@@ -470,4 +472,4 @@ if __name__ == "__main__":
         vifigure.contour(var_indices, nbins=50)
         vifigure.beautify()
         plot_path = os.path.join("plots", "var_indices")
-        vifigure.save(os.path.join(plot_path, "field{}_Nperccd{}_Nevents{}.pdf".format(field.id, args.limit, args.N)))
+        vifigure.save(os.path.join(plot_path, "field{}_Nperccd{}_Nevents{}.png".format(field.id, args.limit, args.N)))

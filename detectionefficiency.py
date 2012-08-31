@@ -74,7 +74,10 @@ def simulate_events_worker(sim_light_curve, tE, u0, reference_mag, indices):
     #   added microlensing events
     light_curve.reset()
     
-    light_curve.addMicrolensingEvent(tE=tE, u0=u0)
+    # APW HACK -- add microlensing events only on a data point, ignores the *survey* detection efficiency
+    t0 = light_curve.mjd[np.random.randint(len(light_curve.mjd))]
+    #t0 = None
+    light_curve.addMicrolensingEvent(tE=tE, u0=u0, t0=t0)
     
     try:
         lc_var_indices = analyze.compute_variability_indices(light_curve, indices, return_tuple=True) + (light_curve.tE, light_curve.u0, reference_mag, True)
@@ -105,7 +108,7 @@ def simulate_events_compute_indices(light_curve, events_per_light_curve, indices
     for event_id in range(events_per_light_curve):
         # Only add events 50% of the time, to allow for false positives
         if np.random.uniform() > 0.5:
-            tE = 10**np.random.uniform(0., 3.)
+            tE = 10**np.random.uniform(0.3, 3.)
             pool.apply_async(simulate_events_worker, args=(sim_light_curve, tE, u0, reference_mag, indices), callback=callback)
         else:
             var_indices_with_events.append(vanilla_var_indices + (sim_light_curve.tE, sim_light_curve.u0, reference_mag, False))
@@ -118,7 +121,14 @@ def simulate_events_compute_indices(light_curve, events_per_light_curve, indices
     var_indices_with_events = np.array(var_indices_with_events, dtype=zip(names,dtypes))
     return var_indices_with_events
 
-def compute_detection_efficiency(var_indices, var_indices_with_events, indices):
+def compute_Nsigma(var_indices_with_events, F=5):
+    """ Determine the N in our N-sigma cut by finding the value that gives us a 
+        F% false positive rate.
+        
+        By default, a 5% false positive rate is chosen
+    """
+
+def compute_detection_efficiency(var_indices, var_indices_with_events, indices, events_per_light_curve):
     """ """
     
     # Will be a boolean array to select out only rows where event_added == True
@@ -131,6 +141,8 @@ def compute_detection_efficiency(var_indices, var_indices_with_events, indices):
                 bin_edges=tE_bin_edges)
     
     for index_name in indices:
+        # TODO: Determine Nsigma
+        
         if index_name == "con":
             idx = var_indices_with_events[index_name] >= 1
         else:
@@ -179,7 +191,7 @@ def compare_detection_efficiencies_on_field(field, light_curves_per_ccd, events_
         # Conditions for reading from the 'sources' table
         #   - Only select sources with enough good observations (>25)
         #   - Omit sources with large amplitude variability so they don't mess with our simulation
-        wheres = ["(ngoodobs > 25)", "(stetsonJ < 100)", "(vonNeumannRatio > 1.0)"]
+        wheres = ["(ngoodobs > 25)", "(stetsonJ < 100)", "(vonNeumannRatio > 1.0)", "(stetsonJ > 0)"]
         
         # Keep track of calculated var indices for each CCD
         #all_var_indices_with_events = []
@@ -272,7 +284,6 @@ def compare_detection_efficiencies_on_field(field, light_curves_per_ccd, events_
                     count += 1
                 # ----------------------------------------------   
                     
-                
             ccd.close()
         
         f = open(pickle_filename, "w")
@@ -294,16 +305,17 @@ def compare_detection_efficiencies_on_field(field, light_curves_per_ccd, events_
                    "eta" : {"lw" : 3, "ls" : "-", "color" : "k"}, \
                    "sigma_mu" : {"lw" : 1, "ls" : "-", "color" : "b", "alpha" : 0.5}, \
                    "delta_chi_squared" : {"lw" : 3, "ls" : "--", "color" : "k"}, 
-                   "con" : {"lw" : 3, "ls" : ":", "color" : "k"}}
+                   "con" : {"lw" : 3, "ls" : ":", "color" : "k"},
+                   "corr" : {"lw" : 3, "ls" : ":", "color" : "r"}}
     
     num_u0_bins = len(u0s)
     num_mag_bins = len(limiting_mags)-1
-    fig, axes = plt.subplots(num_u0_bins, num_mag_bins, sharex=True, sharey=True, figsize=(15,15))
+    fig, axes = plt.subplots(num_u0_bins, num_mag_bins, sharex=True, sharey=True, figsize=(25,25))
     
     for ii, limiting_mag_pair in enumerate(sorted(var_indices.keys())):
         selection_indices = var_indices[limiting_mag_pair]
         for jj, u0 in enumerate(sorted(var_indices_with_events[limiting_mag_pair].keys())):
-            data = compute_detection_efficiency(selection_indices, var_indices_with_events[limiting_mag_pair][u0], indices)
+            data = compute_detection_efficiency(selection_indices, var_indices_with_events[limiting_mag_pair][u0], indices, events_per_light_curve)
             
             try:
                 ax = axes[ii, jj]
@@ -387,7 +399,7 @@ def example_light_curves(field, u0s=[], limiting_mags=[]):
                 chip = ccd.read()
                 
                 # Read information from the 'sources' table
-                read_wheres = ["(ngoodobs > 100)", "(stetsonJ < 100)", "(vonNeumannRatio > 1.0)", "(referenceMag < {:.3f})".format(limiting_mag2)]
+                read_wheres = ["(ngoodobs > 100)", "(stetsonJ < 100)", "(stetsonJ > 0)", "(vonNeumannRatio > 1.0)", "(referenceMag < {:.3f})".format(limiting_mag2)]
                 sources = chip.sources.readWhere(" & ".join(read_wheres))
                 source_ids = sources["matchedSourceID"]
                 
@@ -484,7 +496,7 @@ if __name__ == "__main__":
     
     np.random.seed(42)
     field = pdb.Field(args.field_id, filter="R")
-    compare_detection_efficiencies_on_field(field, indices=["eta","delta_chi_squared", "con","j","k","sigma_mu"], \
+    compare_detection_efficiencies_on_field(field, indices=["eta","delta_chi_squared", "con", "j","k","sigma_mu","corr"], \
                                             events_per_light_curve=args.N,
                                             light_curves_per_ccd=args.limit,
                                             overwrite=args.overwrite,
