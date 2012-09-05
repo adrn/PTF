@@ -27,7 +27,7 @@ except ImportError:
 
 # PTF
 import globals
-from ptflightcurve import PTFLightCurve
+from ptflightcurve import PTFLightCurve, PDBLightCurve
 import analyze.analyze as analyze
 
 #all_fields = np.load(os.path.join(ptf_params.config["PROJECTPATH"], "data", "all_fields.npy"))
@@ -286,7 +286,7 @@ class CCD(object):
         self._file.close()
         self._file = None
     
-    def light_curve(self, source_id, mag_type="relative", clean=False, where=[], barebones=False):
+    def light_curve(self, source_id, mag_type="relative", clean=False, where=[], barebones=True):
         """ Get a light curve for a given source ID from this chip """
         
         chip = self.read()
@@ -310,9 +310,11 @@ class CCD(object):
             mag_err = sourcedata["magerr_auto"]/10000.0
         
         if barebones:
-            return PTFLightCurve(mjd=mjd, mag=mag, error=mag_err)
+            #return PTFLightCurve(mjd=mjd, mag=mag, error=mag_err)
+            return PDBLightCurve(mjd=mjd, mag=mag, error=mag_err, field_id=self.field.id, ccd_id=self.id, source_id=source_id)
         else:
-            return PTFLightCurve(mjd=mjd, mag=mag, error=mag_err, metadata=sourcedata)
+            #return PTFLightCurve(mjd=mjd, mag=mag, error=mag_err, metadata=sourcedata)
+            return PDBLightCurve(mjd=mjd, mag=mag, error=mag_err, field_id=self.field.id, ccd_id=self.id, source_id=source_id, metadata=sourcedata)
         
 
 # ==================================================================================================

@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 
 # ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=
 
-class PTFLightCurve:
+class PTFLightCurve(object):
     """ Represents a PTF Light Curve """
     
     def __init__(self, mjd, mag, error, metadata=None, exposures=None):
@@ -49,33 +49,6 @@ class PTFLightCurve:
         
         np.random.shuffle(idx)
         self.error = self.mag[idx]
-    
-    @property
-    def field_id(self):
-        if self.exposures != None:
-            fid = int(self.exposures["fieldID"][0])
-        else:
-            fid = None
-        
-        return fid
-        
-    @property
-    def ccd_id(self):
-        if self.exposures != None:
-            cid = int(self.exposures["ccdID"][0])
-        else:
-            cid = None
-        
-        return cid
-    
-    @property
-    def source_id(self):
-        if self.metadata != None:
-            sid = int(self.metadata["matchedSourceID"][0])
-        else:
-            sid = None
-        
-        return sid
     
     def plot(self, ax=None, **kwargs):
         """ Either plots the light curve and show()'s it to the display, or plots it on 
@@ -125,4 +98,13 @@ class PTFLightCurve:
             f.close()
         else:
             raise ValueError("I don't know how to handle {} files!".format(ext))
-            
+
+class PDBLightCurve(PTFLightCurve):
+    """ Subclass of PTFLightCurve that requires a field_id, ccd_id, and source_id """
+    
+    def __init__(self, mjd, mag, error, field_id, ccd_id, source_id, **kwargs):
+        self.field_id = int(field_id)
+        self.ccd_id = int(ccd_id)
+        self.source_id = int(source_id)
+        
+        super(PDBLightCurve, self).__init__(mjd, mag, error, **kwargs)
