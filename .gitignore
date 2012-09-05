@@ -17,3 +17,4 @@ lc_merged*.txt
 *.blg
 *.top
 *.tui
+config

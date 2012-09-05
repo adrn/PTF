@@ -26,13 +26,6 @@ ch = logging.StreamHandler()
 formatter = logging.Formatter("%(name)s / %(levelname)s / %(message)s")
 ch.setFormatter(formatter)
 logger.addHandler(ch)
-
-# TODO: make these live in a config file?
-#db_address = "mongodb://navtara:a78923njk5g*adg%2B@deimos.astro.columbia.edu/"
-db_address = "deimos.astro.columbia.edu"
-db_port = 27017
-db_user = "navtara"
-db_pass = "a78923njk5g*adg+"
    
 def light_curve_to_document(light_curve, **kwargs):
     """ Converts a PTFLightCurve object into a dictionary to be
