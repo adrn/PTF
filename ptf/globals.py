@@ -1,3 +1,5 @@
+import os
+
 # PTF Stats
 pix_scale = 1.01 #arcsec / pixel
 camera_size = (12000., 8000.) #pixels
@@ -13,8 +15,14 @@ index_to_label = {"j" : "J", "k" : "K", "sigma_mu" : r"$\sigma/\mu$", "eta" : r"
 
 config = dict()
 
-with open("config", "r") as f:
+#config_filename = os.path.
+_base_path = os.path.split(__file__)[0]
+
+with open(os.path.join(_base_path, "config"), "r") as f:
     for line in f.readlines():
         key,val = line.split()
-        config[key] = val
+        try:
+            config[key] = int(val)
+        except ValueError:
+            config[key] = val
         
