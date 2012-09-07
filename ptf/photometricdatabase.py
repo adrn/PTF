@@ -338,6 +338,8 @@ class CCD(object):
             
             for source_id in source_ids:
                 this_sourcedata = sourcedata[sourcedata["matchedSourceID"] == source_id]
+                if len(this_sourcedata) == 0: continue
+                
                 ra, dec = this_sourcedata[0]["ra"], this_sourcedata[0]["dec"]
                 yield PDBLightCurve(mjd=this_sourcedata["mjd"], mag=this_sourcedata["mag"], error=this_sourcedata["magErr"], field_id=self.field.id, ccd_id=self.id, source_id=source_id, ra=ra, dec=dec)
             
