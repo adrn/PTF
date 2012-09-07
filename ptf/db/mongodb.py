@@ -53,9 +53,9 @@ def light_curve_to_document(light_curve, **kwargs):
 def document_to_light_curve(document):
     """ Converts a MongoDB document dictionary back into a PTF Light Curve object """
             
-    return PDBLightCurve(mjd=document["mjd"], mag=document["mag"], error=document["error"],
-                         field_id=document["field_id"], ccd_id=document["ccd_id"], source_id=document["source_id"])
-    
+    #return PDBLightCurve(mjd=document["mjd"], mag=document["mag"], error=document["error"],
+    #                     field_id=document["field_id"], ccd_id=document["ccd_id"], source_id=document["source_id"])
+    return PDBLightCurve(**document)    
 
 def get_light_curve_from_collection(field, ccd, source_id, collection):
     """ Get a light curve from MongoDB from the specified field, ccd, and source_id """
@@ -66,13 +66,14 @@ def get_light_curve_from_collection(field, ccd, source_id, collection):
         field_id = int(field.id)
     
     if isinstance(ccd, int):
-        ccd_id = field
+        ccd_id = ccd
     else:
         ccd_id = int(ccd.id)
-        
+    
     document = collection.find_one({"field_id" : field_id,
                                     "ccd_id" : ccd_id,
-                                    "source_id" : int(source_id)})    
+                                    "source_id" : int(source_id)})
+    
     if document == None:
         return None
     else:
@@ -90,5 +91,36 @@ def save_light_curve_to_collection(light_curve, collection, **kwargs):
     else:
         document = light_curve_to_document(light_curve, **kwargs)
         collection.insert(document)
+    
+    return True
+
+def update_candidate_status(field_id, ccd_id, source_id, status, light_curve_collection, candidate_status_collection):
+    """ Update the candidate status for a given light curve """
+    
+    # First get the light curve data from the light curve collection
+    search = {}
+    search["field_id"] = field_id
+    search["ccd_id"] = ccd_id
+    search["source_id"] = source_id
+    raw_candidate = light_curve_collection.find_one(search)
+    
+    if raw_candidate == None:
+        logger.warning("Light curve not found in mongodb!")
+        return False
+    
+    # Now check to see if the candidate_status collection already has a record for this light curve
+    candidate_status = candidate_status_collection.find_one({"light_curve_id" : raw_candidate["_id"]})
+    
+    logger.debug("Candidate status in db: " + str(candidate_status))
+    
+    print candidate_status
+    
+    if candidate_status == None:
+        candidate_status = dict()
+        candidate_status["light_curve_id"] = raw_candidate["_id"]
+        candidate_status["status"] = status
+        candidate_status_collection.insert(candidate_status, safe=True)
+    else:
+        candidate_status_collection.update({"light_curve_id" : raw_candidate["_id"]}, {"$set" : {"status" : status}})
     
     return True
