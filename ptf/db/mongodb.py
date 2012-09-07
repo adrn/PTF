@@ -35,7 +35,7 @@ def light_curve_to_document(light_curve, **kwargs):
     
     for key,value in kwargs.items():
         document[key] = value
-        
+    
     document["mjd"] = list(light_curve.mjd)
     document["mag"] = list(light_curve.mag)
     document["error"] = list(light_curve.error)
@@ -59,8 +59,19 @@ def document_to_light_curve(document):
 
 def get_light_curve_from_collection(field, ccd, source_id, collection):
     """ Get a light curve from MongoDB from the specified field, ccd, and source_id """
-    document = collection.find_one({"field_id" : int(field.id),
-                                    "ccd_id" : int(ccd.id),
+    
+    if isinstance(field, int):
+        field_id = field
+    else:
+        field_id = int(field.id)
+    
+    if isinstance(ccd, int):
+        ccd_id = field
+    else:
+        ccd_id = int(ccd.id)
+        
+    document = collection.find_one({"field_id" : field_id,
+                                    "ccd_id" : ccd_id,
                                     "source_id" : int(source_id)})    
     if document == None:
         return None

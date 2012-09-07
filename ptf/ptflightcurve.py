@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 class PTFLightCurve(object):
     """ Represents a PTF Light Curve """
     
-    def __init__(self, mjd, mag, error, metadata=None, exposures=None):
+    def __init__(self, mjd, mag, error, metadata=None, exposures=None, **kwargs):
         """ Create a PTFLightCurve by passing equal-length arrays of mjd, magnitude, and
             magnitude errors. This object also accepts an optional metadata parameter, 
             which is any numpy recarray that contains extra information about the light
@@ -27,6 +27,9 @@ class PTFLightCurve(object):
         self.amjd = self.mjd = np.array(mjd)[idx].astype(np.float64)
         self.amag = self.mag = np.array(mag)[idx].astype(np.float64)
         self.error = np.array(error)[idx].astype(np.float64)
+        
+        for key,val in kwargs.items():
+            setattr(self, key, val)
         
         if metadata != None:
             self.metadata = np.array(metadata)
@@ -96,6 +99,10 @@ class PTFLightCurve(object):
             f = open(filename, "w")
             pickle.dump(self, f)
             f.close()
+        elif ext == ".npy":
+            arr = np.transpose((self.mjd, self.mag, self.error))
+            arr = np.array(arr, dtype=[("mjd", float), ("mag", float), ("error", float)])
+            np.save(filename, arr)
         else:
             raise ValueError("I don't know how to handle {} files!".format(ext))
 

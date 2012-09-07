@@ -37,7 +37,7 @@ pytable_base_string = os.path.join(match_path, "match_{filter.id:02d}_{field.id:
 filter_map = {"R" : 2, "g" : 1}
 inv_filter_map = {2 : "R", 1 : "g"}
 
-def quality_cut(sourcedata, source_id=None, ccd_edge_cutoff=15, where=[]):
+def quality_cut(sourcedata, source_id=None, ccd_edge_cutoff=15, barebones=False, where=[]):
     """ This function accepts a Pytables table object (from the 'sourcedata' table)
         and returns only the rows that pass the given quality cuts.
         
@@ -101,7 +101,17 @@ def quality_cut(sourcedata, source_id=None, ccd_edge_cutoff=15, where=[]):
         where_string = ""
     
     # Saturation limit, 14.3, based on email conversation with David Levitan
-    sourcedata = sourcedata.readWhere(src + '(sextractorFlags == 0) & \
+    if barebones:
+        # APW: if this is slow, don't do that comprehension
+        srcdata = [(x["matchedSourceID"], x["mjd"], x["mag"], x["magErr"], x["alpha_j2000"], x["delta_j2000"]) for x in sourcedata.where(src + '(sextractorFlags == 0) & \
+                                       (x_image > {}) & (x_image < {}) & \
+                                       (y_image > {}) & (y_image < {}) & \
+                                       (relPhotFlags < 4) & \
+                                       ( (ipacFlags == 2) | (ipacFlags == 0) ) & \
+                                       (mag > 14.3) & (mag < 22)'.format(x_cut1, x_cut2, y_cut1, y_cut2) + where_string)]
+        sourcedata = np.array(srcdata, dtype=[("matchedSourceID", int), ("mjd", float), ("mag", float), ("magErr", float), ("ra", float), ("dec", float)])
+    else:
+        sourcedata = sourcedata.readWhere(src + '(sextractorFlags == 0) & \
                                        (x_image > {}) & (x_image < {}) & \
                                        (y_image > {}) & (y_image < {}) & \
                                        (relPhotFlags < 4) & \
@@ -247,6 +257,7 @@ class Field(object):
         
 class CCD(object):
     _chip = None
+    _file = None
     
     def __repr__(self):
         return "<CCD: id={}, field={}>".format(self.id, self.field)
@@ -275,7 +286,8 @@ class CCD(object):
             raise ValueError("CCD data file does not exist!")
     
     def read(self):
-        self._file = tables.openFile(self.filename)
+        if self._file == None:
+            self._file = tables.openFile(self.filename)
         
         if self._chip == None:
             self._chip = getattr(getattr(getattr(self._file.root, "filter{:02d}".format(self.filter.id)), "field{:06d}".format(self.field.id)), "chip{:02d}".format(self.id))
@@ -315,7 +327,22 @@ class CCD(object):
         else:
             #return PTFLightCurve(mjd=mjd, mag=mag, error=mag_err, metadata=sourcedata)
             return PDBLightCurve(mjd=mjd, mag=mag, error=mag_err, field_id=self.field.id, ccd_id=self.id, source_id=source_id, metadata=sourcedata)
+    
+    def light_curves(self, source_ids, where=[], clean=True):
+        """ """
         
+        chip = self.read()
+        
+        if clean:
+            sourcedata = quality_cut(chip.sourcedata, barebones=True, where=where)
+            
+            for source_id in source_ids:
+                this_sourcedata = sourcedata[sourcedata["matchedSourceID"] == source_id]
+                ra, dec = this_sourcedata[0]["ra"], this_sourcedata[0]["dec"]
+                yield PDBLightCurve(mjd=this_sourcedata["mjd"], mag=this_sourcedata["mag"], error=this_sourcedata["magErr"], field_id=self.field.id, ccd_id=self.id, source_id=source_id, ra=ra, dec=dec)
+            
+        else:
+            raise NotImplementedError()
 
 # ==================================================================================================
 #   Convenience functions

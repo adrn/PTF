@@ -36,7 +36,10 @@ except ImportError, RuntimeError:
     
     gaussian_model = lambda p, x: p[0]*np.exp(-(x - p[1])**2 / (2*p[2]**2)) + p[3]
     gaussian_error_func = lambda p, x, mag, sigma: (mag - gaussian_model(p, x)) / sigma
-    
+
+constant_model = lambda p, x: p[0] + np.zeros(len(x))
+linear_model = lambda p, x: p[0]*x + p[1]
+gaussian_model = lambda p, x: p[0]*np.exp(-(x - p[1])**2 / (2*p[2]**2)) + p[3]
 
 # ------
 # Models
@@ -135,7 +138,45 @@ def test_estimate_continuum():
         ax.legend()
         plt.show()
 
-def compute_delta_chi_squared(light_curve, error_func1, model1_initial, error_func2, model2_initial, force_fit=False, num_attempts=10):
+def gaussian_line_delta_chi_squared(light_curve):
+    """ Compute the difference in chi-squared between a Gaussian and a straight line """
+    
+    #error_func1=linear_error_func, \
+    #model1_initial=(0.0, median_mag),\
+    
+    median_mag = np.median(light_curve.mag)
+    dcs, (constant_params, gaussian_params) = compute_delta_chi_squared(light_curve,\
+                                error_func1=constant_error_func, \
+                                model1_initial=(median_mag,),\
+                                error_func2=gaussian_error_func, \
+                                model2_initial=(-5.0, light_curve.mjd[np.argmin(light_curve.mag)], 10.0, median_mag), \
+                                return_params=True)
+    
+    if gaussian_params[2] < 1. or gaussian_params[0] > 0. or gaussian_params[1] > max(light_curve.mjd) or gaussian_params[1] < min(light_curve.mjd):
+        dcs = -100.0
+    
+    # Get points around the Gaussian fit that are brighter than the median magnitude
+    w, = np.where((light_curve.mjd > (gaussian_params[1]-gaussian_params[2])) & (light_curve.mjd < (gaussian_params[1]+gaussian_params[2])) & (light_curve.mag < gaussian_params[3]))
+    N = len(w)
+    
+    if N < 10:
+        dcs = -100.0
+    
+    """
+    if dcs > 100:
+        import matplotlib.pyplot as plt
+        fig = plt.figure(figsize=(15,10))
+        ax = fig.add_subplot(111)
+        light_curve.plot(ax)
+        ax.plot(light_curve.mjd, constant_model(constant_params, light_curve.mjd), "r-", alpha=0.5)
+        ax.plot(light_curve.mjd, gaussian_model(gaussian_params, light_curve.mjd), "b-", alpha=0.5)
+        ax.set_title(r"{} -- $\Delta\chi^2$={} -- N={}".format(",".join(map(str,gaussian_params)), dcs, N))
+        fig.savefig("plots/test_{}.png".format(light_curve.source_id))
+    """
+    
+    return dcs
+
+def compute_delta_chi_squared(light_curve, error_func1, model1_initial, error_func2, model2_initial, force_fit=False, num_attempts=10, return_params=False):
     """ Compute the difference in chi-squared between two different model 
         fits to the light curve.
         
@@ -154,6 +195,8 @@ def compute_delta_chi_squared(light_curve, error_func1, model1_initial, error_fu
         num_attempts : int
             Number of times to try iterating the fit with new initial conditions. Only relevant
             if force_fit=True.
+        return_params : bool
+            If true, it will return a tuple containing the parameters from the two model fits.
     """
     
     # If we need to force the fits to converge, we have to iterate the fits
@@ -214,7 +257,10 @@ def compute_delta_chi_squared(light_curve, error_func1, model1_initial, error_fu
                                        light_curve.mag, \
                                        light_curve.error)**2)# / len(model2_params)
     
-    return model1_chisq - model2_chisq
+    if return_params:
+        return model1_chisq - model2_chisq, (model1_params, model2_params)
+    else:
+        return model1_chisq - model2_chisq
 
 def test_compute_delta_chi_squared():
     """ 
