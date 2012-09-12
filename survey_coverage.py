@@ -14,6 +14,7 @@ import cPickle as pickle
 import logging
 import time, datetime
 import json
+import math
 
 # Third-party
 import numpy as np
@@ -24,6 +25,7 @@ import matplotlib.colors as mc
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 import tables
+import apwlib.geometry as g
 
 # Project
 import ptf.photometricdatabase as pdb
@@ -35,6 +37,8 @@ ch = logging.StreamHandler()
 formatter = logging.Formatter("%(name)s / %(levelname)s / %(message)s")
 ch.setFormatter(formatter)
 logger.addHandler(ch)
+
+all_fields = np.load(os.path.join("data", "all_fields.npy"))
 
 class SurveyInfo(object):
     """ Some example use cases for this object:
@@ -142,8 +146,8 @@ def field_to_feature(field):
     properties = dict(name=str(field.id))
     geometry = dict(type="Polygon")
     
-    ra = field.ra-180.0
-    dec = field.dec
+    ra = field.ra.degrees-180.0
+    dec = field.dec.degrees
     
     ra_offset = camera_size_degrees[0]/math.cos(math.radians(dec))/2.
     dec_offset = camera_size_degrees[1]/2.
@@ -204,18 +208,32 @@ def field_list_to_json(fields, filename=None):
             logger.debug("Skipping field {}".format(field))
             continue
         
-        if field.dec < -40:
+        try:
+            field.ra
+            field.dec
+        except AttributeError:
+            this_field = all_fields[all_fields["id"] == field.id]
+            if len(this_field) != 1: 
+                logger.warning("Field {} is weird".format(field))
+                continue
+                
+            field.ra = g.RA.fromDegrees(this_field["ra"][0])
+            field.dec = g.Dec.fromDegrees(this_field["dec"][0])
+        
+        if field.dec.degrees < -40:
             logger.warning("Field {} is weird, dec < -40".format(field))
+            continue
         
         feature = field_to_feature(field)
         
         # Determine color of field
-        rgb = cm.autumn(scaler(field.number_of_exposures))
+        #rgb = cm.autumn(scaler(field.number_of_exposures))
+        rgb = cm.gist_heat(scaler(field.number_of_exposures))
         feature["properties"]["color"] = mc.rgb2hex(rgb)
-        feature["properties"]["alpha"] = scaler(field.number_of_exposures)*0.5 + 0.2
+        feature["properties"]["alpha"] = scaler(field.number_of_exposures)*0.75 + 0.05
         feature["properties"]["number_of_observations"] = str(field.number_of_exposures)
-        feature["properties"]["ra"] = str(field.ra)
-        feature["properties"]["dec"] = str(field.dec)
+        feature["properties"]["ra"] = "{:.5f}".format(field.ra.degrees)
+        feature["properties"]["dec"] = "{:.5f}".format(field.dec.degrees)
         
         final_dict["features"].append(feature)
     
@@ -388,6 +406,8 @@ if __name__ == "__main__":
                     help="Create survey coverage plots (R-band and g-band)")
     parser.add_argument("--dump-json", action="store_true", dest="dump_json", default=False,
                     help="Dump a JSON FeatureCollection for the interactive survey coverage plot")
+    parser.add_argument("--file", dest="json_file", default="data/survey_coverage/ptf_fields.json",
+                    help="Dump a JSON FeatureCollection to the specified file")
                     
     args = parser.parse_args()
     
@@ -424,5 +444,6 @@ if __name__ == "__main__":
     
     if args.dump_json:
         # dump json file for survey coverage site
-        pass
+        print R_info.timestamp
+        field_list_to_json(R_info.fields(1), filename=args.json_file)
     
