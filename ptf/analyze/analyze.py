@@ -18,8 +18,6 @@ try:
 except ImportError:
     raise ImportError("apwlib not found! \nDo: 'git clone git@github.com:adrn/apwlib.git' and run 'python setup.py install' to install.")
 
-
-
 try:
     import error_functions
     constant_error_func = error_functions.constant_error_func

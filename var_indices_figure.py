@@ -25,7 +25,7 @@ from apwlib.globals import greenText, redText
 
 # Project
 import ptf.photometricdatabase as pdb
-import detectionefficiency as de
+#import detectionefficiency as de
 import ptf.analyze.analyze as analyze
 from ptf.globals import index_to_label
 
@@ -329,7 +329,7 @@ class VIFigure(object):
                 x_bin_sizes = (xedges[1:] - xedges[:-1]).reshape((1,nbins))
                 y_bin_sizes = (yedges[1:] - yedges[:-1]).reshape((nbins,1))
                 
-                print x_idx, y_idx,d H.shape, x_bin_sizes.shape, y_bin_sizes.shape
+                #print x_idx, y_idx, H.shape, x_bin_sizes.shape, y_bin_sizes.shape
                 pdf = (H*(x_bin_sizes*y_bin_sizes))
                 
                 level1 = so.brentq(find_confidence_interval, 0., 1., args=(pdf, 0.68))

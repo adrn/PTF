@@ -25,7 +25,6 @@ from __future__ import division
 
 # Standard library
 import logging
-import multiprocessing
 import os
 import sys
 import cPickle as pickle
@@ -83,11 +82,14 @@ def test_magnitude_model():
     
     plt.show()    
 
+def chi(p, mag, mjd, sigma):
+    return (mag - magnitude_model(p, mjd)) / sigma
+
 def ln_likelihood(p, mag, mjd, sigma):
     """ We use chi-squared as our likelihood function because in *most cases*, 
         the magnitude errors are approximately Gaussian.
     """
-    diff = (mag - magnitude_model(p, mjd)) / sigma
+    diff = chi(p, mag, mjd, sigma)
     return -0.5 * np.sum(diff*diff)
 
 def test_ln_likelihood():
@@ -112,44 +114,68 @@ def ln_p_u0(u0):
     else:
         return -np.log(1.34)
 
-def ln_p_t0(t0, tmin, tmax):
+def ln_p_t0(t0, mjd, mag, t0_sigma=5.):
     """ Prior on time of event t0 """
-    if t0 < tmin or t0 > tmax:
-        return -np.inf
-    else:
-        return -np.log(tmax-tmin)
+    return -0.5 * (np.log(2.*np.pi*t0_sigma) + (t0 - mjd[np.argmin(mag)])**2 / t0_sigma**2)
 
-def ln_p_tE(tE):
+def ln_p_tE(tE, tE_sigma=1.):
     """ Prior on duration of event tE """
-    
-    # TODO: For now this is uninformative, but I may want to penalize 
-    #       shorter events?
-    if tE < 1. or tE > 1000:
-        return -np.inf
-    else:
-        #return -np.log(1000-1.)
-        return np.log(1/2.17) + np.exp(-0.5*(np.log10(tE)-1.4)**2)
+    return -0.5 * (np.log(2.*np.pi*tE_sigma) + (np.log(tE) - np.log(30.))**2 / tE_sigma**2) # Log-normal centered at 30 days
 
 def ln_p_m0(m0, median_mag, mag_rms):
     """ Prior on reference magnitude m0. This will be a Gaussian around 
         the median magnitude of the light curve
     """
-    return -0.5*np.log(2.*np.pi*mag_rms) - (m0 - median_mag)**2 / (2.*mag_rms**2)
+    mag_rms *= 5
+    return -0.5 * (np.log(2.*np.pi*mag_rms) + (m0 - median_mag)**2 / mag_rms**2)
 
 def ln_prior(p, mag, mjd):
-    m0, u0, t0, tE = p
+    m0, u0, t0, tE = p    
+    return ln_p_u0(u0) + ln_p_t0(t0, mjd, mag) + ln_p_tE(tE) + ln_p_m0(m0, np.median(mag), np.std(mag))
+
+def plot_priors(light_curve, ln=False):
+    mag = light_curve.mag
+    mjd = light_curve.mjd
     
-    p_u0 = ln_p_u0(u0)
-    p_t0 = ln_p_t0(t0, mjd.min(), mjd.max())
-    p_tE = ln_p_tE(tE)
-    p_m0 = ln_p_m0(m0, np.median(mag), np.std(mag))
+    plt.figure(figsize=(15,15))
     
-    #logger.debug("Prior on u0: {}".format(p_u0))
-    #logger.debug("Prior on t0: {}".format(p_t0))
-    #logger.debug("Prior on tE: {}".format(p_tE))
-    #logger.debug("Prior on m0: {}".format(p_m0))
+    plt.subplot(221)
+    x = np.linspace(np.median(mag) - 5., np.median(mag) + 5., 100)
+    if ln: 
+        plt.plot(x, ln_p_m0(x, np.median(mag), np.std(mag)), "k-")
+        plt.xlabel(r"$\log m_0$")
+    else:
+        plt.plot(x, np.exp(ln_p_m0(x, np.median(mag), np.std(mag))), "k-")
+        plt.xlabel(r"$m_0$")
     
-    return ln_p_u0(u0) + ln_p_t0(t0, mjd.min(), mjd.max()) + ln_p_tE(tE) + ln_p_m0(m0, np.median(mag), np.std(mag))
+    plt.subplot(222)
+    x = np.linspace(0., 1.34, 100)
+    if ln: 
+        plt.plot(x, [ln_p_u0(xi) for xi in x], "k-")
+        plt.xlabel(r"$\log u_0$")
+    else:
+        plt.plot(x, np.exp([ln_p_u0(xi) for xi in x]), "k-")
+        plt.xlabel(r"$u_0$")
+    
+    plt.subplot(223)
+    x = np.linspace(mjd.min(), mjd.max(), 100)
+    if ln: 
+        plt.plot(x, ln_p_t0(x, mjd, mag), "k-")
+        plt.xlabel(r"$\log t_0$")
+    else:
+        plt.plot(x, np.exp(ln_p_t0(x, mjd, mag)), "k-")
+        plt.xlabel(r"$t_0$")
+    
+    plt.subplot(224)
+    x = 10**np.linspace(0, 3, 100)
+    if ln: 
+        plt.plot(x, ln_p_tE(x), "k-")
+        plt.xlabel(r"$\log t_E$")
+    else:
+        plt.plot(x, np.exp(ln_p_tE(x)), "k-")
+        plt.xlabel(r"$t_E$")
+    
+    plt.savefig("plots/test.png")
 
 def ln_posterior(p, mag, mjd, sigma):
     return ln_prior(p, mag, mjd) + ln_likelihood(p, mag, mjd, sigma)
@@ -203,6 +229,9 @@ def fit_model_to_light_curve(light_curve, nwalkers=200, nburn_in=100, nsamples=2
     
     return sampler
 
+def V(p, mag, mjd, sigma):
+    np.append(chi(p, mag, mjd, sigma), 
+
 if __name__ == "__main__":
     
     from argparse import ArgumentParser
@@ -230,19 +259,25 @@ if __name__ == "__main__":
         test_ln_prior()
         sys.exit(0)
     
-    field = pdb.Field(100043, "R")
+    field = pdb.Field(3756, "R")
     for ccd in field.ccds.values():
         chip = ccd.read()
         
-        sources = chip.sources.readWhere("(ngoodobs > 25) & (vonNeumannRatio < 1.0) & (vonNeumannRatio > 0)")
+        sources = chip.sources.readWhere("(ngoodobs > 100) & (referenceMag < 16)")
         logger.info("{} sources".format(len(sources)))
         
         for source in sources:
             light_curve = ccd.light_curve(source["matchedSourceID"], clean=True, barebones=True)
             
             if len(light_curve.mjd) > 100:
+                
+                light_curve = SimulatedLightCurve.from_ptflightcurve(light_curve)
+                light_curve.addMicrolensingEvent(t0=55954, u0=0.9, tE=21.5694)
+                
+                #plot_priors(light_curve, ln=True)
+                
                 logger.debug(source["matchedSourceID"])
-                sampler = fit_model_to_light_curve(light_curve, nwalkers=500, nsamples=1000)
+                sampler = fit_model_to_light_curve(light_curve, nwalkers=200, nsamples=1000)
                 
                 plt.clf()
                 for i,name in enumerate(["m0", "u0", "t0", "tE"]):
@@ -266,4 +301,6 @@ if __name__ == "__main__":
                 ax.set_xlabel("MJD")
                 ax.set_ylabel("R")
                 fig.savefig("plots/event_fitter/field{}_ccd{}_source{}_fit.png".format(field.id, ccd.id, source["matchedSourceID"]))
+                
+                sys.exit(0)
         
