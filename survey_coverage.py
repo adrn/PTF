@@ -30,6 +30,7 @@ import apwlib.geometry as g
 # Project
 import ptf.photometricdatabase as pdb
 from ptf.globals import camera_size_degrees
+import ptf.globals as pg
 
 # Create logger for this module
 logger = logging.getLogger(__name__)
@@ -68,7 +69,8 @@ class SurveyInfo(object):
         """ Return a list of fields with more than the above number of observations """
         
         rows = self._fields_exposures[self._fields_exposures["num_exposures"] >= min_num_observations]
-        return [pdb.Field(row["field"], self.filter, number_of_exposures=row["num_exposures"]) for row in rows]
+        fields = [pdb.Field(row["field"], self.filter, number_of_exposures=row["num_exposures"]) for row in rows]
+        return [f for f in fields if f.ra != None]
 
 def get_fields_exposures(filter, filename=None, overwrite=False):
     """ Given a filter, go to the PTF photometric database and get information about all PTF
@@ -389,6 +391,34 @@ def fields_to_coverage_plot(fields):
         cov_plot.add_field(field, **kwargs)
     
     return cov_plot
+
+def get_overlapping_fields(ra, dec, fields=None, filter="R", size=1.):
+    """ Given a position and a region size (in degrees), get all fields
+        that overlap that region.
+    """
+    R = size + pg.camera_size_radius
+    
+    if not isinstance(ra, g.Angle):
+        if isinstance(ra, str):
+            ra = g.RA(ra)
+        else:
+            ra = g.RA.fromDegrees(ra)
+    
+    if not isinstance(dec, g.Angle):
+        # Assume dec is degrees
+        dec = g.Dec(dec)
+    
+    if fields == None:
+        s_info = SurveyInfo(filter=filter)
+        fields = s_info.fields(1)
+    
+    matched_fields = []
+    for field in fields:
+        dist = g.subtends_degrees(ra.degrees, dec.degrees, field.ra.degrees, field.dec.degrees)
+        if dist <= R:
+            matched_fields.append(field)
+    
+    return matched_fields
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
