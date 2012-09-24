@@ -202,7 +202,7 @@ def detection_efficiency_for_field(field, ccds=range(12), config=dict(), overwri
             # Nsteps is the number of steps this routine has to take to converge -- just used for diagnostics
             Nsteps = 0
             while True:
-                fpr = sum((these_statistics > (mu + Nsigma*sigma)) | (these_statistics < (mu - Nsigma*sigma))) / float(len(these_statistics))
+                fpr = np.sum((these_statistics > (mu + Nsigma*sigma)) | (these_statistics < (mu - Nsigma*sigma))) / float(len(these_statistics))
                 logger.debug("Step: {}, FPR: {}".format(Nsteps, fpr))
                 
                 # WARNING: If you don't use enough simulations, this may never converge!
@@ -215,7 +215,7 @@ def detection_efficiency_for_field(field, ccds=range(12), config=dict(), overwri
                 
                 Nsteps += 1
                 
-                if Nsteps > 10000:
+                if Nsteps > 1000:
                     logger.warn("{} didn't converge!".format(index))
                     break
                 
@@ -257,6 +257,7 @@ def detection_efficiency_for_field(field, ccds=range(12), config=dict(), overwri
     
     # Now compute the detection efficiency of each index using the selection criteria from the false positive rate simulation
     selected_distributions = {}
+    detection_efficiencies = {}
     for index in indices:        
         this_index_values = np.log10(simulated_microlensing_statistics[index])
         selected_ml_statistics = simulated_microlensing_statistics[(this_index_values > selection_criteria[index]["upper"]) | (this_index_values < selection_criteria[index]["lower"])]
@@ -264,13 +265,14 @@ def detection_efficiency_for_field(field, ccds=range(12), config=dict(), overwri
         
         total_detection_efficiency = len(selected_ml_statistics) / float(len(simulated_microlensing_statistics[index]))
         print "{}, eff={}".format(index, total_detection_efficiency)
+        detection_efficiencies[index] = total_detection_efficiency
     
     if plot:
-        plot_distributions(selected_distributions, simulated_microlensing_statistics, params=["tE", "u0", "m"], filename=plot_filename)
+        plot_distributions(selected_distributions, simulated_microlensing_statistics,detection_efficiencies, params=["tE", "u0", "m"], filename=plot_filename, indices=indices)
         
     return simulated_microlensing_statistics, selected_distributions
 
-def plot_distributions(selected_distributions, simulated_microlensing_statistics, params=["u0", "tE"], Nbins=50, filename=None):
+def plot_distributions(selected_distributions, simulated_microlensing_statistics, detection_efficiencies, params=["u0", "tE"], Nbins=50, filename=None, indices=None):
     """ Plot the distributions of u0 and tE for all selected events for the indices """
     
     if filename == None:
@@ -282,22 +284,51 @@ def plot_distributions(selected_distributions, simulated_microlensing_statistics
                   "u0" : np.linspace(0., 1.34, Nbins),
                   "m" : np.linspace(14.3, 21.5, Nbins)}
     
+    if indices == None:
+        indices = selected_distributions.keys()
+    
     for ii,param in enumerate(params):
         bins = None
-        for jj,index in enumerate(selected_distributions.keys()):
+        for jj,index in enumerate(indices):
             n, bins, patches = axes[ii,jj].hist(simulated_microlensing_statistics[param], bins=param_bins[param], histtype="step", color="r")
-            n, bins, patches = axes[ii,jj].hist(selected_distributions[index][param], bins=param_bins[param], histtype="step", color="k", alpha=0.7)
+            try:
+                n, bins, patches = axes[ii,jj].hist(selected_distributions[index][param], bins=param_bins[param], histtype="step", color="k", alpha=0.7)
+            except ValueError:
+                logging.warn("Failed to create histogram for {}".format(index))
             
             if jj == 0:
-                axes[ii,jj].set_ylabel(param)
+                axes[ii,jj].set_ylabel(param, fontsize=24)
+            
+            if ii == 0:
+                axes[ii,jj].set_title(r"Total $\varepsilon$={:.1f}".format(detection_efficiencies[index]*100.))
             
             if ii == (len(params)-1):
-                axes[ii,jj].set_xlabel(index)
+                axes[ii,jj].set_xlabel(index_to_label[index], fontsize=24)
             
             if param == "tE":
                 axes[ii,jj].set_xscale("log")
     
+    fig.suptitle("Field: {}".format(field.id))
     fig.savefig(filename)
+
+def get_best_light_curve(field, ccd_id):
+    ccd = field.ccds[ccd_id]
+    chip = ccd.read()
+    sources = chip.sources.readWhere("ngoodobs > 100")
+    obses = [s["ngoodobs"] for s in sources]
+    idx = np.array(obses).argmax()
+    source = sources[idx]
+    light_curve = ccd.light_curve(source["matchedSourceID"], clean=True, barebones=True)
+    ccd.close()    
+    return light_curve
+
+def plot_best_light_curve(field_id, ccd_id):
+    field = pdb.Field(field_id, "R")
+    lc = get_best_light_curve(field, ccd_id)
+    fig = plt.figure(figsize=(15,10))
+    ax = fig.add_subplot(111)
+    lc.plot(ax)
+    fig.savefig("plots/new_detection_efficiency/example_light_curve_f{}_ccd{}.png".format(field.id, ccd_id))
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
@@ -328,7 +359,8 @@ if __name__ == "__main__":
     else:
         logger.setLevel(logging.INFO)
     
-    indices = ["eta","sigma_mu","j","k", "delta_chi_squared"]
+    #indices = ["eta","sigma_mu","j","k", "delta_chi_squared"]
+    indices = ["eta","delta_chi_squared"]
     
     config = dict()
     config["number_of_fpr_light_curves"] = args.limit
@@ -343,7 +375,17 @@ if __name__ == "__main__":
                                                                                                overwrite=args.overwrite, \
                                                                                                indices=indices,
                                                                                                plot=args.plot)
-
+    if args.plot:
+        plot_best_light_curve(args.field_id, 2)
+    sys.exit(0)
+    fig, axes = plt.subplots(1, 1, sharex=True, figsize=(15,10))
+    for ii,field_id in enumerate([4588, 100152, 3756]):
+        field = pdb.Field(field_id, "R")
+        lc = get_best_light_curve(field, 2)
+        axes.plot(lc.mjd, [ii]*len(lc.mjd), "ko", ms=6, alpha=0.15)
+        axes.text(55200, ii+0.1, str(field_id))
+    axes.set_ylim(-0.2, 2.2)
+    fig.savefig("plots/new_detection_efficiency/example_light_curves.png")
 #
 # Some older stuff
 #
