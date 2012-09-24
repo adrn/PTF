@@ -114,11 +114,11 @@ def ln_p_u0(u0):
     else:
         return -np.log(1.34)
 
-def ln_p_t0(t0, mjd, mag, t0_sigma=5.):
+def ln_p_t0(t0, mjd, mag, t0_sigma=25.):
     """ Prior on time of event t0 """
     return -0.5 * (np.log(2.*np.pi*t0_sigma) + (t0 - mjd[np.argmin(mag)])**2 / t0_sigma**2)
 
-def ln_p_tE(tE, tE_sigma=1.):
+def ln_p_tE(tE, tE_sigma=1.3):
     """ Prior on duration of event tE """
     return -0.5 * (np.log(2.*np.pi*tE_sigma) + (np.log(tE) - np.log(30.))**2 / tE_sigma**2) # Log-normal centered at 30 days
 
@@ -127,7 +127,7 @@ def ln_p_m0(m0, median_mag, mag_rms):
         the median magnitude of the light curve
     """
     mag_rms *= 5
-    return -0.5 * (np.log(2.*np.pi*mag_rms) + (m0 - median_mag)**2 / mag_rms**2)
+    return -0.5 * (np.log(2.*np.pi*mag_rms) + (m0 - median_mag)**2 / (2.*mag_rms)**2)
 
 def ln_prior(p, mag, mjd):
     m0, u0, t0, tE = p    
@@ -213,7 +213,7 @@ def fit_model_to_light_curve(light_curve, nwalkers=200, nburn_in=100, nsamples=2
     #                10**np.random.uniform(0., 3.)] for ii in range(nwalkers)])
     p0 = np.array([[np.random.normal(np.median(light_curve.mag), np.std(light_curve.mag)),
                     np.random.uniform(0., 1.34),
-                    np.random.uniform(light_curve.mjd.min()-10., light_curve.mjd.min()+10.),
+                    np.random.uniform(light_curve.mjd.min()-50., light_curve.mjd.min()+50.),
                     10**np.random.uniform(0.3, 3.)] for ii in range(nwalkers)])
     ndim = p0.shape[1]
     
@@ -229,9 +229,6 @@ def fit_model_to_light_curve(light_curve, nwalkers=200, nburn_in=100, nsamples=2
     
     return sampler
 
-def V(p, mag, mjd, sigma):
-    np.append(chi(p, mag, mjd, sigma), 
-
 if __name__ == "__main__":
     
     from argparse import ArgumentParser
@@ -243,6 +240,22 @@ if __name__ == "__main__":
                     help="Be quiet! (default = False)")
     parser.add_argument("--test", action="store_true", dest="test", default=False,
                     help="Run tests, then exit.")
+    
+    parser.add_argument("-f", dest="field_id", default=None, required=True, type=int,
+                    help="Field ID")
+    parser.add_argument("-c", dest="ccd_id", default=None, required=True, type=int,
+                    help="CCD ID")
+    parser.add_argument("-s", dest="source_id", default=None, required=True, type=int,
+                    help="Source ID")
+    parser.add_argument("--clean", dest="clean", action="store_true", default=False,
+                    help="Clean the light curve")
+    
+    parser.add_argument("--walkers", dest="walkers", default=200, type=int,
+                    help="Number of walkers")
+    parser.add_argument("--steps", dest="steps", default=1000, type=int,
+                    help="Number of steps to take")
+    parser.add_argument("--burn-in", dest="burn_in", default=100, type=int,
+                    help="Number of steps to burn in")
     
     args = parser.parse_args()
     
@@ -259,48 +272,55 @@ if __name__ == "__main__":
         test_ln_prior()
         sys.exit(0)
     
-    field = pdb.Field(3756, "R")
-    for ccd in field.ccds.values():
-        chip = ccd.read()
-        
-        sources = chip.sources.readWhere("(ngoodobs > 100) & (referenceMag < 16)")
-        logger.info("{} sources".format(len(sources)))
-        
-        for source in sources:
-            light_curve = ccd.light_curve(source["matchedSourceID"], clean=True, barebones=True)
-            
-            if len(light_curve.mjd) > 100:
+    field = pdb.Field(args.field_id, "R")
+    ccd = field.ccds[args.ccd_id]
+    light_curve = ccd.light_curve(args.source_id, clean=args.clean, barebones=True)
+    if args.source_id == 5466:
+        idx = light_curve.mag > 18.25
+        light_curve.mjd = light_curve.mjd[idx]
+        light_curve.mag = light_curve.mag[idx]
+        light_curve.error = light_curve.error[idx]
+    sampler = fit_model_to_light_curve(light_curve, nwalkers=args.walkers, nsamples=args.steps, nburn_in=args.burn_in)
                 
-                light_curve = SimulatedLightCurve.from_ptflightcurve(light_curve)
-                light_curve.addMicrolensingEvent(t0=55954, u0=0.9, tE=21.5694)
-                
-                #plot_priors(light_curve, ln=True)
-                
-                logger.debug(source["matchedSourceID"])
-                sampler = fit_model_to_light_curve(light_curve, nwalkers=200, nsamples=1000)
-                
-                plt.clf()
-                for i,name in enumerate(["m0", "u0", "t0", "tE"]):
-                    plt.subplot(2,2,i+1)
-                    plt.hist(sampler.flatchain[:,i], 100, color="k", histtype="step")
-                    plt.title("{}".format(name))
-                    plt.ylabel("Posterior Probability")
-                
-                plt.savefig("plots/event_fitter/field{}_ccd{}_source{}_posterior.png".format(field.id, ccd.id, source["matchedSourceID"]))
-                
-                fig = plt.figure()
-                ax = fig.add_subplot(111)
-                mjd = np.arange(light_curve.mjd.min(), light_curve.mjd.max(), 0.2)
-                for link in sampler.flatchain[-25:]:
-                    m0, u0, t0, tE = link
-                    s_light_curve = SimulatedLightCurve(mjd=mjd, error=np.zeros_like(mjd), mag=m0)
-                    s_light_curve.addMicrolensingEvent(t0=t0, u0=u0, tE=tE)
-                    ax.plot(s_light_curve.mjd, s_light_curve.mag, "k-", alpha=0.2)
-                
-                light_curve.plot(ax)
-                ax.set_xlabel("MJD")
-                ax.set_ylabel("R")
-                fig.savefig("plots/event_fitter/field{}_ccd{}_source{}_fit.png".format(field.id, ccd.id, source["matchedSourceID"]))
-                
-                sys.exit(0)
+    plt.clf()
+    plt.figure(figsize=(15,15))
+    for i,name in enumerate(["m0", "u0", "t0", "tE"]):
+        plt.subplot(2,2,i+1)
+        plt.hist(sampler.flatchain[:,i], 100, color="k", histtype="step")
+        plt.title("{}".format(name))
+        plt.ylabel("Posterior Probability")
+    
+    plt.savefig("plots/event_fitter/field{}_ccd{}_source{}_posterior.png".format(field.id, ccd.id, args.source_id))
+    
+    fig = plt.figure(figsize=(8,8))
+    ax = fig.add_subplot(111)
+    ax_inset = fig.add_axes([0.65, 0.65, 0.25, 0.25])
+    
+    mjd = np.arange(light_curve.mjd.min(), light_curve.mjd.max(), 0.2)
+    end_chain = sampler.flatchain[-100:]
+    first_t0 = None
+    for ii in np.random.randint(100, size=10):
+        link = end_chain[ii]
+        m0, u0, t0, tE = link
+        if first_t0 == None:
+            first_t0 = t0
+        s_light_curve = SimulatedLightCurve(mjd=mjd, error=np.zeros_like(mjd), mag=m0)
+        s_light_curve.addMicrolensingEvent(t0=t0, u0=u0, tE=tE)
+        ax.plot(s_light_curve.mjd-first_t0, s_light_curve.mag, "r-", alpha=0.2)
+        ax_inset.plot(s_light_curve.mjd-first_t0, s_light_curve.mag, "r-", alpha=0.2)
+    
+    light_curve.mjd -= first_t0
+    light_curve.plot(ax)
+    ax.set_xlim(-4.*tE, 4.*tE)
+    ax.text(-3.5*tE, np.max(s_light_curve.mag)+0.2, r"$u_0\approx${u0:.3f}".format(u0=u0) + "\n" + r"$t_E\approx${tE:.2f} days".format(tE=tE))
+    ax.set_xlabel(r"time-$t_0$ [days]", fontsize=24)
+    ax.set_ylabel(r"$M_R$", fontsize=24)
+    
+    light_curve.plot(ax_inset)
+    ax_inset.set_ylim(light_curve.mag.min()+abs(light_curve.mag.min()-m0)/6., light_curve.mag.min()-0.05)
+    ax_inset.set_xlim(-0.3*tE, 0.3*tE)
+    ax_inset.set_xticklabels([])
+    ax_inset.set_yticklabels([])
+    
+    fig.savefig("plots/event_fitter/field{}_ccd{}_source{}.png".format(field.id, ccd.id, args.source_id))
         
