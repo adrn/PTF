@@ -5,6 +5,14 @@ from __future__ import division
     Interface for the PTF microlensing event candidate database 
     (using MongoDB)
     
+    Server: deimos.astro.columbia.edu
+    Database: ptf
+    Collections:
+        light_curves -- where the actual light curve data is stored
+        candidate_status -- used to store the status of a candidate, e.g. "boring", "interesting", etc.
+        table_state -- used to store the state of the table on my PTF candidate website
+        selection_criteria -- we run simulations for each field to compute the selection boundary for eta
+    
 """
 
 __author__ = "adrn <adrn@astro.columbia.edu>"
@@ -14,11 +22,13 @@ import os, sys
 import logging
 
 # Third-party
-import pymongo
 import numpy as np
+import pymongo
 
 # Project 
 from ..ptflightcurve import PDBLightCurve
+from ..globals import config
+from ..analyze import analyze as pa
 
 # Create logger for this module
 logger = logging.getLogger(__name__)
@@ -26,19 +36,32 @@ ch = logging.StreamHandler()
 formatter = logging.Formatter("%(name)s / %(levelname)s / %(message)s")
 ch.setFormatter(formatter)
 logger.addHandler(ch)
-   
+
+# Database connection
+def PTFConnection():
+    connection = pymongo.Connection(config["db_address"], config["db_port"])
+    ptf = connection.ptf # the database
+    ptf.authenticate(config["db_user"], config["db_password"])
+    return ptf
+
 def light_curve_to_document(light_curve, **kwargs):
     """ Converts a PTFLightCurve object into a dictionary to be
         loaded into MongoDB.
     """
     document = dict()
     
-    for key,value in kwargs.items():
-        document[key] = value
+    if not kwargs.has_key("indices"):
+        # Compute indices
+        document["indices"] = pa.compute_variability_indices(light_curve, indices=["eta", "j", "k", "delta_chi_squared", "sigma_mu"])
+    
+    if not kwargs.has_key("microlensing_fit"):
+        # Compute microlensing fit parameters
+        document["microlensing_fit"] = pa.fit_microlensing_event(light_curve)
     
     document["mjd"] = list(light_curve.mjd)
     document["mag"] = list(light_curve.mag)
     document["error"] = list(light_curve.error)
+    document["filter"] = "R"
     
     try:
         document["field_id"] = light_curve.field_id
@@ -48,22 +71,23 @@ def light_curve_to_document(light_curve, **kwargs):
         print "You must pass a PTF PDBLightCurve object in, not a PTFLightCurve object"
         raise
     
+    document["tags"] = []
+    
     return document
 
 def document_to_light_curve(document):
     """ Converts a MongoDB document dictionary back into a PTF Light Curve object """
             
-    #return PDBLightCurve(mjd=document["mjd"], mag=document["mag"], error=document["error"],
-    #                     field_id=document["field_id"], ccd_id=document["ccd_id"], source_id=document["source_id"])
     return PDBLightCurve(**document)    
 
-def get_light_curve_from_collection(field, ccd, source_id, collection):
+def get_light_curve_from_collection(field, ccd, source_id, collection, filter="R"):
     """ Get a light curve from MongoDB from the specified field, ccd, and source_id """
     
     if isinstance(field, int):
         field_id = field
     else:
         field_id = int(field.id)
+        filter = field.filter.name
     
     if isinstance(ccd, int):
         ccd_id = ccd
@@ -72,55 +96,52 @@ def get_light_curve_from_collection(field, ccd, source_id, collection):
     
     document = collection.find_one({"field_id" : field_id,
                                     "ccd_id" : ccd_id,
-                                    "source_id" : int(source_id)})
+                                    "source_id" : int(source_id),
+                                    "filter" : filter})
     
     if document == None:
         return None
     else:
         return document_to_light_curve(document)
 
-def save_light_curve_to_collection(light_curve, collection, **kwargs):
+def save_light_curve_document_to_collection(light_curve_document, collection, overwrite=False):
     """ Saves the given light curve to the specified mongodb collection """
     
-    search_existing = collection.find_one({"field_id" : light_curve.field_id,
-                                           "ccd_id" : light_curve.ccd_id,
-                                           "source_id" : light_curve.source_id})
+    search_existing = collection.find_one({"field_id" : light_curve_document["field_id"],
+                                           "ccd_id" : light_curve_document["ccd_id"],
+                                           "source_id" : light_curve_document["source_id"],
+                                           "filter" : light_curve_document["filter"]})
     
     if search_existing != None:
-        logger.warning("Light curve {} {} {} already exists in database!".format(light_curve.field_id, light_curve.ccd_id, light_curve.source_id))
+        if overwrite:
+            logger.debug("Overwriting existing light curve {} {} {}".format(light_curve_document["field_id"], light_curve_document["ccd_id"], light_curve_document["source_id"]))
+            collection.remove({"field_id" : light_curve_document["field_id"],
+                               "ccd_id" : light_curve_document["ccd_id"],
+                               "source_id" : light_curve_document["source_id"]})
+        else:
+            logger.debug("Light curve {} {} {} already exists in database!".format(light_curve_document["field_id"], light_curve_document["ccd_id"], light_curve_document["source_id"]))
+            return False
     else:
-        document = light_curve_to_document(light_curve, **kwargs)
-        collection.insert(document)
+        collection.insert(light_curve_document)
     
     return True
 
-def update_candidate_status(field_id, ccd_id, source_id, status, light_curve_collection, candidate_status_collection):
-    """ Update the candidate status for a given light curve """
+def add_tag_to_light_curve_document(light_curve_document, tag, light_curve_collection):
+    """ Add a tag to the light curve object """
     
-    # First get the light curve data from the light curve collection
-    search = {}
-    search["field_id"] = field_id
-    search["ccd_id"] = ccd_id
-    search["source_id"] = source_id
-    raw_candidate = light_curve_collection.find_one(search)
+    update = light_curve_collection.update({"_id" : light_curve_document["_id"]},\
+                                           {"$addToSet": { "tags" : tag } });
+
+    return update
+
+def remove_tag_from_light_curve_document(light_curve_document, tag, light_curve_collection):
+    """ Remove a tag from the light curve object """
     
-    if raw_candidate == None:
-        logger.warning("Light curve not found in mongodb!")
-        return False
-    
-    # Now check to see if the candidate_status collection already has a record for this light curve
-    candidate_status = candidate_status_collection.find_one({"light_curve_id" : raw_candidate["_id"]})
-    
-    logger.debug("Candidate status in db: " + str(candidate_status))
-    
-    print candidate_status
-    
-    if candidate_status == None:
-        candidate_status = dict()
-        candidate_status["light_curve_id"] = raw_candidate["_id"]
-        candidate_status["status"] = status
-        candidate_status_collection.insert(candidate_status, safe=True)
-    else:
-        candidate_status_collection.update({"light_curve_id" : raw_candidate["_id"]}, {"$set" : {"status" : status}})
-    
-    return True
+    update = light_curve_collection.update({"_id" : light_curve_document["_id"]},\
+                                           {"$pull": { "tags" : tag } });
+
+    return update
+
+def update_light_curves(collection):
+    """ Update the data in all the light curves in the specified collection """
+    # TODO!
