@@ -8,10 +8,12 @@ __author__ = "adrn <adrn@astro.columbia.edu>"
 # Standard library
 import os
 import math
+import copy
 
 # Third-party
 import numpy as np
 import scipy.optimize as so
+from lmfit import minimize, Parameters
 
 try:
     from apwlib.globals import greenText, yellowText, redText
@@ -42,16 +44,60 @@ gaussian_model = lambda p, x: p[0]*np.exp(-(x - p[1])**2 / (2*p[2]**2)) + p[3]
 # ------
 # Models
 # ------
-def error_function(p, x, y, sigma_y, model):
-    return (y - model(p,x)) / sigma_y
 
-def u_t(p, t):
-    return np.sqrt(p[0]**2 + ((t - p[1])/p[2])**2)
-
-def A_u(u):
+def A(p, t):
+    """ Microlensing amplifiction factor """
+    u = np.sqrt(p["u0"].value*p["u0"].value + ((t-p["t0"].value)/p["tE"].value)**2)
     return (u**2 + 2) / (u*np.sqrt(u**2 + 4))
 
-microlensing_flux_model = lambda t, p: p[0]*A_u(u_t(p[1:], t))
+def microlensing_model(p, t):
+    """ """
+    return p["m0"].value - 2.5*np.log10(A(p, t))
+
+def microlensing_error_func(p, t, mag, sigma):
+    return (mag - microlensing_model(p, t)) / sigma
+
+def fit_subtract_microlensing(light_curve):
+    """ Fit and subtract a microlensing event to the light curve """
+    
+    params = Parameters()
+    params.add('tE', value=20, min=2., max=1000.)
+    params.add('t0', value=light_curve.mjd[np.argmin(light_curve.mag)], min=light_curve.mjd.min(), max=light_curve.mjd.max())
+    params.add('u0', value=0.5, min=0.0, max=1.34)
+    params.add('m0', value=np.median(light_curve.mag))
+    
+    result = minimize(microlensing_error_func, params, args=(light_curve.mjd, light_curve.mag, light_curve.error))
+    
+    #print result.chisqr, result.success, result.ier
+    #print 'Best-Fit Values:'
+    #for name, par in params.items():
+    #    print '  %s = %.4f +/- %.4f ' % (name, par.value, par.stderr)
+    
+    light_curve_new = copy.copy(light_curve)
+    light_curve_new.mag = light_curve.mag - microlensing_model(params, light_curve_new.mjd)
+    
+    light_curve.tE = params["tE"].value
+    light_curve.t0 = params["t0"].value
+    light_curve.u0 = params["u0"].value
+    light_curve.m0 = params["m0"].value
+    
+    return light_curve_new
+
+def fit_microlensing_event(light_curve):
+    """ Fit and subtract a microlensing event to the light curve """
+    
+    params = Parameters()
+    params.add('tE', value=20, min=2., max=1000.)
+    params.add('t0', value=light_curve.mjd[np.argmin(light_curve.mag)], min=light_curve.mjd.min(), max=light_curve.mjd.max())
+    params.add('u0', value=0.5, min=0.0, max=1.34)
+    params.add('m0', value=np.median(light_curve.mag))
+    
+    result = minimize(microlensing_error_func, params, args=(light_curve.mjd, light_curve.mag, light_curve.error))
+    
+    return {"tE" : params["tE"].value, \
+            "t0" : params["t0"].value, \
+            "u0" : params["u0"].value, \
+            "m0" : params["m0"].value}
 
 # -------------
 # Analysis code
