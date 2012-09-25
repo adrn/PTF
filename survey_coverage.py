@@ -39,7 +39,7 @@ formatter = logging.Formatter("%(name)s / %(levelname)s / %(message)s")
 ch.setFormatter(formatter)
 logger.addHandler(ch)
 
-all_fields = np.load(os.path.join("data", "all_fields.npy"))
+all_fields = np.load(os.path.join(os.path.split(pg._base_path)[0], "data", "all_fields.npy"))
 
 class SurveyInfo(object):
     """ Some example use cases for this object:
@@ -61,7 +61,7 @@ class SurveyInfo(object):
         if not isinstance(filter, pdb.Filter):
             self.filter = pdb.Filter(filter)
         
-        cache_filename = os.path.join("data", "survey_coverage", "fields_observations_{}.npy".format(str(self.filter)))
+        cache_filename = os.path.join(os.path.split(pg._base_path)[0], "data", "survey_coverage", "fields_observations_{}.npy".format(str(self.filter)))
         self._fields_exposures = get_fields_exposures(self.filter, filename=cache_filename, overwrite=overwrite)
         self.timestamp = datetime.datetime.strptime(time.ctime(os.path.getmtime(cache_filename)), "%a %b %d %H:%M:%S %Y")
         

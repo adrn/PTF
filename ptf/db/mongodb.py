@@ -27,8 +27,9 @@ import pymongo
 
 # Project 
 from ..ptflightcurve import PDBLightCurve
-from ..globals import config
+from ..globals import config, _base_path
 from ..analyze import analyze as pa
+from ..photometricdatabase import Field
 
 # Create logger for this module
 logger = logging.getLogger(__name__)
@@ -132,24 +133,6 @@ def save_light_curve_document_to_collection(light_curve_document, collection, ov
     
     return True
 
-'''
-def add_tag_to_light_curve_document(light_curve_document, tag, light_curve_collection):
-    """ Add a tag to the light curve object """
-    
-    update = light_curve_collection.update({"_id" : light_curve_document["_id"]},\
-                                           {"$addToSet": { "tags" : tag.lower() } });
-
-    return update
-
-def remove_tag_from_light_curve_document(light_curve_document, tag, light_curve_collection):
-    """ Remove a tag from the light curve object """
-    
-    update = light_curve_collection.update({"_id" : light_curve_document["_id"]},\
-                                           {"$pull": { "tags" : tag.lower() } });
-
-    return update
-'''
-
 def update_light_curve_document_tags(light_curve_document, tags, light_curve_collection):
     """ Add a tag to the light curve object """
     
@@ -192,3 +175,26 @@ def field_to_document(field, **kwargs):
             continue
     
     return new_field
+
+def load_all_fields(field_collection):
+    """ Load all of the field information into mongodb """
+    
+    R_fields = np.load("data/survey_coverage/fields_observations_R.npy")
+    loaded_field_ids = [a["_id"] for a in field_collection.find(fields=["_id"])]
+    
+    field_ids_to_load = list(set(R_fields["field"]).difference(set(loaded_field_ids)))
+    
+    for field_id in field_ids_to_load:
+        field = Field(field_id)
+        
+        # Double check that it's not already in there!
+        if field_collection.find_one({"_id" : field.id}) != None:
+            logger.info("Field is already loaded! What happened?! {}".format(field.id))
+            continue
+            
+        field_doc = field_to_document(field)
+        field_collection.insert(field_doc)
+        logger.debug("Field loaded into mongodb {}".format(field.id))
+    
+    return True
+    

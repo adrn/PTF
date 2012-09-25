@@ -1,4 +1,5 @@
 import os
+import numpy as np
 
 # PTF Stats
 pix_scale = 1.01 #arcsec / pixel
@@ -39,3 +40,5 @@ def source_index_name_to_pdb_index(source, index_name):
         return source[pdb_index_name[index_name][0]] / source[pdb_index_name[index_name][1]]            
     else:
         return source[pdb_index_name[index_name]]
+
+all_fields = np.load(os.path.join(os.path.split(_base_path)[0], "data", "all_fields.npy"))
