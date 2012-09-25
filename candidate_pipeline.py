@@ -233,12 +233,8 @@ def select_candidates(field, selection_criteria):
             if len(light_curve.mjd) < min_number_of_good_observations: continue
             
             # Re-compute eta now that we've (hopefull) cleaned out any bad data
-            clean_eta = pa.eta(light_curve)
-            light_curve.eta = clean_eta
-
-            # Compute delta chi-squared
-            delta_chi_squared = pa.gaussian_line_delta_chi_squared(light_curve)
-            light_curve.delta_chi_squared = delta_chi_squared
+            indices = pa.compute_variability_indices(light_curve, indices=["eta", "delta_chi_squared", "j", "k", "sigma_mu"])
+            light_curve.indices = indices
             
             # Try to fit a microlensing model, then subtract it, then recompute eta and see
             #   if it is still an outlier
@@ -246,9 +242,9 @@ def select_candidates(field, selection_criteria):
             new_eta = pa.eta(new_light_curve)
             baseline = light_curve.mjd.max() - light_curve.mjd.min()
             
-            if (clean_eta <= lower_cut) and (new_eta >= lower_cut) and \
+            if (indices["eta"] <= lower_cut) and (new_eta >= lower_cut) and \
                (round(light_curve.u0, 2) < 1.34) and (round(light_curve.tE) > 2.) and \
-               (delta_chi_squared > 10.) and (light_curve.tE < 2.*baseline) and (delta_chi_squared > 250):
+               (indices["delta_chi_squared"] > 250.) and (light_curve.tE < 2.*baseline):
                 candidates.append(light_curve)
         
         ccd.close()
@@ -265,7 +261,7 @@ def save_candidates_to_mongodb(candidates, collection):
             logging.error("Candidate light curve has no 'ra' or 'dec' attributes!")
             continue
         
-        light_curve_document = mongo.light_curve_to_document(candidate)
+        light_curve_document = mongo.light_curve_to_document(candidate, indices=candidate.indices)
         mongo.save_light_curve_document_to_collection(light_curve_document, collection)
     
     return True
@@ -303,13 +299,10 @@ if __name__ == "__main__":
     else:
         stream_handler.setLevel(logging.INFO)
         
-    #connection = pymongo.Connection(config["db_address"], config["db_port"])
-    #ptf = connection.ptf # the database
-    #ptf.authenticate(config["db_user"], config["db_password"])
     ptf = mongo.PTFConnection()
-    selection_criteria_collection = ptf.selection_criteria
     light_curve_collection = ptf.light_curves
-    already_searched = ptf.already_searched
+    field_collection = ptf.fields
+    already_searched = ptf.already_searched #HACK
     
     fields = args.field_id
     min_number_of_good_observations = args.min_num_observations
@@ -319,20 +312,37 @@ if __name__ == "__main__":
         fields = all_fields[all_fields["num_exposures"] > args.min_num_observations]["field"]
         logger.info("Chose to run on all fields with >{} observations -- {} fields.".format(args.min_num_observations, len(fields)))
     
-    for field_id in fields:
+    for field_id in sorted(fields[fields > 4383]):
         # Skip field 101001 because it breaks the pipeline for some reason!
         if field_id == 101001: continue
         
         field = pdb.Field(field_id, "R")
         logger.info(redText("Field: {}".format(field.id)))
         
+        try:
+            if field.ra == None or field.dec == None:
+                raise AttributeError()
+        except AttributeError:
+            continue
+            
+        # See if field is in database, remove it if we need to overwrite
+        if args.overwrite:
+            field_collection.remove({"_id" : field.id})
+            
+        field_document = field_collection.find_one({"_id" : field.id})
+        if field_document == None:
+            logger.debug("Field document not found -- creating and loading into mongodb!")
+            field_document = mongo.field_to_document(field)
+            field_collection.insert(field_document)
+        
         lctest = light_curve_collection.find_one({"field_id" : field.id})
-        was_searched = already_searched.find_one({"field_id" : field.id})
-        if lctest != None or was_searched != None: 
+        field_doc = field_collection.find_one({"_id" : field.id}, fields=["already_searched"])
+        was_searched = already_searched.find_one({"field_id" : field.id}) #HACK
+        if lctest != None or field_doc["already_searched"] or was_searched != None: 
             logger.info("Already found in candidate database!")
             continue
             
-        selection_criteria = selection_criteria_collection.find_one({"field_id" : field.id, "index" : "eta"})
+        selection_criteria = field_collection.find_one({"_id" : field.id}, fields=["selection_criteria"])["selection_criteria"]
         
         if args.overwrite or selection_criteria == None:
             logger.info("Selection criteria not available for field.")
@@ -341,15 +351,22 @@ if __name__ == "__main__":
                                                                       number_of_fpr_simulations_per_light_curve=args.num_simulations)
             
             if selection_criteria == None:
-                already_searched.insert({"field_id" : field.id})
+                field_collection.update({"_id" : field.id}, {"$set" : {"already_searched" : True}})
+                #already_searched.insert({"field_id" : field.id})
                 continue
             logger.debug("Done with selection criteria simulation...saving to database")
-            save_selection_criteria(field, selection_criteria, selection_criteria_collection, overwrite=args.overwrite)
+            selection_criteria_document = {}
+            selection_criteria_document["upper"] = selection_criteria["eta"]["upper"]
+            selection_criteria_document["lower"] = selection_criteria["eta"]["lower"]
+            field_collection.update({"_id" : field.id}, {"$set" : {"selection_criteria" : selection_criteria_document}})
+            #save_selection_criteria(field, selection_criteria, selection_criteria_collection, overwrite=args.overwrite)
         
         logger.debug("Selection criteria loaded")
-        selection_criteria = selection_criteria_collection.find_one({"field_id" : field.id, "index" : "eta"})   
-        candidates = select_candidates(field, selection_criteria)
+        selection_criteria_document = field_collection.find_one({"_id" : field.id}, fields=["selection_criteria"])["selection_criteria"]
+
+        candidates = select_candidates(field, selection_criteria_document)
         logger.info("Selected {} candidates after checking light curve data".format(len(candidates)))
         
         save_candidates_to_mongodb(candidates, light_curve_collection)
-        already_searched.insert({"field_id" : field.id})
+        #already_searched.insert({"field_id" : field.id})
+        field_collection.update({"_id" : field.id}, {"$set" : {"already_searched" : True}})
