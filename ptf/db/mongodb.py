@@ -53,10 +53,14 @@ def light_curve_to_document(light_curve, **kwargs):
     if not kwargs.has_key("indices"):
         # Compute indices
         document["indices"] = pa.compute_variability_indices(light_curve, indices=["eta", "j", "k", "delta_chi_squared", "sigma_mu"])
+    else:
+        document["indices"] = kwargs["indices"]
     
     if not kwargs.has_key("microlensing_fit"):
         # Compute microlensing fit parameters
         document["microlensing_fit"] = pa.fit_microlensing_event(light_curve)
+    else:
+        document["microlensing_fit"] = kwargs["microlensing_fit"]
     
     document["mjd"] = list(light_curve.mjd)
     document["mag"] = list(light_curve.mag)
@@ -67,6 +71,8 @@ def light_curve_to_document(light_curve, **kwargs):
         document["field_id"] = light_curve.field_id
         document["ccd_id"] = light_curve.ccd_id
         document["source_id"] = light_curve.source_id
+        document["ra"] = light_curve.ra
+        document["dec"] = light_curve.dec
     except AttributeError:
         print "You must pass a PTF PDBLightCurve object in, not a PTFLightCurve object"
         raise
@@ -126,11 +132,12 @@ def save_light_curve_document_to_collection(light_curve_document, collection, ov
     
     return True
 
+'''
 def add_tag_to_light_curve_document(light_curve_document, tag, light_curve_collection):
     """ Add a tag to the light curve object """
     
     update = light_curve_collection.update({"_id" : light_curve_document["_id"]},\
-                                           {"$addToSet": { "tags" : tag } });
+                                           {"$addToSet": { "tags" : tag.lower() } });
 
     return update
 
@@ -138,10 +145,50 @@ def remove_tag_from_light_curve_document(light_curve_document, tag, light_curve_
     """ Remove a tag from the light curve object """
     
     update = light_curve_collection.update({"_id" : light_curve_document["_id"]},\
-                                           {"$pull": { "tags" : tag } });
+                                           {"$pull": { "tags" : tag.lower() } });
 
     return update
+'''
+
+def update_light_curve_document_tags(light_curve_document, tags, light_curve_collection):
+    """ Add a tag to the light curve object """
+    
+    if not isinstance(tags, list): return False
+    
+    light_curve_collection.update({"_id" : light_curve_document["_id"]},
+                                  {"$set": { "tags" : [tag.lower() for tag in tags] }}
+                                 );
+
+    return True
 
 def update_light_curves(collection):
     """ Update the data in all the light curves in the specified collection """
     # TODO!
+
+def field_to_document(field, **kwargs):
+    """ Turn a PDB Field object into a field document for mongodb """
+    
+    selection_criteria = kwargs.get("selection_criteria", None)
+    
+    new_field = {}
+    new_field["_id"] = field.id
+    new_field["selection_criteria"] = selection_criteria
+    new_field["already_searched"] = False
+    new_field["filter"] = field.filter.name
+    new_field["ra"] = field.ra.degrees
+    new_field["dec"] = field.dec.degrees
+    new_field["exposures"] = {}
+
+    exposures_per_ccd = field.exposures
+    for ccd_id in range(12):
+        try:
+            new_field["exposures"][str(ccd_id)] = {"mjd" : list(exposures_per_ccd[ccd_id]["obsMJD"].astype(float)), \
+                                              "background" : list(exposures_per_ccd[ccd_id]["obsMJD"].astype(float)), \
+                                              "airmass" : list(exposures_per_ccd[ccd_id]["airmass"].astype(float)), \
+                                              "seeing" : list(exposures_per_ccd[ccd_id]["seeing"].astype(float)), \
+                                              "moonIllumFrac" : list(exposures_per_ccd[ccd_id]["moonIllumFrac"].astype(float))
+                                             }
+        except:
+            continue
+    
+    return new_field

@@ -515,12 +515,14 @@ def compute_variability_indices(light_curve, indices=[], return_tuple=False):
         idx_dict["eta"] = eta(light_curve)
     
     if "delta_chi_squared" in indices:
-        idx_dict["delta_chi_squared"] = compute_delta_chi_squared(light_curve,\
+        """idx_dict["delta_chi_squared"] = compute_delta_chi_squared(light_curve,\
                                                                   error_func1=linear_error_func, \
                                                                   model1_initial=(0.0, np.median(light_curve.mag)),\
                                                                   error_func2=gaussian_error_func, \
                                                                   model2_initial=(-5.0, np.median(light_curve.mjd), 5.0, np.median(light_curve.mag))\
                                                                  )
+        """
+        idx_dict["delta_chi_squared"] = gaussian_line_delta_chi_squared(light_curve)
         
     if "continuum" in indices or "sigma_mu" in indices:
         continuum_mag, noise_sigma = estimate_continuum(light_curve, sigma_clip=True)
