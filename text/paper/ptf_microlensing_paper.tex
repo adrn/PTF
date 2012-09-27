@@ -31,7 +31,8 @@
 
 \title{Identifying Microlensing Events in Large, Non-Uniformly Sampled Surveys: The Case
  of the Palomar Transient Factory}
-\author{Adrian~M.~Price-Whelan\altaffilmark{\ref{col}}, Marcel~A.~Ag\"ueros\altaffilmark{\ref{col}}, Amanda Fournier\altaffilmark{\ref{ucsb}}, Rachel Street\altaffilmark{\ref{lcogt}}, Eran Ofek\altaffilmark{\ref{weiz},\ref{eins}}, David Levitan\altaffilmark{\ref{calt}}, Joshua S.\ Bloom\altaffilmark{\ref{cal}}, S.\ Bradley Cenko\altaffilmark{\ref{cal}}, Mansi M.\ Kasliwal\altaffilmark{\ref{calt}}, Shrinivas R.\ Kulkarni\altaffilmark{\ref{calt}}, Nicholas~M.~Law\altaffilmark{\ref{to},\ref{dun}}, Peter Nugent\altaffilmark{\ref{lbnl}}, Dovi Poznanski\altaffilmark{\ref{cal},\ref{calt},\ref{eins}}, Robert M.\ Quimby\altaffilmark{\ref{calt}}}
+\author{Adrian~M.~Price-Whelan\altaffilmark{\ref{col}}, Marcel~A.~Ag\"ueros\altaffilmark{\ref{col}}, Amanda Fournier\altaffilmark{\ref{ucsb}}, Rachel Street\altaffilmark{\ref{lcogt}}, Eran Ofek\altaffilmark{\ref{weiz},\ref{eins}}, David Levitan\altaffilmark{\ref{calt}}, and the PTF Collaboration}
+%, Joshua S.\ Bloom\altaffilmark{\ref{cal}}, S.\ Bradley Cenko\altaffilmark{\ref{cal}}, Mansi M.\ Kasliwal\altaffilmark{\ref{calt}}, Shrinivas R.\ Kulkarni\altaffilmark{\ref{calt}}, Nicholas~M.~Law\altaffilmark{\ref{to},\ref{dun}}, Peter Nugent\altaffilmark{\ref{lbnl}}, Dovi Poznanski\altaffilmark{\ref{cal},\ref{calt},\ref{eins}}, Robert M.\ Quimby\altaffilmark{\ref{calt}}}
 
 \altaffiltext{\theaddress}{\stepcounter{address}\label{col} Department of Astronomy, Columbia University, 550 W 120th St., New York, NY 10027, USA}
 \altaffiltext{\theaddress}{\stepcounter{address}\label{ucsb} Department of Physics, Broida Hall, University of California, Santa Barbara, CA 93106, USA}
@@ -62,30 +63,29 @@ Many current photometric, time-domain surveys are driven by specific goals, such
 \section{Introduction}
 
 \subsection{Overview}
-General relativity tells us that mass alters the propagation of light. In particular, light from a background source passing some mass distribution will be deflected by an angle that depends on the distance between the source and mass distribution, as well as the structure and kinematics of the mass distribution itself. For an observer aligned with a source and a point lensing mass, the relevant angular scale for the observed deflection is given by the Einstein ring radius:
+General relativity tells us that mass alters the propagation of light. In particular, light from a background source passing some mass distribution will be deflected by an angle that depends on the distance between the source and mass distribution, as well as the structure and kinematics of the mass distribution itself. For an observer aligned with a background source and a point lensing mass, the relevant angular scale for the observed deflection is given by the Einstein ring radius:
 \begin{equation} \label{eq:einstein_radius}
 	\theta_E = \sqrt{\frac{4GM}{c^2}\frac{D_{S} - D_L}{D_L D_S}}
 \end{equation}
 where $D_L$ is the distance to the lensing object, $D_S$ is the distance to the source, and $M$ is the mass of the lens. 
 
-Microlensing designates any unresolvable gravitational lensing, where the images formed by the lens just contribute to an increase in flux. For Galactic distance and mass scales, the Einstein radius (Eq.~\ref{eq:einstein_radius}) can be expressed as:
+Microlensing refers to any unresolved gravitational lensing, where the images formed simply contribute to a transient increase in flux from the source. For Galactic distance and mass scales, the Einstein radius (Eq.~\ref{eq:einstein_radius}) can be expressed as:
 \begin{align}
 	\theta_E &\approx 550\mathrm{\mu as}~\sqrt{\frac{1-D_L/D_S}{D_L/D_S}}~\Big(\frac{D_S}{8~\mathrm{kpc}}\Big)^{-1/2} \Big(\frac{M}{0.3~M_\sun}\Big)^{1/2}
 \end{align}
-\citep{paczynski1986, gaudi2011}. A solar-mass star in the bulge lensing another star in the bulge would have an Einstein radius of about $\theta_E \sim 0.3~\mathrm{mas}$, well below the resolution limit of even our most powerful telescopes.
+\citep{paczynski1986, gaudi2011}. 
+%A solar-mass star in the bulge lensing another star in the bulge would have an Einstein radius of about $\theta_E \sim 0.3~\mathrm{mas}$, well below the resolution limit of even our most powerful telescopes.
 
-Since Einstein first mentioned gravitational microlensing \citep{einstein1936}, it has been applied to the search for dark and compact objects \citep{original_macho, oslowski2008, sartore2010}, galactic structure and kinematics \citep{binney2000}, and extrasolar planets \citep{}[APW: cite]. Microlensing events were once a relatively rare phenomena, but with advances in CCD technology and the help of several dedicated microlensing surveys [APW: cite], more than [APW: check number]500 events are detected each year by several microlensing collaborations and surveys. Within the next decade, this number is expected to [] as the next generation of photometric, time-domain surveys come online [APW: cite LCOGT, LSST, ??].
+Since Einstein first mentioned gravitational microlensing \citep{einstein1936}, it has been applied to the search for dark and compact objects \citep{original_macho, oslowski2008, sartore2010}, galactic structure and kinematics \citep{binney2000}, and extrasolar planets \citep{gaudi2011}. Microlensing events were once a relatively rare phenomena, but with advances in CCD technology and the help of several dedicated microlensing surveys [APW: cite], more than [APW: check number]500 events are detected each year by several microlensing collaborations and surveys. Within the next decade, this number is expected to rise as the next generation of photometric, time-domain surveys come online.
 
-[APW: Some brief description of what is PTF, why it is the bridge between what has been done and what will be done, etc...]
-
-\subsection{Something??}
-Assuming that the source is an un-blended point source and the lens is a foreground, dim object, a microlensing event is fully described by three parameters: the angular impact parameter $u_0$, the peak time of the event $t_0$, and the timescale of the event (Einstein crossing time) $t_E$ such that the increase in flux due to source magnification is given by:
+\subsection{Signatures}
+Assuming that the source is an un-blended point source and the lens is a foreground, dim object, a microlensing event is fully described by three parameters: the angular impact parameter $u_0$, the peak time of the event $t_0$, and the timescale of the event (Einstein crossing time) $t_E$ such that the flux is given by:
 \begin{align}
 	F(t) &= A(t)\times F_{source} \\
 	A(u) &= \frac{u^2 + 2}{u\sqrt{u^2 + 4}}\\
 	u(t) &= \sqrt{u_0^2 + 2\Big(\frac{t-t_0}{t_E}\Big)}
 \end{align}
-where $A(t)$ is the amplification factor.
+where $A(u(t))$ is the amplification factor.
 
 The microlensing perturbation can also be expressed in terms of magnitudes as:
 \begin{align}
@@ -94,36 +94,32 @@ The microlensing perturbation can also be expressed in terms of magnitudes as:
 where $m_0(t)$ is the unperturbed, possibly time-variable magnitude of the source.
 
 %However, if the event is \textit{too} bright, the pixels will saturate and there could be photometric errors flagging the most interesting data as bad.
-When $u_0$ is small ($u_0<<1$), the amplification is large. If $t_E$ is short ($t_E \lesssim\mathrm{days}$), surveys may miss or poorly sample the event, but if $t_E$ is long ($t_E \gtrsim 1~\mathrm{year}$) the event may be confused with other forms of long-duration variability. \figurename~\ref{fig:microlensing_sim} shows a ``typical'' PTF light curve and demonstrates what microlensing events with $t_E=20~\mathrm{days}$ and varying $u_0$ may look like in the data.
+When $u_0$ is small ($u_0<<1$), the amplification is large. If $t_E$ is short ($t_E \lesssim\mathrm{days}$), surveys may miss or poorly sample the event, but if $t_E$ is long ($t_E \gtrsim 1~\mathrm{year}$) the event may be confused with other forms of long-duration variability. \figurename~\ref{fig:microlensing_sim} shows a well-sampled PTF light curve and demonstrates what a microlensing event with fixed $t_E=20~\mathrm{days}$ and varied $u_0$ may look like in the data.
 
 The microlensing event rate in some particular region of sky depends on the space and velocity distributions of sources and on the space, velocity, and mass distribution of lenses. To maximize the event rate, microlensing surveys have typically focused their observations towards high stellar density regions such as the Galactic Bulge, M31, and the Magellanic clouds. Microlensing events do occur away from stellar population centers, but without a large-area, time-domain search of these regions, only one such event has been recorded ([APW: cite Fukui 2007, Gaudi 2008 RE: Tago event). [APW] Gaudi 2008 were able to establish probabilistic limits on the mass, distance, proper motion, and magnitude of this lens using existing observations near the location of the event. With JHK magnitudes of the lens itself or a direct measurement of the proper velocity of the lens, these limits could be turned into precise measurements. Such a detailed analysis is not normally possible for events in the previously mentioned high-density regions where the lenses are much farther away, and blending makes precise photometry difficult. 
 
-Not all events away from the bulge will be as fortunate as the Tago event, but lensing events away from stellar population centers are generally expected to have closer sources, closer lenses, and less crowded background fields compared to  those found by modern microlensing surveys ([APW: cite Di Stefano mesolensing]). Thus, the properties of the lenses are more likely to be well-constrained by direct observation, possibly enabling mass measurements of objects not bound in binary pairs. The event rate in low stellar density regions will certainly be smaller than the event rate near the Bulge \citep[e.g.,][]{wood_optical_depth, ogle_optical_depth, macho_optical_depth, eros_optical_depth}, but the opportunity for precise, direct observations of lenses would be extremely valuable for studying low-mass stars, substellar objects, and stellar remnants such as isolated neutron stars [APW: cite NS work?]. 
-
-[MOTIVATION FOR PROJECT -- Han, Di Stefano, Di Stefano et al. -- mesolensing and near-field microlensing]
+Not all events away from the bulge will be as fortunate as the Tago event, but lensing events away from stellar population centers are generally expected to have closer sources, closer lenses, and less crowded background fields compared to  those found by modern microlensing surveys ([APW: cite Di Stefano mesolensing]). Thus, the properties of the lenses are more likely to be well-constrained by direct observation, possibly enabling mass measurements of objects not bound in binary pairs. The event rate in low stellar density regions will certainly be smaller than the event rate near the Bulge \citep[e.g.,][]{wood_optical_depth, ogle_optical_depth, macho_optical_depth, eros_optical_depth}, but the opportunity for the precise study of lenses would be extremely valuable for studying low-mass stars, substellar objects, and stellar remnants such as isolated neutron stars [APW: cite NS work?]. 
 
 \section{PTF Observations and Data}
 The Palomar Transient Factory is a transient detection system that begins with a wide-field survey camera mounted on the automated 48 inch Oschin Schmidt telescope at Palomar Observatory, CA, uses a real-time data reduction pipeline to identify transients of interest, passes these to a dedicated photometric follow-up telescope, and generates an archive of all detected sources \citep{nick2009,rau2009}.
 
 The PTF camera is the 12K$\times$8K mosaic camera formerly at the Canada-France-Hawaii Telescope. The camera has 11 working chips, 10$^7$ pixels, and a 7.26 deg$^2$ field-of-view \citep{rahmer2008}. Under median seeing conditions (1.1$\arcsec$), observations in Mould $R$ or Sloan Digital Sky Survey (SDSS) $g$ achieve 2.0$\arcsec$ full-width half-maximum images and reach 5$\sigma$ magnitudes of $R \approx 21.0$ and $g \approx 21.3$ mag in a standard 60~s exposure \citep{nick2010}. As of August 9, 2012, the PTF footprint included $\apwsim$10,100 (2600) deg$^2$ imaged $>$25 ($>$100) times in $R$ and $\apwsim$2200 (170) deg$^2$ imaged that often in $g$ (\figurename~\ref{fig:survey_footprint})\footnote{For an interactive visualization of the PTF survey coverage, see: [TODO: url]}.
 
+The PTF survey footprint (\figurename~\ref{fig:survey_footprint}) is not uniformly sampled -- spatially or temporally. Each field has a unique sampling pattern determined by (1) the sub-surveys within PTF, (2) the time of year, as some low-declination fields can only be imaged during part of the year, or (3) the priority of the field, which could  change at any time. As a result, PTF light curves often contain gaps, regions of high-cadence observations, and regions of low-cadence observations, leading to a massive data set of irregularly-sampled, time-domain photometry. \figurename~\ref{fig:sampling} shows six randomly-selected light curves (with their magnitudes removed) and demonstrates the varying cadences and coverage that different fields may have over the same one-year baseline.
+
 \section{Microlensing event recovery} \label{sec:event_recovery}
-Microlensing surveys typically use difference image analysis (cite Lupton?) to identify transient events in raw imaging data. Light curves of any transient sources are then analyzed and further pruned using a variety of selection methods to search for microlensing event candidates (cite MACHO, OGLE). Using difference imaging is essential for studying crowded fields such as the Galactic bulge where photometry is difficult (cite or figure?), and also limits the number of light curves that must be analyzed, thus saving on computation time. Pre-selection with difference imaging also enables fast, real-time detection of events, allowing dedicated microlensing surveys to obtain high-cadence follow-up observations of interesting sources. Such surveys also have the advantage of relatively uniform time sampling of the survey footprint over an observing season.
+Microlensing surveys typically use difference image analysis \citep{alard1998} to identify transient events in raw imaging data. Light curves of any transient sources are then analyzed and further pruned using a variety of selection methods to search for microlensing event candidates (cite MACHO, OGLE). Using difference imaging is essential for studying crowded fields such as the Galactic bulge where photometry is difficult and also limits the number of light curves that must be analyzed, thus saving on computation time. Pre-selection with difference imaging also enables fast, real-time detection of events, allowing dedicated microlensing surveys to obtain high-cadence follow-up observations of interesting sources. Such surveys also have the advantage of relatively uniform time sampling of their survey footprint over an observing season.
 
-The PTF survey footprint (\figurename~\ref{fig:survey_footprint}) is not uniformly sampled -- spatially or temporally. Each field has a unique sampling pattern determined by (1) the sub-surveys within PTF, (2) the time of year, as some low-declination fields can only be imaged during part of the year, or (3) the priority of the field, which could  change at any time. As a result, PTF light curves often contain gaps, regions of high-cadence observations, and regions of low-cadence observations, leading to a massive data set of irregularly-sampled, time-domain photometry. \figurename~\ref{fig:sampling} shows six randomly-selected light curves (with their magnitudes removed) and demonstrates the varying cadences and coverage fractions that different fields may have over the same one-year baseline.
-
---
-
-Previous work has used a variety of survey-specific selection methods (as described in \citealt{alcock2000, wyrzykowski2009, hamadache2009, sumi2011}), but the general idea is to \begin{enumerate}
+After identifying transients, the light curves must be further analyzed to distinguish microlensing event candidates from variable stars, outbursting systems, and novae. Previous efforts have used a variety of survey-specific selection methods (as described in \citealt{alcock2000, wyrzykowski2009, hamadache2009, sumi2011}), but the general idea is to \begin{enumerate}
 	\item detect transient events using difference image analysis, 
 	\item require that any selected light curves have some number of consecutive datapoints brighter than some threshold,
 	\item require that a microlensing model fit best describes the data using some cut on $\chi^2$,
 	\item require that the model event parameters have reasonable values.
 \end{enumerate}
-Applying the second cut above to irregularly sampled data is more challenging and more computationally expensive because we must account for gaps in our data. Furthermore, it isn't obvious that this same selection procedure will be as successful for the PTF data. Motivated by work on identifying and classifying general variability in light curve data \citep{shin2009}[others?], we set out to compare the performance of microlensing event selection using a set of variability statistics as an initial cut in our candidate detection pipeline.
+Applying the second cut above to irregularly sampled data is more challenging and more computationally expensive because we must account for gaps in our data. Furthermore, it isn't obvious that this same selection procedure will be as successful for the PTF data. Motivated by work on identifying and classifying general variability in light curve data \citep{shin2009}[others?], we set out to compare the performance of microlensing event selection using a set of variability statistics.
 
 \subsection{Event Selection} \label{sec:event_selection}
-We choose five statistical measures of variability, as compiled by \cite{shin2009}, that have been previously applied to classification of periodic variables, and evaluate their effectiveness in recovering simulated microlensing events in the data. These statistics, or \emph{variability indices}, are $\sigma/\mu$, $Con$, $\eta$, $J$, and $K$ (we choose not to implement the sixth, $AoVM$, because it mainly helps with periodic sources). $\sigma/\mu$ is the ratio of the root-variance to the sample mean, 
+We choose five statistical measures of variability, as compiled by \cite{shin2009}, that have been previously applied to classification and discovery of periodic variables, and evaluate their effectiveness in recovering simulated microlensing events in the data. These statistics, or \emph{variability indices}, are $\sigma/\mu$, $Con$, $\eta$, $J$, and $K$ (we choose not to implement the sixth, $AoVM$, because it mainly helps with periodic sources). $\sigma/\mu$ is the ratio of the root-variance to the sample mean, 
 \begin{align}
 	\frac{\sigma}{\mu} = \frac{\sqrt{\sum^N_i (x_i - \mu)^2 / (N-1)}}{\sum^N_i x_i/N},
 \end{align}
@@ -131,33 +127,27 @@ where N is the total number of observations in the light curve. We modify their 
 \begin{align}
 	\eta = \frac{\delta^2}{\sigma^2} = \frac{\sum^{N-1}_i(x_{i+1} - x_i)^2/(N-1)}{\sigma^2}
 \end{align}
-$\eta$ is small, but still greater than zero, when there is strong serial correlation between successive data points. $J$ and $K$ were suggested by \cite{stetson1996}:
+$\eta$ is small when there is strong positive serial correlation between successive data points. $J$ and $K$ were suggested by \cite{stetson1996}:
 \begin{align}
 	\delta_i &= \sqrt{\frac{N}{N-1}}\frac{x_i-\mu}{e_i}\\
 	J &= \sum^{N-1}_i sign(\delta_i \delta_{i+1})\sqrt{|\delta_i \delta_{i+1}|}\\
 	K &= \frac{1/N\sum^N_i |\delta_i|}{\sqrt{1/N\sum^N_i\delta_i^2}}
 \end{align}
-where $e_i$ is the photometric error of each data point. $J$ tends to 0 for non-variable stars, but is large when there are significant differences between successive data points in a light curve. $K$ is a measure of the kurtosis or ``peakedness'' of the distribution of points in the light curve. We add one more variability index motivated by Cut 3 (\S\ref{sec:event_recovery}): $\Delta \chi^2$ is defined as the difference in chi-squared between fitting a five-parameter Gaussian model and fitting a linear model to the light curve. \figurename~\ref{fig:indices_examples} shows examples of a median light curve for each variability statistic (left panels) along with the most extreme outliers (right panels) for XXX light curves on a single CCD on PTF field YYY.
+where $e_i$ is the photometric error of each data point. $J$ tends to 0 for non-variable stars, but is large when there are significant differences between successive data points in a light curve. $K$ is a measure of the kurtosis of the distribution of data points in the light curve. We add one more variability index, $\Delta \chi^2$, motivated by Cut 3 (\S\ref{sec:event_recovery}): $\Delta \chi^2$ is defined as the difference in chi-squared between fitting a Gaussian model and fitting a linear model to the light curve data. \figurename~\ref{fig:indices_examples} shows maximal outlier light curves for each variability statistic (except $Con$) out of \apwsim 20,000 light curves on a single CCD on PTF field 100049. [The indices are sensitive to different aspects of variability in the data...]
 
-\figurename~\ref{fig:scatter_plot_matrix} shows a scatter-plot matrix of all six of our variability statistics. In this figure, we take 10,000 light curves from a single PTF field (field id = ), compute the variability indices for each light curve, and then plot $1\sigma$ (red) and $2\sigma$ (green) contours in each panel for the resultant distributions. We then add 10 simulated microlensing events to each light curve, recompute the variability indices, and plot these values as black points.
+- Here discuss a figure that shows variance of the distribution of the indices for simulated light curves w/ varied noise sigma
 
-[Describe the different selection methods]
+%\figurename~\ref{fig:scatter_plot_matrix} shows a scatter-plot matrix of the variability statistics. In this figure, we take 1,000 light curves from each CCD on a single PTF field, compute the variability indices for each light curve, and then plot $1\sigma$ (red) and $2\sigma$ (green) contours in each panel for the resultant distributions. We then add 10 simulated microlensing events to each light curve, recompute the variability indices, and plot these values as black points.
 
-- Proper statistical modeling is too time consuming, so we first have to define some selection criteria to limit the sample (number of good observations, quality cuts, etc.)
-
-- Discuss $\Delta \chi^2$ method, downfalls (speed, not robust -- how do you define the threshold?). Show a plot of distribution of $\Delta \chi^2$ with and without simulated events, e.g. the distribution doesn't separate well, then show $\eta$ and how the peak of the distribution moves.
-
-- Shin et al. paper
-
-- Introduce variability statistics: define them, what they pick out, what they have been used for before
+%- Discuss $\Delta \chi^2$ method, downfalls (speed, not robust -- how do you define the threshold?). Show a plot of distribution of $\Delta \chi^2$ with and without simulated events, e.g. the distribution doesn't separate well, then show $\eta$ and how the peak of the distribution moves.
 
 \subsection{Detection Efficiency}
-The probability of detecting any given microlensing event depends on the parameters of the event, the survey properties (observing strategy, limiting magnitude, weather), and the nature of the stellar field (crowding). To compute the detection efficiency, $\varepsilon$, for a given selection criterium, we run Monte Carlo simulations to artificially add microlensing events to real data and evaluate how often these events are recovered by the cut. This analysis must be done on a field-by-field basis, however we can compare our selection methods on a sub-sample of representative cases. Performing these simulations with real data allows us to compute the ... [APW: explain difference between two different detection efficiencies (of selection method vs. of survey parameters), and how we marginalize over both].
+The probability of detecting any given microlensing event depends on the parameters of the event, the survey properties (observing strategy, limiting magnitude, weather), and the nature of the stellar field (crowding). To compute the detection efficiency, $\varepsilon$, for a given selection method, we must first determine our selection criteria for each variability index. For a given PTF field, we randomly sample 1000 light curves from the database with good observations and for each of these we use the time and error information to simulate 100 light curves with Gaussian scatter. We find the value of each variability index such that the selection returns 1\% of these simulated data -- that is, we choose the limiting value of each variability index so our false positive rate is 1\%.
 
-For a particular field, we randomly sample 1,000 light curves from each chip with $>25$ ``good'' observations (good observations are those that have no IPAC or SExtractor flags set [Marcel: is there some IPAC paper to cite here?]). With this sample, we compute the set of variability statistics (\S\ref{sec:event_selection}), then iterate to add [APW: N] different simulated microlensing events to each light curve. We use a random number generator to only add events during $\apwsim 50\%$ of the iterations, which allows us to later quantify the false positive rate of our selection methods. For each iteration we recompute the variability statistics and store the event parameters. [The parameters for each simulated event, the peak time, $t_0$, is drawn from a uniform distribution between the minimum and maximum observation times, the impact parameter, $u_0$, is drawn from a uniform distribution between 0 and 1, and the event timescale, $t_E$, is drawn from a log-uniform distribution between 1 and 1000 days.]
+Once we have figured out our selection boundaries for each variability index, we run more Monte Carlo simulations to artificially add microlensing events to real data from a given field and evaluate how often these events are recovered by the procedure. For a particular field, we randomly sample 1,000 light curves from each CCD with $>25$ ``good'' observations (observations that have no IPAC or SExtractor flags set [Marcel: is there some IPAC paper to cite here?]). With this sample, we compute the set of variability statistics (\S\ref{sec:event_selection}), then iterate to add 100 different simulated microlensing events to each light curve. The parameters for each simulated event are chosen as follows: the peak time, $t_0$, is drawn from a uniform distribution between the minimum and maximum observation times, the impact parameter, $u_0$, is drawn from a uniform distribution between 0 and 1.34 (cite?), finally, the event timescale, $t_E$, is drawn from a log-uniform distribution between 1 and 1000 days. For each iteration we recompute the variability statistics and store the event parameters. \figurename~\ref{fig:detection_efficiency} shows the detection efficiency for each variability statistic as functions of microlensing impact parameter and source limiting magnitude [APW: TODO, create this figure]. These detection efficiency curves are affected by the structure of the data, thus with a non-uniformly sampled field the efficiency will never reach 100\%.
 
-We apply our selection criteria to each simulated light curve using the variability statistics computed for the initial light curves (from \textit{before} we add simulated events), and then bin the selected data by the event timescale [APW: figure reference]. 
-
+%Possibly..
+Figures XX-YY show detection efficiency curves for three representative fields chosen for their different sampling patterns. For each of these cases we find that ZZZ consistently performs better than the other indices at recovering microlensing events.
 
 %The parameters for the random microlensing events are chosen as follows: 
 %\begin{align}
@@ -222,7 +212,7 @@ This paper is based on observations obtained with the Samuel Oschin Telescope as
 
 \begin{figure}
 	\centering
-	\caption{(a) the light curve plotted as is, (b) light curve with a simulated microlensing event with $u_0=1.0$, $t_E=20~\mathrm{days}$, (c) same as (b) with $u_0=0.5$, (d) same as (b) with $u_0=0.01$.}
+	\caption{(a) the light curve plotted as is, (b) light curve with a simulated microlensing event with $u_0=1.0$, $t_E=20~\mathrm{days}$, (c) same as (b) with $u_0=0.5$, (d) same as (b) with $u_0=0.01$. The red dashed line shows the approximate saturation limit of the PTF camera in R-band.}
     \includegraphics[width=1.0\textwidth]{figures/simulated_events.pdf}
     \label{fig:microlensing_sim}
 \end{figure}
@@ -239,6 +229,13 @@ This paper is based on observations obtained with the Samuel Oschin Telescope as
 	\caption{A visualization of the different sampling regimes of six different PTF fields over the same one year baseline. Darker points mean more data (more exposures). Some fields have roughly uniform coverage, where others are very dense during some weeks and not others. }
     \includegraphics[width=1.0\textwidth]{figures/sampling_figure.pdf}
     \label{fig:sampling}
+\end{figure}
+
+\begin{figure}
+	\centering
+	\caption{The maximum outlier light curves for each variability index on PTF field 100049.}
+    \includegraphics[width=1.0\textwidth]{figures/max_outlier_light_curves.pdf}
+    \label{fig:indices_examples}
 \end{figure}
 
 %
