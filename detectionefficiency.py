@@ -31,104 +31,25 @@ from ptf.simulation.simulatedlightcurve import SimulatedLightCurve
 import ptf.photometricdatabase as pdb
 import ptf.analyze.analyze as analyze
 from ptf.globals import index_to_label
+import ptf.variability_indices as vi
 
-def detection_efficiency(statistic, indices_with_events, lower_cut=None, upper_cut=None):
-    """ Compute the detection efficiency of a specific variability statistic.
-        
-        This function computes the detection efficiency by accepting a column
-        of variability statistic values, and upper and lower bounds, and computes
-        the fraction of events detected. 
-    """
-    
-    and_it = False
-    if lower_cut != None:
-        lower_idx = indices_with_events[statistic] < lower_cut
-    else:
-        lower_idx = np.array([True]*len(indices_with_events))
-        and_it = True
-    
-    if upper_cut != None:
-        upper_idx = indices_with_events[statistic] > upper_cut
-    else:
-        upper_idx = np.array([True]*len(indices_with_events))
-        and_it = True
-    
-    if and_it:
-        idx = lower_idx & upper_idx
-    else:
-        idx = lower_idx | upper_idx
-        
-    selected = indices_with_events[idx]
-    
-    efficiency = sum(selected["event_added"] == True) / sum(indices_with_events["event_added"])
-    N_false_positives = sum(selected["event_added"] == False)
-    
-    return (efficiency, N_false_positives)
+#from var_indices_figure import VIFigure
 
-def simulate_events_worker(sim_light_curve, tE, u0, reference_mag, indices):
-    """ Only to be used in the multiprocessing pool below! """
-    
-    light_curve = copy.copy(sim_light_curve)
-    
-    # Reset the simulated light curve back to the original data, e.g. erase any previously
-    #   added microlensing events
-    light_curve.reset()
-    
-    # APW HACK -- add microlensing events only on a data point, ignores the *survey* detection efficiency
-    t0 = light_curve.mjd[np.random.randint(len(light_curve.mjd))]
-    #t0 = None
-    light_curve.addMicrolensingEvent(tE=tE, u0=u0, t0=t0)
-    
-    try:
-        lc_var_indices = analyze.compute_variability_indices(light_curve, indices, return_tuple=True) + (light_curve.tE, light_curve.u0, reference_mag, True)
-        return lc_var_indices
-    except:
-        logger.warning("Failed to compute variability indices for simulated light curve!")
-    
-
-def simulate_events_compute_indices(light_curve, events_per_light_curve, indices, u0=None):
+def compute_false_positive_rate(var_indices, var_indices_simulated, indices, Nsigmas):
     """ """
-    #logger.debug("\t\tsimulate_events_compute_indices")
     
-    # Create a SimulatedLightCurve object for the light_curve. This object has the addMicrolensingEvent() method.
-    sim_light_curve = SimulatedLightCurve(mjd=light_curve.mjd, mag=light_curve.mag, error=light_curve.error)
-    sim_light_curve.reset()
-    
-    # Estimate the reference magnitude using the median magnitude
-    reference_mag = np.median(sim_light_curve.mag)
-    
-    var_indices_with_events = []
-    def callback(result):
-        var_indices_with_events.append(result)
-    
-    # Pre-compute the variability indices to add when we *don't* add an event, to compute false positive rate
-    vanilla_var_indices = analyze.compute_variability_indices(sim_light_curve, indices, return_tuple=True)
-    
-    pool = multiprocessing.Pool(processes=8)
-    for event_id in range(events_per_light_curve):
-        # Only add events 50% of the time, to allow for false positives
-        if np.random.uniform() > 0.5:
-            tE = 10**np.random.uniform(0.3, 3.)
-            pool.apply_async(simulate_events_worker, args=(sim_light_curve, tE, u0, reference_mag, indices), callback=callback)
-        else:
-            var_indices_with_events.append(vanilla_var_indices + (sim_light_curve.tE, sim_light_curve.u0, reference_mag, False))
-    
-    pool.close()
-    pool.join()
-    
-    names = indices + ["tE", "u0", "m", "event_added"]
-    dtypes = [float]*len(indices) + [float,float,float,bool]
-    var_indices_with_events = np.array(var_indices_with_events, dtype=zip(names,dtypes))
-    return var_indices_with_events
-
-def compute_Nsigma(var_indices_with_events, F=5):
-    """ Determine the N in our N-sigma cut by finding the value that gives us a 
-        F% false positive rate.
+    false_positive_rate = dict()
+    for index_name in indices:
+        Nsigma = Nsigmas[index_name]
+        mu, sigma = np.mean(var_indices[index_name]), np.std(var_indices[index_name])
+        idx = index_to_selection_indices(index_name, var_indices_simulated, mu, sigma, Nsigma)
+        logger.debug("{} : sigma={}, Nsigma={}, {}".format(index_name, sigma, Nsigma, mu+Nsigma*sigma))
         
-        By default, a 5% false positive rate is chosen
-    """
+        false_positive_rate[index_name] = len(var_indices_simulated[index_name][idx]) / len(var_indices_simulated[index_name])
+    
+    return false_positive_rate
 
-def compute_detection_efficiency(var_indices, var_indices_with_events, indices, events_per_light_curve):
+def compute_detection_efficiency(var_indices, var_indices_with_events, indices, Nsigmas):
     """ """
     
     # Will be a boolean array to select out only rows where event_added == True
@@ -141,24 +62,41 @@ def compute_detection_efficiency(var_indices, var_indices_with_events, indices, 
                 bin_edges=tE_bin_edges)
     
     for index_name in indices:
-        # TODO: Determine Nsigma
+        Nsigma = Nsigmas[index_name]
         
-        if index_name == "con":
-            idx = var_indices_with_events[index_name] >= 1
-        else:
-            mu, sigma = np.mean(var_indices[index_name]), np.std(var_indices[index_name])
-            idx = (var_indices_with_events[index_name] > (mu+2.*sigma)) | (var_indices_with_events[index_name] < (mu-2.*sigma))
+        mu, sigma = np.mean(var_indices[index_name]), np.std(var_indices[index_name])       
+        idx = index_to_selection_indices(index_name, var_indices_with_events, mu, sigma, Nsigma)
             
         detections_per_bin, tE_bin_edges = np.histogram(var_indices_with_events[idx]["tE"], bins=timescale_bins)
         
         total_efficiency = sum(var_indices_with_events[idx & events_added_idx]["event_added"]) / sum(events_added_idx)
-        num_false_positives = len(var_indices_with_events[idx & (events_added_idx == False)])
+        #num_false_positives = len(var_indices_with_events[idx & (events_added_idx == False)])
         
         data[index_name] = dict(total_efficiency=total_efficiency, \
                                 num_false_positives=num_false_positives, \
                                 detections_per_bin=detections_per_bin)
     
     return data
+
+def determine_Nsigma(selection_indices, var_indices_simulated, indices):
+    """ """
+
+    Nsigmas_for_indices = {"eta" : 1.0, "delta_chi_squared" : 0.0, "j" : 0.0, "k" : 1.0, "con" : 0.0, "corr" : 0.0, "sigma_mu" : 0.0}
+    
+    while True:
+        false_positive_rates = compute_false_positive_rate(selection_indices, var_indices_simulated, indices, Nsigmas=Nsigmas_for_indices)
+        
+        should_break = True
+        for index in indices:
+            if false_positive_rates[index] > 0.01:
+                Nsigmas_for_indices[index] += 0.01
+                should_break = False
+        
+        if should_break:
+            break
+    
+    logger.debug("Final FPR: {}".format(false_positive_rates))
+    return Nsigmas_for_indices
 
 def compare_detection_efficiencies_on_field(field, light_curves_per_ccd, events_per_light_curve, overwrite=False, indices=["j","k","eta","sigma_mu","delta_chi_squared"], u0s=[], limiting_mags=[]):
     """ TODO: document """   
@@ -172,6 +110,7 @@ def compare_detection_efficiencies_on_field(field, light_curves_per_ccd, events_
     file_base = "field{:06d}_Nperccd{}_Nevents{}_u0_{}_m{}".format(field.id, light_curves_per_ccd, events_per_light_curve, "-".join(map(str,u0s)), "-".join(map(str,limiting_mags))) + ".{ext}"
     pickle_filename = os.path.join("data", "detectionefficiency", file_base.format(ext="pickle"))
     plot_filename = os.path.join("plots", "detectionefficiency", file_base.format(ext="png"))
+    fpr_plot_filename = os.path.join("plots", "detectionefficiency", "fpr_{}".format(file_base.format(ext="png")))
     
     if not os.path.exists(os.path.dirname(pickle_filename)):
         os.mkdir(os.path.dirname(pickle_filename))
@@ -194,7 +133,6 @@ def compare_detection_efficiencies_on_field(field, light_curves_per_ccd, events_
         wheres = ["(ngoodobs > 25)", "(stetsonJ < 100)", "(vonNeumannRatio > 1.0)", "(stetsonJ > 0)"]
         
         # Keep track of calculated var indices for each CCD
-        #all_var_indices_with_events = []
         var_indices = dict()
         var_indices_with_events = dict()
         
@@ -231,9 +169,17 @@ def compare_detection_efficiencies_on_field(field, light_curves_per_ccd, events_
                     logger.debug("\t\t\tSource ID: {}".format(source_id))
                     light_curve = ccd.light_curve(source_id, clean=True, barebones=True)
                     
-                    # After quality cut, if light curve has less than 25 observations, skip it!
+                    # After my quality cut, if light curve has less than 25 observations, skip it!
                     if len(light_curve.mjd) < 25:
                         continue
+                    
+                    # Run simulation to compute false positive variability indices
+                    logger.debug("Starting false positive simulation")
+                    these_indices = simulate_light_curves_compute_indices(light_curve, num_simulated=events_per_light_curve, indices=indices)
+                    try:
+                        var_indices_simulated = np.hstack((var_indices_simulated, these_indices))
+                    except NameError:
+                        var_indices_simulated = these_indices
                     
                     these_var_indices = np.array([analyze.compute_variability_indices(light_curve, indices, return_tuple=True)], dtype=dtype)
                     try:
@@ -242,6 +188,7 @@ def compare_detection_efficiencies_on_field(field, light_curves_per_ccd, events_
                         var_indices[mag_key] = these_var_indices
                     
                     for u0 in u0s:
+                        logger.debug("Starting detection efficiency computation for u0={}".format(u0))
                         these_indices = simulate_events_compute_indices(light_curve, events_per_light_curve=events_per_light_curve, indices=indices, u0=u0)
                         try:
                             var_indices_with_events[mag_key][u0] = np.hstack((var_indices_with_events[mag_key][u0], these_indices))
@@ -287,7 +234,7 @@ def compare_detection_efficiencies_on_field(field, light_curves_per_ccd, events_
             ccd.close()
         
         f = open(pickle_filename, "w")
-        pickle.dump((var_indices, var_indices_with_events), f)
+        pickle.dump((var_indices, var_indices_with_events, var_indices_simulated), f)
         f.close()
     else:
         logger.info("Data file {} already exists".format(pickle_filename))
@@ -295,7 +242,7 @@ def compare_detection_efficiencies_on_field(field, light_curves_per_ccd, events_
     logger.info(greenText("Starting plot routine!") + "\n  Data source: {}\n  Plotting and saving to: {}".format(pickle_filename, plot_filename))
     logger.debug("\t\tReading in data file...")
     f = open(pickle_filename, "r")
-    var_indices, var_indices_with_events = pickle.load(f)
+    var_indices, var_indices_with_events, var_indices_simulated = pickle.load(f)
     f.close()
     logger.debug("\t\tData loaded!")
     
@@ -310,56 +257,74 @@ def compare_detection_efficiencies_on_field(field, light_curves_per_ccd, events_
     
     num_u0_bins = len(u0s)
     num_mag_bins = len(limiting_mags)-1
-    fig, axes = plt.subplots(num_u0_bins, num_mag_bins, sharex=True, sharey=True, figsize=(25,25))
+    
+    # Detection efficiency figure, axes
+    eff_fig, eff_axes = plt.subplots(num_u0_bins, num_mag_bins, sharex=True, sharey=True, figsize=(25,25))
     
     for ii, limiting_mag_pair in enumerate(sorted(var_indices.keys())):
         selection_indices = var_indices[limiting_mag_pair]
         for jj, u0 in enumerate(sorted(var_indices_with_events[limiting_mag_pair].keys())):
-            data = compute_detection_efficiency(selection_indices, var_indices_with_events[limiting_mag_pair][u0], indices, events_per_light_curve)
+
+            Nsigmas = determine_Nsigma(selection_indices, var_indices_simulated, indices)
+
+            # Log the values of N x sigma
+            for index,Nsigma in Nsigmas.items():
+                logger.info("{} = {}sigma".format(index, Nsigma))
+                
+            data = compute_detection_efficiency(selection_indices, var_indices_with_events[limiting_mag_pair][u0], indices, Nsigmas=Nsigmas)
             
             try:
-                ax = axes[ii, jj]
+                eff_ax = eff_axes[ii, jj]
             except:
-                ax = axes
+                # If only one axis
+                eff_ax = eff_axes
 
             for index_name in indices:
-                ax.semilogx((data["bin_edges"][1:]+data["bin_edges"][:-1])/2, \
+                eff_ax.semilogx((data["bin_edges"][1:]+data["bin_edges"][:-1])/2, \
                              data[index_name]["detections_per_bin"] / data["total_counts_per_bin"], \
                              label=r"{}".format(index_to_label[index_name]), \
                              **line_styles[index_name])
                 #label=r"{}: $\varepsilon$={:.3f}, $F$={:.1f}%".format(index_to_label[index_name], data[index_name]["total_efficiency"], data[index_name]["num_false_positives"]/(11.*events_per_light_curve*light_curves_per_ccd)*100), \
             
             # Fix the y range and modify the tick lines
-            ax.set_ylim(0., 1.0)
-            ax.tick_params(which='major', length=10, width=2)
-            ax.tick_params(which='minor', length=5, width=1)
+            eff_ax.set_ylim(0., 1.0)
+            eff_ax.tick_params(which='major', length=10, width=2)
+            eff_ax.tick_params(which='minor', length=5, width=1)
             
             if ii == 0:
-                try: ax.set_title("$u_0$={:.2f}".format(u0), size=36, y=1.1)
+                try: eff_ax.set_title("$u_0$={:.2f}".format(u0), size=36, y=1.1)
                 except: pass
                 
             if jj == (num_mag_bins-1):
-                ax.set_ylabel("{:.1f}<R<{:.1f}".format(*limiting_mag_pair), size=32, rotation="horizontal")
-                ax.yaxis.set_label_position("right")
+                eff_ax.set_ylabel("{:.1f}<R<{:.1f}".format(*limiting_mag_pair), size=32, rotation="horizontal")
+                eff_ax.yaxis.set_label_position("right")
             
-            plt.setp(ax.get_xticklabels(), visible=False)
-            plt.setp(ax.get_yticklabels(), visible=False)
+            plt.setp(eff_ax.get_xticklabels(), visible=False)
+            plt.setp(eff_ax.get_yticklabels(), visible=False)
             
             if jj == 0:
-                plt.setp(ax.get_yticklabels(), visible=True, size=24)
-                ax.set_ylabel(r"$\varepsilon$", size=38)
+                plt.setp(eff_ax.get_yticklabels(), visible=True, size=24)
+                eff_ax.set_ylabel(r"$\varepsilon$", size=38)
             if ii == (num_u0_bins-1):
-                ax.set_xlabel(r"$t_E$ [days]", size=34)
-                plt.setp(ax.get_xticklabels(), visible=True, size=24)
+                eff_ax.set_xlabel(r"$t_E$ [days]", size=34)
+                plt.setp(eff_ax.get_xticklabels(), visible=True, size=24)
             
             if jj == (num_mag_bins-1) and ii == (num_u0_bins-1):
-                legend = ax.legend(loc="upper right")
+                legend = eff_ax.legend(loc="upper right")
                 legend_text  = legend.get_texts()
                 plt.setp(legend_text, fontsize=36)
     
-    fig.subplots_adjust(hspace=0.1, wspace=0.1, right=0.88)
+    eff_fig.subplots_adjust(hspace=0.1, wspace=0.1, right=0.88)
     logger.debug("Saving figure and cleaning up!")
-    fig.savefig(plot_filename)
+    eff_fig.savefig(plot_filename) 
+    #fpr_fig.savefig(fpr_plot_filename)
+    
+    vifigure = VIFigure(indices=indices, figsize=(22,22))
+    vifigure.scatter(var_indices_simulated, alpha=0.1)
+    #vifigure.contour(var_indices, nbins=50)
+    vifigure.beautify()
+    plot_path = os.path.join("plots", "var_indices")
+    vifigure.save(os.path.join(plot_path, "field{}_Nperccd{}_Nevents{}.png".format(field.id, light_curves_per_ccd, events_per_light_curve)))
 
 def example_light_curves(field, u0s=[], limiting_mags=[]):
     """ Given a field, a list of microlensing event impact parameters,
@@ -496,7 +461,7 @@ if __name__ == "__main__":
     
     np.random.seed(42)
     field = pdb.Field(args.field_id, filter="R")
-    compare_detection_efficiencies_on_field(field, indices=["eta","delta_chi_squared", "con", "j","k","sigma_mu","corr"], \
+    compare_detection_efficiencies_on_field(field, indices=["eta","delta_chi_squared", "con", "j","k","sigma_mu"], \
                                             events_per_light_curve=args.N,
                                             light_curves_per_ccd=args.limit,
                                             overwrite=args.overwrite,

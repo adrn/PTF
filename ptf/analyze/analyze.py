@@ -8,17 +8,17 @@ __author__ = "adrn <adrn@astro.columbia.edu>"
 # Standard library
 import os
 import math
+import copy
 
 # Third-party
 import numpy as np
 import scipy.optimize as so
+from lmfit import minimize, Parameters
 
 try:
     from apwlib.globals import greenText, yellowText, redText
 except ImportError:
     raise ImportError("apwlib not found! \nDo: 'git clone git@github.com:adrn/apwlib.git' and run 'python setup.py install' to install.")
-
-
 
 try:
     import error_functions
@@ -36,21 +36,68 @@ except ImportError, RuntimeError:
     
     gaussian_model = lambda p, x: p[0]*np.exp(-(x - p[1])**2 / (2*p[2]**2)) + p[3]
     gaussian_error_func = lambda p, x, mag, sigma: (mag - gaussian_model(p, x)) / sigma
-    
+
+constant_model = lambda p, x: p[0] + np.zeros(len(x))
+linear_model = lambda p, x: p[0]*x + p[1]
+gaussian_model = lambda p, x: p[0]*np.exp(-(x - p[1])**2 / (2*p[2]**2)) + p[3]
 
 # ------
 # Models
 # ------
-def error_function(p, x, y, sigma_y, model):
-    return (y - model(p,x)) / sigma_y
 
-def u_t(p, t):
-    return np.sqrt(p[0]**2 + ((t - p[1])/p[2])**2)
-
-def A_u(u):
+def A(p, t):
+    """ Microlensing amplifiction factor """
+    u = np.sqrt(p["u0"].value*p["u0"].value + ((t-p["t0"].value)/p["tE"].value)**2)
     return (u**2 + 2) / (u*np.sqrt(u**2 + 4))
 
-microlensing_flux_model = lambda t, p: p[0]*A_u(u_t(p[1:], t))
+def microlensing_model(p, t):
+    """ """
+    return p["m0"].value - 2.5*np.log10(A(p, t))
+
+def microlensing_error_func(p, t, mag, sigma):
+    return (mag - microlensing_model(p, t)) / sigma
+
+def fit_subtract_microlensing(light_curve):
+    """ Fit and subtract a microlensing event to the light curve """
+    
+    params = Parameters()
+    params.add('tE', value=20, min=2., max=1000.)
+    params.add('t0', value=light_curve.mjd[np.argmin(light_curve.mag)], min=light_curve.mjd.min(), max=light_curve.mjd.max())
+    params.add('u0', value=0.5, min=0.0, max=1.34)
+    params.add('m0', value=np.median(light_curve.mag))
+    
+    result = minimize(microlensing_error_func, params, args=(light_curve.mjd, light_curve.mag, light_curve.error))
+    
+    #print result.chisqr, result.success, result.ier
+    #print 'Best-Fit Values:'
+    #for name, par in params.items():
+    #    print '  %s = %.4f +/- %.4f ' % (name, par.value, par.stderr)
+    
+    light_curve_new = copy.copy(light_curve)
+    light_curve_new.mag = light_curve.mag - microlensing_model(params, light_curve_new.mjd)
+    
+    light_curve.tE = params["tE"].value
+    light_curve.t0 = params["t0"].value
+    light_curve.u0 = params["u0"].value
+    light_curve.m0 = params["m0"].value
+    
+    return light_curve_new
+
+def fit_microlensing_event(light_curve):
+    """ Fit and subtract a microlensing event to the light curve """
+    
+    params = Parameters()
+    params.add('tE', value=20, min=2., max=1000.)
+    params.add('t0', value=light_curve.mjd[np.argmin(light_curve.mag)], min=light_curve.mjd.min(), max=light_curve.mjd.max())
+    params.add('u0', value=0.5, min=0.0, max=1.34)
+    params.add('m0', value=np.median(light_curve.mag))
+    
+    result = minimize(microlensing_error_func, params, args=(light_curve.mjd, light_curve.mag, light_curve.error))
+    
+    return {"tE" : params["tE"].value, \
+            "t0" : params["t0"].value, \
+            "u0" : params["u0"].value, \
+            "m0" : params["m0"].value}
 
 # -------------
 # Analysis code
@@ -135,7 +182,45 @@ def test_estimate_continuum():
         ax.legend()
         plt.show()
 
-def compute_delta_chi_squared(light_curve, error_func1, model1_initial, error_func2, model2_initial, force_fit=False, num_attempts=10):
+def gaussian_line_delta_chi_squared(light_curve):
+    """ Compute the difference in chi-squared between a Gaussian and a straight line """
+    
+    #error_func1=linear_error_func, \
+    #model1_initial=(0.0, median_mag),\
+    
+    median_mag = np.median(light_curve.mag)
+    dcs, (constant_params, gaussian_params) = compute_delta_chi_squared(light_curve,\
+                                error_func1=constant_error_func, \
+                                model1_initial=(median_mag,),\
+                                error_func2=gaussian_error_func, \
+                                model2_initial=(-5.0, light_curve.mjd[np.argmin(light_curve.mag)], 10.0, median_mag), \
+                                return_params=True)
+    
+    if gaussian_params[2] < 1. or gaussian_params[0] > 0. or gaussian_params[1] > max(light_curve.mjd) or gaussian_params[1] < min(light_curve.mjd):
+        dcs = -100.0
+    
+    # Get points around the Gaussian fit that are brighter than the median magnitude
+    w, = np.where((light_curve.mjd > (gaussian_params[1]-gaussian_params[2])) & (light_curve.mjd < (gaussian_params[1]+gaussian_params[2])) & (light_curve.mag < gaussian_params[3]))
+    N = len(w)
+    
+    if N < 10:
+        dcs = -100.0
+    
+    """
+    if dcs > 100:
+        import matplotlib.pyplot as plt
+        fig = plt.figure(figsize=(15,10))
+        ax = fig.add_subplot(111)
+        light_curve.plot(ax)
+        ax.plot(light_curve.mjd, constant_model(constant_params, light_curve.mjd), "r-", alpha=0.5)
+        ax.plot(light_curve.mjd, gaussian_model(gaussian_params, light_curve.mjd), "b-", alpha=0.5)
+        ax.set_title(r"{} -- $\Delta\chi^2$={} -- N={}".format(",".join(map(str,gaussian_params)), dcs, N))
+        fig.savefig("plots/test_{}.png".format(light_curve.source_id))
+    """
+    
+    return dcs
+
+def compute_delta_chi_squared(light_curve, error_func1, model1_initial, error_func2, model2_initial, force_fit=False, num_attempts=10, return_params=False):
     """ Compute the difference in chi-squared between two different model 
         fits to the light curve.
         
@@ -154,6 +239,8 @@ def compute_delta_chi_squared(light_curve, error_func1, model1_initial, error_fu
         num_attempts : int
             Number of times to try iterating the fit with new initial conditions. Only relevant
             if force_fit=True.
+        return_params : bool
+            If true, it will return a tuple containing the parameters from the two model fits.
     """
     
     # If we need to force the fits to converge, we have to iterate the fits
@@ -214,7 +301,10 @@ def compute_delta_chi_squared(light_curve, error_func1, model1_initial, error_fu
                                        light_curve.mag, \
                                        light_curve.error)**2)# / len(model2_params)
     
-    return model1_chisq - model2_chisq
+    if return_params:
+        return model1_chisq - model2_chisq, (model1_params, model2_params)
+    else:
+        return model1_chisq - model2_chisq
 
 def test_compute_delta_chi_squared():
     """ 
@@ -425,12 +515,14 @@ def compute_variability_indices(light_curve, indices=[], return_tuple=False):
         idx_dict["eta"] = eta(light_curve)
     
     if "delta_chi_squared" in indices:
-        idx_dict["delta_chi_squared"] = compute_delta_chi_squared(light_curve,\
+        """idx_dict["delta_chi_squared"] = compute_delta_chi_squared(light_curve,\
                                                                   error_func1=linear_error_func, \
                                                                   model1_initial=(0.0, np.median(light_curve.mag)),\
                                                                   error_func2=gaussian_error_func, \
                                                                   model2_initial=(-5.0, np.median(light_curve.mjd), 5.0, np.median(light_curve.mag))\
                                                                  )
+        """
+        idx_dict["delta_chi_squared"] = gaussian_line_delta_chi_squared(light_curve)
         
     if "continuum" in indices or "sigma_mu" in indices:
         continuum_mag, noise_sigma = estimate_continuum(light_curve, sigma_clip=True)

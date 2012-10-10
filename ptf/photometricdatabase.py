@@ -37,7 +37,7 @@ pytable_base_string = os.path.join(match_path, "match_{filter.id:02d}_{field.id:
 filter_map = {"R" : 2, "g" : 1}
 inv_filter_map = {2 : "R", 1 : "g"}
 
-def quality_cut(sourcedata, source_id=None, ccd_edge_cutoff=15, where=[]):
+def quality_cut(sourcedata, source_id=None, ccd_edge_cutoff=15, barebones=False, where=[]):
     """ This function accepts a Pytables table object (from the 'sourcedata' table)
         and returns only the rows that pass the given quality cuts.
         
@@ -75,17 +75,17 @@ def quality_cut(sourcedata, source_id=None, ccd_edge_cutoff=15, where=[]):
             # bit 3 = saturated
         
         SExtractor flags:
-            1     The object has neighbors, bright and close enough to 
+            0     The object has neighbors, bright and close enough to 
                   significantly bias the photometry, or bad pixels 
                   (more than 10% of the integrated area affected).
-            2     The object was originally blended with another one.
-            4     At least one pixel of the object is saturated 
+            1     The object was originally blended with another one.
+            2     At least one pixel of the object is saturated 
                   (or very close to).
-            8     The object is truncates (to close to an image boundary).
-            16    Object's aperture data are incomplete or corrupted.
-            32    Object's isophotal data are incomplete or corrupted.
-            64    A memory overflow occurred during deblending.
-            128   A memory overflow occurred during extraction.
+            3     The object is truncates (to close to an image boundary).
+            4     Object's aperture data are incomplete or corrupted.
+            5     Object's isophotal data are incomplete or corrupted.
+            6     A memory overflow occurred during deblending.
+            7     A memory overflow occurred during extraction.
     """    
     x_cut1, x_cut2 = ccd_edge_cutoff, globals.ccd_size[0] - ccd_edge_cutoff
     y_cut1, y_cut2 = ccd_edge_cutoff, globals.ccd_size[1] - ccd_edge_cutoff
@@ -101,12 +101,29 @@ def quality_cut(sourcedata, source_id=None, ccd_edge_cutoff=15, where=[]):
         where_string = ""
     
     # Saturation limit, 14.3, based on email conversation with David Levitan
-    sourcedata = sourcedata.readWhere(src + '(sextractorFlags == 0) & \
-                                       (x_image > {}) & (x_image < {}) & \
+    if barebones:
+        # APW: if this is slow, don't do that comprehension
+        srcdata = [(x["matchedSourceID"], x["mjd"], x["mag"], x["magErr"], x["alpha_j2000"], x["delta_j2000"], x["sextractorFlags"]) for x in sourcedata.where(src + \
+                                       '(x_image > {}) & (x_image < {}) & \
+                                       (y_image > {}) & (y_image < {}) & \
+                                       (relPhotFlags < 4) & \
+                                       ( (ipacFlags == 2) | (ipacFlags == 0) ) & \
+                                       (mag > 14.3) & (mag < 22)'.format(x_cut1, x_cut2, y_cut1, y_cut2) + where_string)]
+        sourcedata = np.array(srcdata, dtype=[("matchedSourceID", int), ("mjd", float), ("mag", float), ("magErr", float), ("ra", float), ("dec", float), ("sextractorFlags", int)])
+    else:
+        sourcedata = sourcedata.readWhere(src + \
+                                       '(x_image > {}) & (x_image < {}) & \
                                        (y_image > {}) & (y_image < {}) & \
                                        (relPhotFlags < 4) & \
                                        ( (ipacFlags == 2) | (ipacFlags == 0) ) & \
                                        (mag > 14.3) & (mag < 22)'.format(x_cut1, x_cut2, y_cut1, y_cut2) + where_string)
+    
+    # This checks to see the fraction of points that have bad sextractor flags -- if the majority of them are bad, this
+    #   is probably a blended source.
+    #print (np.sum(sourcedata["sextractorFlags"] > 0) / float(len(sourcedata)))
+    if (len(sourcedata) > 0) and (np.sum(sourcedata["sextractorFlags"] > 0) / float(len(sourcedata))) >= 0.25:
+        logger.debug("Skipping light curve due to blending")
+        sourcedata = np.array([], dtype=[("matchedSourceID", int), ("mjd", float), ("mag", float), ("magErr", float), ("ra", float), ("dec", float), ("sextractorFlags", int)])
     
     sourcedata = sourcedata[np.isfinite(sourcedata["mag"]) & \
                             np.isfinite(sourcedata["mjd"]) & \
@@ -193,6 +210,7 @@ class Field(object):
             logger.debug("No CCD data found for: {}".format(self))
         
         this_field = all_fields[all_fields["id"] == self.id]
+        self.ra = self.dec = None
         try:
             self.ra = g.RA.fromDegrees(this_field["ra"][0])
             self.dec = g.Dec.fromDegrees(this_field["dec"][0])
@@ -200,9 +218,10 @@ class Field(object):
             if self.dec.degrees < -40: raise ValueError()
         except IndexError:
             logger.warning("Field {} not found in field list, with {} observations!".format(self, self._num_exp))
+            self.ra = self.dec = None
         except ValueError:
             logger.warning("Field {} has wonky coordinates: {}, {}".format(self, self.ra, self.dec))
-            del self.ra, self.dec
+            self.ra = self.dec = None
     
     @property
     def number_of_exposures(self):
@@ -247,6 +266,7 @@ class Field(object):
         
 class CCD(object):
     _chip = None
+    _file = None
     
     def __repr__(self):
         return "<CCD: id={}, field={}>".format(self.id, self.field)
@@ -275,7 +295,8 @@ class CCD(object):
             raise ValueError("CCD data file does not exist!")
     
     def read(self):
-        self._file = tables.openFile(self.filename)
+        if self._file == None:
+            self._file = tables.openFile(self.filename)
         
         if self._chip == None:
             self._chip = getattr(getattr(getattr(self._file.root, "filter{:02d}".format(self.filter.id)), "field{:06d}".format(self.field.id)), "chip{:02d}".format(self.id))
@@ -292,7 +313,7 @@ class CCD(object):
         chip = self.read()
         
         if clean:
-            sourcedata = quality_cut(chip.sourcedata, source_id=source_id, where=where)
+            sourcedata = quality_cut(chip.sourcedata, source_id=source_id, where=where, barebones=barebones)
         else:
             if len(where) > 0:
                 where_string = " & " + " & ".join(where)
@@ -309,13 +330,36 @@ class CCD(object):
             mag = sourcedata["mag_auto"]/1000.0 + sourcedata["absphotzp"]
             mag_err = sourcedata["magerr_auto"]/10000.0
         
+        try:
+            #ra, dec = sourcedata[0]["alpha_j2000"], sourcedata[0]["delta_j2000"]
+            ra, dec = sourcedata[0]["ra"], sourcedata[0]["dec"]
+        except IndexError: # no sourcedata for this source
+            ra, dec = None, None
+        
         if barebones:
             #return PTFLightCurve(mjd=mjd, mag=mag, error=mag_err)
-            return PDBLightCurve(mjd=mjd, mag=mag, error=mag_err, field_id=self.field.id, ccd_id=self.id, source_id=source_id)
+            return PDBLightCurve(mjd=mjd, mag=mag, error=mag_err, field_id=self.field.id, ccd_id=self.id, source_id=source_id, ra=ra, dec=dec)
         else:
             #return PTFLightCurve(mjd=mjd, mag=mag, error=mag_err, metadata=sourcedata)
-            return PDBLightCurve(mjd=mjd, mag=mag, error=mag_err, field_id=self.field.id, ccd_id=self.id, source_id=source_id, metadata=sourcedata)
+            return PDBLightCurve(mjd=mjd, mag=mag, error=mag_err, field_id=self.field.id, ccd_id=self.id, source_id=source_id, metadata=sourcedata, ra=ra, dec=dec)
+    
+    def light_curves(self, source_ids, where=[], clean=True):
+        """ """
         
+        chip = self.read()
+        
+        if clean:
+            sourcedata = quality_cut(chip.sourcedata, barebones=True, where=where)
+            
+            for source_id in source_ids:
+                this_sourcedata = sourcedata[sourcedata["matchedSourceID"] == source_id]
+                if len(this_sourcedata) == 0: continue
+                
+                ra, dec = this_sourcedata[0]["ra"], this_sourcedata[0]["dec"]
+                yield PDBLightCurve(mjd=this_sourcedata["mjd"], mag=this_sourcedata["mag"], error=this_sourcedata["magErr"], field_id=self.field.id, ccd_id=self.id, source_id=source_id, ra=ra, dec=dec)
+            
+        else:
+            raise NotImplementedError()
 
 # ==================================================================================================
 #   Convenience functions
