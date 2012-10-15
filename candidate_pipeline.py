@@ -224,11 +224,6 @@ def select_candidates(field, selection_criteria):
         for source in sources:
             light_curve = ccd.light_curve(source["matchedSourceID"], barebones=True, clean=True)
             
-            #if source["matchedSourceID"] == 2126:
-            #    srcd = chip.sourcedata.readWhere("matchedSourceID == 2126")
-            #    print light_curve.mag
-            #    sys.exit(0)
-            
             # If light curve doesn't have enough clean observations, skip it
             if len(light_curve.mjd) < min_number_of_good_observations: continue
             

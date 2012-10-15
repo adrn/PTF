@@ -582,9 +582,7 @@ if __name__ == "__main__":
     np.random.seed(104)
     #make_survey_sampling_figure(10)
     #microlensing_event_sim()
-    #maximum_outlier_indices_plot(100049)
-    #maximum_outlier_indices_plot(100101) # APW TESTING
-    #maximum_outlier_indices_plot(100078) # APW TESTING
+    #maximum_outlier_indices_plot(100101)
     
     #variability_indices_distributions()
     #Don't use this! variability_indices_distributions_easy()
