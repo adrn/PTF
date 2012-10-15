@@ -80,6 +80,7 @@ def fit_subtract_microlensing(light_curve):
     light_curve.t0 = params["t0"].value
     light_curve.u0 = params["u0"].value
     light_curve.m0 = params["m0"].value
+    light_curve.chisqr = result.chisqr
     
     return light_curve_new
 

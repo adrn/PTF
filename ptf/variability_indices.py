@@ -86,11 +86,12 @@ def simulate_events_worker(sim_light_curve, tE, u0, reference_mag, indices):
     light_curve.reset()
     
     # APW HACK -- add microlensing events only on a data point, ignores the *survey* detection efficiency
-    t0 = light_curve.mjd[np.random.randint(len(light_curve.mjd))]
-    #t0 = None
+    #t0 = light_curve.mjd[np.random.randint(len(light_curve.mjd))]
+    t0 = None
     light_curve.addMicrolensingEvent(tE=tE, u0=u0, t0=t0)
     
     lc_var_indices = analyze.compute_variability_indices(light_curve, indices, return_tuple=True) + (light_curve.tE, light_curve.u0, reference_mag)
+    
     return lc_var_indices
 
 def simulate_events_compute_indices(light_curve, events_per_light_curve, indices, u0=None):
@@ -108,17 +109,19 @@ def simulate_events_compute_indices(light_curve, events_per_light_curve, indices
     def callback(result):
         var_indices_with_events.append(result)
     
+    # APW HACK
     pool = multiprocessing.Pool(processes=8)
     for event_id in range(events_per_light_curve):
         tE = 10**np.random.uniform(0.3, 3.)
         pool.apply_async(simulate_events_worker, args=(sim_light_curve, tE, u0, reference_mag, indices), callback=callback)
-        #callback(simulate_light_curves_worker(sim_light_curve, tE, u0, reference_mag, indices))
+        #callback(simulate_events_worker(sim_light_curve, tE, u0, reference_mag, indices))
     
     pool.close()
     pool.join()
     
     dtypes = [(index,float) for index in indices] + [("tE",float),("u0",float),("m",float)]
     var_indices_with_events = np.array(var_indices_with_events, dtype=dtypes)
+    
     return var_indices_with_events
 
 def simulate_light_curves_worker(sim_light_curve, indices):

@@ -76,7 +76,9 @@ class PTFLightCurve(object):
             plt.show()
             return
         
-        ax.errorbar(self.mjd, self.mag, self.error, ecolor='0.7', capsize=0, **kwargs)
+        # APW Hack
+        idx = np.where(self.error < 0.5)
+        ax.errorbar(self.mjd[idx], self.mag[idx], self.error[idx], ecolor='0.7', capsize=0, **kwargs)
         ax.set_ylim(ax.get_ylim()[::-1])
         return ax
     
@@ -106,6 +108,12 @@ class PTFLightCurve(object):
         else:
             raise ValueError("I don't know how to handle {} files!".format(ext))
 
+    def slice_mjd(self, min=None, max=None):
+        """ Select out a part of the light curve between two MJD values -- INCLUSIVE """
+        idx = (self.mjd >= min) & (self.mjd <= max)
+        
+        return PTFLightCurve(mjd=self.mjd[idx], mag=self.mag[idx], error=self.error[idx])
+        
 class PDBLightCurve(PTFLightCurve):
     """ Subclass of PTFLightCurve that requires a field_id, ccd_id, and source_id """
     

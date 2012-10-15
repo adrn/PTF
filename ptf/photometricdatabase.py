@@ -242,7 +242,7 @@ class Field(object):
         for ccdid,ccd in self.ccds.items():
             chip = ccd.read()
             exposures_per_ccd[ccdid] = chip.exposures[:]
-            ccd.close()
+            #ccd.close()
         
         return exposures_per_ccd
     
@@ -256,7 +256,7 @@ class Field(object):
             chip = ccd.read()
             mjds = np.sort(chip.exposures.col("obsMJD"))
             baseline_per_ccd[ccdid] = mjds[-1]-mjds[0]
-            ccd.close()
+            #ccd.close()
         
         return baseline_per_ccd
     
