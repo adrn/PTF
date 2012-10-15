@@ -6,10 +6,6 @@ from __future__ import division
         For each field, we run simulations to determine the selection criteria for "interesting"
         variable sources, store those values in mongodb, then we use these criteria to go back
         to the PDB and select out candidates. 
-        
-    NEW IDEA! Today is 9/16/12. It is now 4:58 PM
-    - When doing delta chi-squared, subtract off the fit, recompute eta and see if it's still an outlier.
-        if it is, throw it away!
 """
 
 __author__ = "adrn <adrn@astro.columbia.edu>"
