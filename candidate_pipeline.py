@@ -111,10 +111,10 @@ def compute_selection_criteria_for_field(field, fpr=0.01, number_of_fpr_light_cu
         for source_id in source_ids:
             light_curve = ccd.light_curve(source_id, barebones=True, clean=True)
             if len(light_curve.mjd) < min_number_of_good_observations: 
-                logger.debug("\tRejected source {}".format(source_id))
+                #logger.debug("\tRejected source {}".format(source_id))
                 continue
                 
-            logger.debug("\tSelected source {}".format(source_id))
+            #logger.debug("\tSelected source {}".format(source_id))
             these_indices = vi.simulate_light_curves_compute_indices(light_curve, num_simulated=number_of_fpr_simulations_per_light_curve, indices=indices)
             try:
                 simulated_light_curve_statistics = np.hstack((simulated_light_curve_statistics, these_indices))
@@ -246,6 +246,10 @@ def select_candidates(field, selection_criteria):
                (round(light_curve.u0, 2) < 1.34) and (round(light_curve.tE) > 2.) and \
                (indices["delta_chi_squared"] > 250.) and (light_curve.tE < 2.*baseline):
                 candidates.append(light_curve)
+            
+            elif (indices["eta"] <= lower_cut) and (new_eta <= lower_cut) and (indices["delta_chi_squared"] > 100.) and (indices["j"] > 250):
+                light_curve.tags = ["variable star candidate"]
+                candidates.append(light_curve)
         
         ccd.close()
     
@@ -262,6 +266,10 @@ def save_candidates_to_mongodb(candidates, collection):
             continue
         
         light_curve_document = mongo.light_curve_to_document(candidate, indices=candidate.indices)
+        try:
+            light_curve_document["tags"] += candidate.tags
+        except AttributeError:
+            pass
         mongo.save_light_curve_document_to_collection(light_curve_document, collection)
     
     return True
@@ -287,7 +295,7 @@ if __name__ == "__main__":
                     help="Number of light curves to select from each CCD.")
     parser.add_argument("--num-simulations", dest="num_simulations", default=100, type=int,
                     help="Number of simulations per light curve.")
-    parser.add_argument("--min-observations", dest="min_num_observations", default=100, type=int,
+    parser.add_argument("--min-observations", dest="min_num_observations", default=50, type=int,
                     help="The minimum number of observations")
     
     args = parser.parse_args()
@@ -312,7 +320,7 @@ if __name__ == "__main__":
         fields = all_fields[all_fields["num_exposures"] > args.min_num_observations]["field"]
         logger.info("Chose to run on all fields with >{} observations -- {} fields.".format(args.min_num_observations, len(fields)))
     
-    for field_id in sorted(fields[fields > 4383]):
+    for field_id in sorted(fields):
         # Skip field 101001 because it breaks the pipeline for some reason!
         if field_id == 101001: continue
         
@@ -337,8 +345,7 @@ if __name__ == "__main__":
         
         lctest = light_curve_collection.find_one({"field_id" : field.id})
         field_doc = field_collection.find_one({"_id" : field.id}, fields=["already_searched"])
-        was_searched = already_searched.find_one({"field_id" : field.id}) #HACK
-        if lctest != None or field_doc["already_searched"] or was_searched != None: 
+        if lctest != None or field_doc["already_searched"]: 
             logger.info("Already found in candidate database!")
             continue
             
@@ -354,6 +361,7 @@ if __name__ == "__main__":
                 field_collection.update({"_id" : field.id}, {"$set" : {"already_searched" : True}})
                 #already_searched.insert({"field_id" : field.id})
                 continue
+                
             logger.debug("Done with selection criteria simulation...saving to database")
             selection_criteria_document = {}
             selection_criteria_document["upper"] = selection_criteria["eta"]["upper"]
