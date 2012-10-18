@@ -12,6 +12,7 @@ import logging
 import numpy as np
 import apwlib.geometry as g
 from apwlib.globals import redText, greenText, yellowText
+import galacticutils
 
 # Create logger for this module
 logger = logging.getLogger(__name__)
@@ -37,9 +38,12 @@ pytable_base_string = os.path.join(match_path, "match_{filter.id:02d}_{field.id:
 filter_map = {"R" : 2, "g" : 1}
 inv_filter_map = {2 : "R", 1 : "g"}
 
-def quality_cut(sourcedata, source_id=None, ccd_edge_cutoff=15, barebones=False, where=[]):
+def quality_cut(sourcedata, source_id=None, ccd_edge_cutoff=15, barebones=True, where=[]):
     """ This function accepts a Pytables table object (from the 'sourcedata' table)
         and returns only the rows that pass the given quality cuts.
+        
+        Updated 2012-10-16:
+            David Levitan suggested not using sextractor bit 2, or IPAC bits 6 / 11.
         
         Parameters
         ----------
@@ -86,7 +90,7 @@ def quality_cut(sourcedata, source_id=None, ccd_edge_cutoff=15, barebones=False,
             5     Object's isophotal data are incomplete or corrupted.
             6     A memory overflow occurred during deblending.
             7     A memory overflow occurred during extraction.
-    """    
+    """
     x_cut1, x_cut2 = ccd_edge_cutoff, globals.ccd_size[0] - ccd_edge_cutoff
     y_cut1, y_cut2 = ccd_edge_cutoff, globals.ccd_size[1] - ccd_edge_cutoff
     
@@ -100,30 +104,33 @@ def quality_cut(sourcedata, source_id=None, ccd_edge_cutoff=15, barebones=False,
     else:
         where_string = ""
     
+    """
+    base_cut = '(x_image > {}) & (x_image < {}) & \
+                (y_image > {}) & (y_image < {}) & \
+                (relPhotFlags < 4) & \
+                ((ipacFlags & 6077) == 0) & \
+                (mag > 14.3) & (mag < 21) & \
+                ((sextractorFlags & 251) == 0)'.format(x_cut1, x_cut2, y_cut1, y_cut2)
+    """
+    base_cut = '(x_image > {}) & (x_image < {}) & \
+                (y_image > {}) & (y_image < {}) & \
+                (relPhotFlags < 4) & \
+                (mag > 14.3) & (mag < 21)'.format(x_cut1, x_cut2, y_cut1, y_cut2)
+    
     # Saturation limit, 14.3, based on email conversation with David Levitan
     if barebones:
-        # APW: if this is slow, don't do that comprehension
-        srcdata = [(x["matchedSourceID"], x["mjd"], x["mag"], x["magErr"], x["alpha_j2000"], x["delta_j2000"], x["sextractorFlags"]) for x in sourcedata.where(src + \
-                                       '(x_image > {}) & (x_image < {}) & \
-                                       (y_image > {}) & (y_image < {}) & \
-                                       (relPhotFlags < 4) & \
-                                       ( (ipacFlags == 2) | (ipacFlags == 0) ) & \
-                                       (mag > 14.3) & (mag < 22)'.format(x_cut1, x_cut2, y_cut1, y_cut2) + where_string)]
-        sourcedata = np.array(srcdata, dtype=[("matchedSourceID", int), ("mjd", float), ("mag", float), ("magErr", float), ("ra", float), ("dec", float), ("sextractorFlags", int)])
+        srcdata = [(x["matchedSourceID"], x["mjd"], x["mag"], x["magErr"], x["alpha_j2000"], x["delta_j2000"], x["sextractorFlags"], x["ipacFlags"]) for x in sourcedata.where(src + base_cut + where_string)]
+        sourcedata = np.array(srcdata, dtype=[("matchedSourceID", int), ("mjd", float), ("mag", float), ("magErr", float), ("ra", float), ("dec", float), ("sextractorFlags", int), ("ipacFlags", int)])
     else:
-        sourcedata = sourcedata.readWhere(src + \
-                                       '(x_image > {}) & (x_image < {}) & \
-                                       (y_image > {}) & (y_image < {}) & \
-                                       (relPhotFlags < 4) & \
-                                       ( (ipacFlags == 2) | (ipacFlags == 0) ) & \
-                                       (mag > 14.3) & (mag < 22)'.format(x_cut1, x_cut2, y_cut1, y_cut2) + where_string)
+        srcdata = [x for x in sourcedata.where(src + base_cut + where_string)]
+        sourcedata = np.array(srcdata, dtype=sourcedata.dtype)
     
-    # This checks to see the fraction of points that have bad sextractor flags -- if the majority of them are bad, this
-    #   is probably a blended source.
-    #print (np.sum(sourcedata["sextractorFlags"] > 0) / float(len(sourcedata)))
-    if (len(sourcedata) > 0) and (np.sum(sourcedata["sextractorFlags"] > 0) / float(len(sourcedata))) >= 0.25:
-        logger.debug("Skipping light curve due to blending")
-        sourcedata = np.array([], dtype=[("matchedSourceID", int), ("mjd", float), ("mag", float), ("magErr", float), ("ra", float), ("dec", float), ("sextractorFlags", int)])
+    if len(sourcedata) == 0:
+        return np.array([])
+    
+    # Now we want to filter out bitmasks, which *can't be done* in an expression -- very annoying.
+    mask = ((sourcedata["sextractorFlags"] & 251) == 0) & (((sourcedata["ipacFlags"] & 6077) == 0))
+    sourcedata = sourcedata[mask]
     
     sourcedata = sourcedata[np.isfinite(sourcedata["mag"]) & \
                             np.isfinite(sourcedata["mjd"]) & \
@@ -307,6 +314,21 @@ class CCD(object):
         self._file.close()
         self._file = None
     
+    def maximum_outlier_eta(self):
+        chip = self.read()
+        
+        sources = chip.sources.readWhere("(vonNeumannRatio > 0.)")
+        while True:
+            outlier = sources[np.array(sources["vonNeumannRatio"]).argmin()]
+            lc = self.light_curve(outlier["matchedSourceID"], clean=True)
+            if len(lc) < 10: 
+                sources = np.delete(sources, np.array(sources["vonNeumannRatio"]).argmin())
+            else:
+                break
+        
+        return lc
+        
+    
     def light_curve(self, source_id, mag_type="relative", clean=False, where=[], barebones=True):
         """ Get a light curve for a given source ID from this chip """
         
@@ -320,6 +342,9 @@ class CCD(object):
             else:
                 where_string = ""
             sourcedata = chip.sourcedata.readWhere('(matchedSourceID == {})'.format(source_id) + where_string)
+        
+        if len(sourcedata) == 0:
+            return PTFLightCurve(mjd=[], mag=[], error=[])
             
         mjd = sourcedata["mjd"]
         
@@ -331,10 +356,12 @@ class CCD(object):
             mag_err = sourcedata["magerr_auto"]/10000.0
         
         try:
-            #ra, dec = sourcedata[0]["alpha_j2000"], sourcedata[0]["delta_j2000"]
-            ra, dec = sourcedata[0]["ra"], sourcedata[0]["dec"]
+            ra, dec = sourcedata[0]["alpha_j2000"], sourcedata[0]["delta_j2000"]
         except IndexError: # no sourcedata for this source
-            ra, dec = None, None
+            try:
+                ra, dec = sourcedata[0]["ra"], sourcedata[0]["dec"]
+            except IndexError:
+                ra, dec = None, None
         
         if barebones:
             #return PTFLightCurve(mjd=mjd, mag=mag, error=mag_err)
@@ -360,6 +387,23 @@ class CCD(object):
             
         else:
             raise NotImplementedError()
+
+def random_light_curve(field_id=100101, *args, **kwargs):
+    field = Field(field_id, "R")
+    ccd = field.ccds.values()[np.random.randint(len(field.ccds.values()))]
+    chip = ccd.read()
+    sources = chip.sources.readWhere("ngoodobs > 10")
+    np.random.shuffle(sources)
+    
+    for source in sources:
+        lc = ccd.light_curve(source["matchedSourceID"], *args, **kwargs)
+        if len(lc) > 10:
+            return lc
+
+def get_light_curve(field_id, ccd_id, source_id, **kwargs):
+    field = Field(field_id, "R")
+    ccd = field.ccds[ccd_id]
+    return ccd.light_curve(source_id, **kwargs)
 
 # ==================================================================================================
 #   Convenience functions
