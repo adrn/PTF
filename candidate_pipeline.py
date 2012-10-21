@@ -225,7 +225,6 @@ def select_candidates(field, selection_criteria):
     
     candidates = []
     for ccd in field.ccds.values():
-        if ccd.id != 2: continue
         logger.info(greenText("Starting with CCD {}".format(ccd.id)))
         chip = ccd.read()
         
@@ -245,11 +244,9 @@ def select_candidates(field, selection_criteria):
             if light_curve != None and len(light_curve) < min_number_of_good_observations: continue
             
             # Re-compute eta now that we've (hopefully) cleaned out any bad data
-            # TODO: I need a better system here for computing delta chi-squared. It should really do something iterative!
             indices = pa.compute_variability_indices(light_curve, indices=["eta", "delta_chi_squared", "j", "k", "sigma_mu"])
             light_curve.indices = indices
             
-            # Make sure microlensing model is a much better fit than a straight line
             # TODO: do something with this num_attempts!
             num_attempts = 5
             ml_chisq = 1E6
@@ -292,7 +289,7 @@ def select_candidates(field, selection_criteria):
                     
                 if (fp["peak_period"][0] < 2.*light_curve.baseline):
                     if max(fp["peak_power"]) > 25.:
-                        light_curve.tags.append("variable star candidate")
+                        light_curve.tags.append("variable star")
                         if light_curve not in candidates: candidates.append(light_curve)
         
         ccd.close()
