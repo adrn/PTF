@@ -183,15 +183,21 @@ def load_all_fields(field_collection):
     loaded_field_ids = [a["_id"] for a in field_collection.find(fields=["_id"])]
     
     field_ids_to_load = list(set(R_fields["field"]).difference(set(loaded_field_ids)))
+    logger.debug("{} fields to load".format(len(field_ids_to_load)))
     
     for field_id in field_ids_to_load:
-        field = Field(field_id)
+        logger.debug("Field {}".format(field_id))
+        field = Field(field_id, "R")
+        
+        if field.ra == None: 
+            print field.id
+            continue
         
         # Double check that it's not already in there!
         if field_collection.find_one({"_id" : field.id}) != None:
             logger.info("Field is already loaded! What happened?! {}".format(field.id))
             continue
-            
+        
         field_doc = field_to_document(field)
         field_collection.insert(field_doc)
         logger.debug("Field loaded into mongodb {}".format(field.id))

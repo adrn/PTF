@@ -11,6 +11,9 @@ import logging
 import numpy as np
 import matplotlib.pyplot as plt
 
+# PTF
+import galacticutils
+
 # ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=
 
 class PTFLightCurve(object):
@@ -22,7 +25,7 @@ class PTFLightCurve(object):
             which is any numpy recarray that contains extra information about the light
             curve data.
         """
-            
+
         idx = np.argsort(mjd)
         self.amjd = self.mjd = np.array(mjd)[idx].astype(np.float64)
         self.amag = self.mag = np.array(mag)[idx].astype(np.float64)
@@ -76,7 +79,9 @@ class PTFLightCurve(object):
             plt.show()
             return
         
-        ax.errorbar(self.mjd, self.mag, self.error, ecolor='0.7', capsize=0, **kwargs)
+        # APW Hack
+        idx = np.where(self.error < 0.5)
+        ax.errorbar(self.mjd[idx], self.mag[idx], self.error[idx], ecolor='0.7', capsize=0, **kwargs)
         ax.set_ylim(ax.get_ylim()[::-1])
         return ax
     
@@ -106,6 +111,38 @@ class PTFLightCurve(object):
         else:
             raise ValueError("I don't know how to handle {} files!".format(ext))
 
+    def slice_mjd(self, min=None, max=None):
+        """ Select out a part of the light curve between two MJD values -- INCLUSIVE """
+        idx = (self.mjd >= min) & (self.mjd <= max)
+        
+        return PTFLightCurve(mjd=self.mjd[idx], mag=self.mag[idx], error=self.error[idx])
+    
+    def __len__(self):
+        return len(self.mjd)
+    
+    def sdss_colors(self, mag_type="psf"):
+        """ Returns a dictionary with SDSS colors for this object. mag_type can be 'psf' or 'mod' """
+        try:
+            sdssData = galacticutils.querySDSSCatalog(self.ra, self.dec)
+        except RuntimeError:
+            return None
+        
+        if sdssData == None:
+            return None
+        
+        mag_type = mag_type.lower()
+        mags = {}
+        
+        for color in "ugriz":
+            mags[color] = sdssData[color + mag_type.capitalize()][0]
+            mags[color+"_err"] = sdssData[color + mag_type.capitalize()][1]
+            
+        return mags
+    
+    @property
+    def baseline(self):
+        return self.mjd.max()-self.mjd.min()
+        
 class PDBLightCurve(PTFLightCurve):
     """ Subclass of PTFLightCurve that requires a field_id, ccd_id, and source_id """
     

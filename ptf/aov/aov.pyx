@@ -9,6 +9,12 @@ laptop:
     -l python \
     -I/System/Library/Frameworks/Python.framework/Versions/2.7/Extras/lib/python/numpy/core/include \
     -o aov.so aov.c
+nav:
+    gcc -shared -pthread -fPIC -fwrapv -O2 -Wall -fno-strict-aliasing \
+    -I /scr2/kepler/dlevitan/sw/epd-7.1-1-rh5-x86_64/include/python2.7/ \
+    -L /scr2/kepler/dlevitan/sw/epd-7.1-1-rh5-x86_64/include/python2.7/ \
+    -I /scr2/kepler/dlevitan/sw/epd-7.0-2-rh5-x86_64/lib/python2.7/site-packages/numpy/core/include/ \
+    -o aov.so aov.c
 """
 from __future__ import division
 

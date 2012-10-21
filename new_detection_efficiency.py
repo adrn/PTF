@@ -77,7 +77,7 @@ def prune_index_distribution(index, index_array):
     else:
         return
 
-def detection_efficiency_for_field(field, ccds=range(12), config=dict(), overwrite=False, indices=["eta","sigma_mu","j","k"], plot=True):
+def detection_efficiency_for_field(field, ccds=range(12), config=dict(), overwrite=False, indices=["eta","sigma_mu","j","k", "delta_chi_squared"], plot=True):
     """ Run a detection efficiency simulation for a PTF field """   
     
     # Get configuration variables or defaults
@@ -90,7 +90,7 @@ def detection_efficiency_for_field(field, ccds=range(12), config=dict(), overwri
     # Convenience variables for filenames
     file_base = "field{:06d}_Nperccd{}_Nevents{}".format(field.id, number_of_microlensing_light_curves, number_of_microlensing_simulations_per_light_curve) + ".{ext}"
     pickle_filename = os.path.join("data", "new_detection_efficiency", file_base.format(ext="pickle"))
-    plot_filename = os.path.join("plots", "new_detection_efficiency", file_base.format(ext="png"))
+    plot_filename = os.path.join("plots", "new_detection_efficiency", file_base.format(ext="pdf"))
     
     if not os.path.exists(os.path.dirname(pickle_filename)):
         os.mkdir(os.path.dirname(pickle_filename))
@@ -226,27 +226,6 @@ def detection_efficiency_for_field(field, ccds=range(12), config=dict(), overwri
             selection_criteria[index]["upper"] = mu + Nsigma*sigma
             selection_criteria[index]["lower"] = mu - Nsigma*sigma
         
-        for index in indices:
-            #this_index_values = prune_index_distribution(index, simulated_microlensing_statistics)
-            this_index_values = simulated_microlensing_statistics[index]
-            if index == "eta":
-                selection = this_index_values > 0
-                this_index_values = np.log10(this_index_values[selection])
-            elif index == "sigma_mu":
-                selection = np.ones_like(this_index_values).astype(bool)
-                this_index_values = np.log10(np.fabs(this_index_values))
-            elif index == "j":
-                selection = this_index_values > 0
-                this_index_values = np.log10(this_index_values[selection])
-            elif index == "k":
-                selection = np.ones_like(this_index_values).astype(bool)
-                this_index_values = np.log10(this_index_values)
-            elif index == "delta_chi_squared":
-                selection = this_index_values > 0
-                this_index_values = np.log10(this_index_values[selection])
-            
-            simulated_microlensing_statistics = simulated_microlensing_statistics[selection]
-        
         f = open(pickle_filename, "w")
         pickle.dump((simulated_microlensing_statistics, selection_criteria), f)
         f.close()       
@@ -258,8 +237,28 @@ def detection_efficiency_for_field(field, ccds=range(12), config=dict(), overwri
     # Now compute the detection efficiency of each index using the selection criteria from the false positive rate simulation
     selected_distributions = {}
     detection_efficiencies = {}
-    for index in indices:        
+    for index in indices:
+        #this_index_values = simulated_microlensing_statistics[index]
         this_index_values = np.log10(simulated_microlensing_statistics[index])
+        
+        """
+        if index == "eta":
+            selection = this_index_values > 0
+            this_index_values = np.log10(this_index_values[selection])
+        elif index == "sigma_mu":
+            selection = np.ones_like(this_index_values).astype(bool)
+            this_index_values = np.log10(np.fabs(this_index_values))
+        elif index == "j":
+            selection = this_index_values > 0
+            this_index_values = np.log10(this_index_values[selection])
+        elif index == "k":
+            selection = np.ones_like(this_index_values).astype(bool)
+            this_index_values = np.log10(this_index_values)
+        elif index == "delta_chi_squared":
+            selection = this_index_values > 0
+            this_index_values = np.log10(this_index_values[selection])
+        """
+        
         selected_ml_statistics = simulated_microlensing_statistics[(this_index_values > selection_criteria[index]["upper"]) | (this_index_values < selection_criteria[index]["lower"])]
         selected_distributions[index] = selected_ml_statistics
         
@@ -268,8 +267,8 @@ def detection_efficiency_for_field(field, ccds=range(12), config=dict(), overwri
         detection_efficiencies[index] = total_detection_efficiency
     
     if plot:
-        plot_distributions(selected_distributions, simulated_microlensing_statistics,detection_efficiencies, params=["tE", "u0", "m"], filename=plot_filename, indices=indices)
-        
+        plot_distributions(selected_distributions, simulated_microlensing_statistics, detection_efficiencies, params=["tE", "u0", "m"], filename=plot_filename, indices=indices)
+    
     return simulated_microlensing_statistics, selected_distributions
 
 def plot_distributions(selected_distributions, simulated_microlensing_statistics, detection_efficiencies, params=["u0", "tE"], Nbins=50, filename=None, indices=None):
@@ -279,7 +278,7 @@ def plot_distributions(selected_distributions, simulated_microlensing_statistics
         #os.path.join(plot_path, )
         raise NotImplementedError()
     
-    fig,axes = plt.subplots(len(params), len(selected_distributions.keys()), figsize=(24,14))
+    fig,axes = plt.subplots(len(params), len(selected_distributions.keys()), figsize=(18,12))
     param_bins = {"tE" : 10**np.linspace(0.3, 3., Nbins),
                   "u0" : np.linspace(0., 1.34, Nbins),
                   "m" : np.linspace(14.3, 21.5, Nbins)}
@@ -287,28 +286,38 @@ def plot_distributions(selected_distributions, simulated_microlensing_statistics
     if indices == None:
         indices = selected_distributions.keys()
     
+    params_to_label = {"u0" : "$u_0$", "t0" : "$t_0$", "tE" : "$t_E$", "m" : "$m_0$"}
     for ii,param in enumerate(params):
         bins = None
         for jj,index in enumerate(indices):
-            n, bins, patches = axes[ii,jj].hist(simulated_microlensing_statistics[param], bins=param_bins[param], histtype="step", color="r")
+            n, bins, patches = axes[jj,ii].hist(simulated_microlensing_statistics[param], bins=param_bins[param], histtype="step", color="k", linestyle="dashed")
             try:
-                n, bins, patches = axes[ii,jj].hist(selected_distributions[index][param], bins=param_bins[param], histtype="step", color="k", alpha=0.7)
+                n, bins, patches = axes[jj,ii].hist(selected_distributions[index][param], bins=param_bins[param], histtype="step", color="r", alpha=0.7)
             except ValueError:
                 logging.warn("Failed to create histogram for {}".format(index))
             
-            if jj == 0:
-                axes[ii,jj].set_ylabel(param, fontsize=24)
+            plt.setp(axes[jj,ii].get_yticklabels(), visible=False)
             
             if ii == 0:
-                axes[ii,jj].set_title(r"Total $\varepsilon$={:.1f}".format(detection_efficiencies[index]*100.))
+                axes[jj,ii].set_ylabel(index_to_label[index], fontsize=24, rotation=0)
             
-            if ii == (len(params)-1):
-                axes[ii,jj].set_xlabel(index_to_label[index], fontsize=24)
+            if ii == 0:
+                ylim = axes[jj,ii].get_ylim()
+                text_y = ylim[1] - (ylim[1]-ylim[0])/5.
+                axes[jj,ii].text(3, text_y, r"Total $\varepsilon$={:.1f}%".format(detection_efficiencies[index]*100.), fontsize=18)
+            
+            if jj != (len(params)-1):
+                plt.setp(axes[jj,ii].get_xticklabels(), visible=False)
+            
+            if jj == (len(params)-1):
+                axes[jj,ii].set_xlabel(params_to_label[param], fontsize=24)
             
             if param == "tE":
-                axes[ii,jj].set_xscale("log")
+                axes[jj,ii].set_xscale("log")
     
-    fig.suptitle("Field: {}".format(field.id))
+    fig.subplots_adjust(hspace=0.1, wspace=0.1)
+    #fig.suptitle("Field: {}".format(field.id), fontsize=24)
+    #fig.savefig(filename, bbox_inches="tight")
     fig.savefig(filename)
 
 def get_best_light_curve(field, ccd_id):
@@ -325,10 +334,15 @@ def get_best_light_curve(field, ccd_id):
 def plot_best_light_curve(field_id, ccd_id):
     field = pdb.Field(field_id, "R")
     lc = get_best_light_curve(field, ccd_id)
-    fig = plt.figure(figsize=(15,10))
+    fig = plt.figure(figsize=(15,5))
     ax = fig.add_subplot(111)
     lc.plot(ax)
-    fig.savefig("plots/new_detection_efficiency/example_light_curve_f{}_ccd{}.png".format(field.id, ccd_id))
+    #ax.yaxis.set_ticks([])
+    from pylab import ScalarFormatter
+    ax.yaxis.set_major_formatter(ScalarFormatter(False))
+    ax.set_xlabel("MJD", fontsize=20)
+    ax.set_ylabel("$R$ (mag)", fontsize=20)
+    fig.savefig("plots/new_detection_efficiency/example_light_curve_f{}_ccd{}.pdf".format(field.id, ccd_id), bbox_inches="tight")
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
@@ -360,12 +374,12 @@ if __name__ == "__main__":
         logger.setLevel(logging.INFO)
     
     #indices = ["eta","sigma_mu","j","k", "delta_chi_squared"]
-    indices = ["eta","delta_chi_squared"]
+    indices = ["eta","delta_chi_squared", "j"]
     
     config = dict()
     config["number_of_fpr_light_curves"] = args.limit
     config["number_of_fpr_simulations_per_light_curve"] = args.N
-    config["number_of_microlensing_light_curves"] = args.limit
+    config["number_of_microlensing_light_curves"] = args.limit*10
     config["number_of_microlensing_simulations_per_light_curve"] = args.N
     
     np.random.seed(42)
@@ -377,6 +391,8 @@ if __name__ == "__main__":
                                                                                                plot=args.plot)
     if args.plot:
         plot_best_light_curve(args.field_id, 2)
+    
+    
     sys.exit(0)
     fig, axes = plt.subplots(1, 1, sharex=True, figsize=(15,10))
     for ii,field_id in enumerate([4588, 100152, 3756]):
@@ -386,6 +402,9 @@ if __name__ == "__main__":
         axes.text(55200, ii+0.1, str(field_id))
     axes.set_ylim(-0.2, 2.2)
     fig.savefig("plots/new_detection_efficiency/example_light_curves.png")
+
+
+'''
 #
 # Some older stuff
 #
@@ -513,3 +532,4 @@ def example_light_curves(field, u0s=[], limiting_mags=[]):
     
     fig.subplots_adjust(hspace=0.1, wspace=0.1, right=0.88)
     fig.savefig(plot_filename)
+'''

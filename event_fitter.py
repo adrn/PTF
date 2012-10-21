@@ -230,6 +230,7 @@ def fit_model_to_light_curve(light_curve, nwalkers=200, nburn_in=100, nsamples=2
     return sampler
 
 if __name__ == "__main__":
+    import matplotlib.gridspec as gridspec
     
     from argparse import ArgumentParser
 
@@ -281,46 +282,75 @@ if __name__ == "__main__":
         light_curve.mag = light_curve.mag[idx]
         light_curve.error = light_curve.error[idx]
     sampler = fit_model_to_light_curve(light_curve, nwalkers=args.walkers, nsamples=args.steps, nburn_in=args.burn_in)
-                
+    end_chain = sampler.flatchain[-args.walkers*100:]
+    
     plt.clf()
-    plt.figure(figsize=(15,15))
+    plt.figure(figsize=(10,14))
+    param_to_label = {"m0" : r"$M_0$", "u0" : r"$u_0$", "t0" : r"$t_0$", "tE" : r"$t_E$"}
     for i,name in enumerate(["m0", "u0", "t0", "tE"]):
+        
+        mn = np.mean(end_chain,axis=0)[i]
+        std = np.std(end_chain,axis=0)[i]
+        bins = np.linspace(mn - 5*std, mn + 5*std, 100)
+            
         plt.subplot(2,2,i+1)
-        plt.hist(sampler.flatchain[:,i], 100, color="k", histtype="step")
-        plt.title("{}".format(name))
-        plt.ylabel("Posterior Probability")
+        plt.hist(sampler.flatchain[:,i], bins=bins, color="k", histtype="step")
+        plt.title("{}".format(param_to_label[name]), fontsize=26)
+        plt.gca().yaxis.set_ticks([])
     
-    plt.savefig("plots/event_fitter/field{}_ccd{}_source{}_posterior.png".format(field.id, ccd.id, args.source_id))
+    plt.suptitle("Posterior Probability Distributions\nField: {}, CCD: {}, Source ID: {}".format(field.id, ccd.id, args.source_id), fontsize=24)
+    plt.tight_layout()
+    plt.subplots_adjust(top=0.9)
+    plt.savefig("plots/event_fitter/field{}_ccd{}_source{}_posterior.pdf".format(field.id, ccd.id, args.source_id))
     
-    fig = plt.figure(figsize=(8,8))
-    ax = fig.add_subplot(111)
-    ax_inset = fig.add_axes([0.65, 0.65, 0.25, 0.25])
+    # LIGHT CURVE FIGURE
     
-    mjd = np.arange(light_curve.mjd.min(), light_curve.mjd.max(), 0.2)
-    end_chain = sampler.flatchain[-100:]
+    fig = plt.figure(figsize=(8,12))
+    fig.suptitle("Field: {}, CCD: {}, Source ID: {}".format(field.id, ccd.id, args.source_id), fontsize=23)
+    gs = gridspec.GridSpec(2, 1, height_ratios=[3,1])
+    ax = plt.subplot(gs[0])
+    ax2 = plt.subplot(gs[1])
+    #ax = fig.add_subplot(211)
+    #ax2 = fig.add_subplot(212)
+    #ax_inset = fig.add_axes([0.65, 0.1, 0.25, 0.25])
+    
+    mjd = np.arange(light_curve.mjd.min()-1000., light_curve.mjd.max()+1000., 0.2)
     first_t0 = None
-    for ii in np.random.randint(100, size=10):
+    for ii in np.random.randint(len(end_chain), size=100):
         link = end_chain[ii]
         m0, u0, t0, tE = link
+        
+        # More than 100% error
+        if np.any(np.fabs(link - np.mean(end_chain,axis=0)) / np.mean(end_chain,axis=0) > 0.75) or tE < 8:
+            continue
+        
         if first_t0 == None:
             first_t0 = t0
         s_light_curve = SimulatedLightCurve(mjd=mjd, error=np.zeros_like(mjd), mag=m0)
         s_light_curve.addMicrolensingEvent(t0=t0, u0=u0, tE=tE)
-        ax.plot(s_light_curve.mjd-first_t0, s_light_curve.mag, "r-", alpha=0.2)
-        ax_inset.plot(s_light_curve.mjd-first_t0, s_light_curve.mag, "r-", alpha=0.2)
+        ax.plot(s_light_curve.mjd-first_t0, s_light_curve.mag, "r-", alpha=0.05)
+        #ax_inset.plot(s_light_curve.mjd-first_t0, s_light_curve.mag, "r-", alpha=0.05)
     
-    light_curve.mjd -= first_t0
-    light_curve.plot(ax)
-    ax.set_xlim(-4.*tE, 4.*tE)
-    ax.text(-3.5*tE, np.max(s_light_curve.mag)+0.2, r"$u_0\approx${u0:.3f}".format(u0=u0) + "\n" + r"$t_E\approx${tE:.2f} days".format(tE=tE))
-    ax.set_xlabel(r"time-$t_0$ [days]", fontsize=24)
-    ax.set_ylabel(r"$M_R$", fontsize=24)
+    mean_m0, mean_u0, mean_t0, mean_tE = np.median(end_chain,axis=0)
+    std_m0, std_u0, std_t0, std_tE = np.std(end_chain,axis=0)
     
-    light_curve.plot(ax_inset)
-    ax_inset.set_ylim(light_curve.mag.min()+abs(light_curve.mag.min()-m0)/6., light_curve.mag.min()-0.05)
-    ax_inset.set_xlim(-0.3*tE, 0.3*tE)
-    ax_inset.set_xticklabels([])
-    ax_inset.set_yticklabels([])
+    light_curve.mjd -= mean_t0
+    zoomed_light_curve = light_curve.slice_mjd(-3.*mean_tE, 3.*mean_tE)
+    zoomed_light_curve.plot(ax)
+    light_curve.plot(ax2)
+    ax.set_xlim(-3.*mean_tE, 3.*mean_tE)
+    ax.text(-2.5*mean_tE, np.min(s_light_curve.mag), r"$u_0=${u0:.3f}$\pm${std:.3f}".format(u0=u0, std=std_u0) + "\n" + r"$t_E=${tE:.1f}$\pm${std:.1f} days".format(tE=mean_tE, std=std_tE), fontsize=19)
+    #ax.set_xlabel(r"time-$t_0$ [days]", fontsize=24)
+    ax.set_ylabel(r"$R$ (mag)", fontsize=24)
     
-    fig.savefig("plots/event_fitter/field{}_ccd{}_source{}.png".format(field.id, ccd.id, args.source_id))
+    ax2.set_xlabel(r"time-$t_0$ [days]", fontsize=24)
+    ax2.set_ylabel(r"$R$ (mag)", fontsize=24)
+    
+    #light_curve.plot(ax_inset)
+    #ax_inset.set_ylim(s_light_curve.mag.min()+abs(s_light_curve.mag.min()-m0)/5., s_light_curve.mag.min()-0.05)
+    #ax_inset.set_xlim(-0.3*tE, 0.3*tE)
+    #ax_inset.set_xticklabels([])
+    #ax_inset.set_yticklabels([])
+    
+    fig.savefig("plots/event_fitter/field{}_ccd{}_source{}.pdf".format(field.id, ccd.id, args.source_id))
         
