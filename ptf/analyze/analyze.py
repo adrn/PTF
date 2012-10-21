@@ -63,10 +63,11 @@ def py_microlensing_error_func(p, t, mag, sigma):
     return microlensing_error_func((u0, t0, tE, m0), t, mag, sigma)
     #return (mag - microlensing_model(p, t)) / sigma
 
-def fit_subtract_microlensing(light_curve):
+def fit_subtract_microlensing(light_curve, fit_data=None):
     """ Fit and subtract a microlensing event to the light curve """
     
-    fit_data = fit_microlensing_event(light_curve)
+    if fit_data == None:
+        fit_data = fit_microlensing_event(light_curve)
     
     #print result.chisqr, result.success, result.ier
     #print 'Best-Fit Values:'
@@ -80,18 +81,27 @@ def fit_subtract_microlensing(light_curve):
     light_curve.t0 = fit_data["t0"].value
     light_curve.u0 = fit_data["u0"].value
     light_curve.m0 = fit_data["m0"].value
-    light_curve.chisqr = fit_data["result"].chisqr
+    light_curve.chisqr = float(fit_data["result"].chisqr)
     
     return light_curve_new
 
-def fit_microlensing_event(light_curve):
+def fit_microlensing_event(light_curve, initial_params={}):
     """ Fit and subtract a microlensing event to the light curve """
     
+    t0 = np.random.normal(light_curve.mjd[np.argmin(light_curve.mag)], 1.)
+    if t0 > light_curve.mjd.max() or t0 < light_curve.mjd.min():
+        t0 = light_curve.mjd[np.argmin(light_curve.mag)]
+        
+    initial_tE = initial_params.get("tE", 10**np.random.uniform(1., 2.5))
+    initial_t0 = initial_params.get("t0", t0)
+    initial_u0 = initial_params.get("u0", np.random.uniform(1E-6, 1.33))
+    initial_m0 = initial_params.get("u0", np.random.normal(np.median(light_curve.mag), 0.5))
+    
     params = Parameters()
-    params.add('tE', value=20, min=2., max=1000.)
-    params.add('t0', value=light_curve.mjd[np.argmin(light_curve.mag)], min=light_curve.mjd.min(), max=light_curve.mjd.max())
-    params.add('u0', value=0.5, min=0.0, max=1.34)
-    params.add('m0', value=np.median(light_curve.mag))
+    params.add('tE', value=initial_tE, min=2., max=1000.)
+    params.add('t0', value=initial_t0, min=light_curve.mjd.min(), max=light_curve.mjd.max())
+    params.add('u0', value=initial_u0, min=0.0, max=1.34)
+    params.add('m0', value=initial_m0)
     
     result = minimize(py_microlensing_error_func, params, args=(light_curve.mjd, light_curve.mag, light_curve.error))
     
@@ -184,7 +194,7 @@ def test_estimate_continuum():
         ax.legend()
         plt.show()
 
-def gaussian_line_delta_chi_squared(light_curve):
+def gaussian_line_delta_chi_squared(light_curve, **kwargs):
     """ Compute the difference in chi-squared between a Gaussian and a straight line """
     
     #error_func1=linear_error_func, \
@@ -196,17 +206,17 @@ def gaussian_line_delta_chi_squared(light_curve):
                                 model1_initial=(median_mag,),\
                                 error_func2=gaussian_error_func, \
                                 model2_initial=(-5.0, light_curve.mjd[np.argmin(light_curve.mag)], 10.0, median_mag), \
-                                return_params=True)
+                                return_params=True, **kwargs)
     
     if gaussian_params[2] < 1. or gaussian_params[0] > 0. or gaussian_params[1] > max(light_curve.mjd) or gaussian_params[1] < min(light_curve.mjd):
         dcs = -100.0
     
     # Get points around the Gaussian fit that are brighter than the median magnitude
-    w, = np.where((light_curve.mjd > (gaussian_params[1]-gaussian_params[2])) & (light_curve.mjd < (gaussian_params[1]+gaussian_params[2])) & (light_curve.mag < gaussian_params[3]))
-    N = len(w)
+    #w, = np.where((light_curve.mjd > (gaussian_params[1]-gaussian_params[2])) & (light_curve.mjd < (gaussian_params[1]+gaussian_params[2])) & (light_curve.mag < gaussian_params[3]))
+    #N = len(w)
     
-    if N < 10:
-        dcs = -100.0
+    #if N < 10:
+    #    dcs = -100.0
     
     """
     if dcs > 100:
@@ -297,12 +307,12 @@ def compute_delta_chi_squared(light_curve, error_func1, model1_initial, error_fu
     model1_chisq = np.sum(error_func1(model1_params, \
                                        light_curve.mjd, \
                                        light_curve.mag, \
-                                       light_curve.error)**2) / len(model1_params)
+                                       light_curve.error)**2) #/ len(model1_params)
     
     model2_chisq = np.sum(error_func2(model2_params, \
                                        light_curve.mjd, \
                                        light_curve.mag, \
-                                       light_curve.error)**2) / len(model2_params)
+                                       light_curve.error)**2) #/ len(model2_params)
     
     if return_params:
         return model1_chisq - model2_chisq, (model1_params, model2_params)

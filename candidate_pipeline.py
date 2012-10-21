@@ -15,6 +15,7 @@ import os
 import math
 import logging
 import cPickle as pickle
+import multiprocessing
 
 # Third-party
 import numpy as np
@@ -224,47 +225,57 @@ def select_candidates(field, selection_criteria):
     
     candidates = []
     for ccd in field.ccds.values():
+        if ccd.id != 2: continue
         logger.info(greenText("Starting with CCD {}".format(ccd.id)))
         chip = ccd.read()
         
-        sources = chip.sources.readWhere("(ngoodobs > {}) & \
+        source_ids = chip.sources.readWhere("(ngoodobs > {}) & \
                                           (vonNeumannRatio > 0.0) & \
                                           ((vonNeumannRatio > {}) | \
-                                          (vonNeumannRatio < {}))".format(min_number_of_good_observations, 10**selection_criteria["upper"], 10**selection_criteria["lower"]))
+                                          (vonNeumannRatio < {}))".format(min_number_of_good_observations, 10**selection_criteria["upper"], 10**selection_criteria["lower"]), \
+                                          field="matchedSourceID")
                                           
-        logger.debug("Selected {} candidates from PDB".format(len(sources)))
+        logger.debug("Selected {} candidates from PDB".format(len(source_ids)))
         
-        for source in sources:
-            # APW: TODO -- this is still the biggest time hog!!!
-            light_curve = ccd.light_curve(source["matchedSourceID"], barebones=True, clean=True)
+        for source_id in source_ids:
+            # APW: TODO -- this is still the biggest time hog!!! It turns out it's still faster than reading the whole thing into memory, though!
+            light_curve = ccd.light_curve(source_id, barebones=True, clean=True)
             
             # If light curve doesn't have enough clean observations, skip it
             if light_curve != None and len(light_curve) < min_number_of_good_observations: continue
             
             # Re-compute eta now that we've (hopefully) cleaned out any bad data
+            # TODO: I need a better system here for computing delta chi-squared. It should really do something iterative!
             indices = pa.compute_variability_indices(light_curve, indices=["eta", "delta_chi_squared", "j", "k", "sigma_mu"])
             light_curve.indices = indices
             
             # Make sure microlensing model is a much better fit than a straight line
-            params = pa.fit_microlensing_event(light_curve)
-            chi_sq = np.sum(pa.py_microlensing_error_func(params, light_curve.mjd, light_curve.mag, light_curve.error)**2)
-            #if indices["delta_chi_squared"] < 
+            # TODO: do something with this num_attempts!
+            num_attempts = 5
+            ml_chisq = 1E6
+            for ii in range(num_attempts):
+                params = pa.fit_microlensing_event(light_curve)
+                new_chisq = params["result"].chisqr
+                
+                if new_chisq < ml_chisq:
+                    ml_chisq = new_chisq
+                    break
             
             # Try to fit a microlensing model, then subtract it, then recompute eta and see
             #   if it is still an outlier
-            new_light_curve = pa.fit_subtract_microlensing(light_curve)
+            new_light_curve = pa.fit_subtract_microlensing(light_curve, fit_data=params)
             new_eta = pa.eta(new_light_curve)
             
             light_curve.tags = []
             if (indices["eta"] <= lower_cut) and (new_eta >= lower_cut) and \
                (round(light_curve.u0, 2) < 1.34) and (round(light_curve.tE) > 2.) and \
-               (light_curve.tE < 2.*light_curve.baseline): # (indices["delta_chi_squared"] > 250.) and 
+               (light_curve.tE < 2.*light_curve.baseline) and indices["delta_chi_squared"] > 100:
                 
                 # Count number of data points between t0-3*tE and t0+3*tE, make sure we have at least a few above 2sigma
                 sliced_lc = light_curve.slice_mjd(params["t0"].value-3.*params["tE"].value, params["t0"].value+3.*params["tE"].value)
                 if sum(sliced_lc.mag > 2.*np.median(light_curve.mag)) < 3:
-                    logger.debug("Light curve has fewer than 3 observations in a peak > 2sigma: {}".format((field.id, ccd.id, source["matchedSourceID"])))
-                    #continue
+                    logger.debug("Light curve has fewer than 3 observations in a peak > 2sigma: {}".format((field.id, ccd.id, light_curve.source_id)))
+                    continue
                     
                 if light_curve not in candidates: candidates.append(light_curve)
 
@@ -298,7 +309,13 @@ def save_candidates_to_mongodb(candidates, collection):
             logging.error("Candidate light curve has no 'ra' or 'dec' attributes!")
             continue
         
-        light_curve_document = mongo.light_curve_to_document(candidate, indices=candidate.indices)
+        microlensing_fit = {}
+        microlensing_fit["tE"] = candidate.tE
+        microlensing_fit["t0"] = candidate.t0
+        microlensing_fit["u0"] = candidate.u0
+        microlensing_fit["m0"] = candidate.m0
+        microlensing_fit["chisqr"] = candidate.chisqr
+        light_curve_document = mongo.light_curve_to_document(candidate, indices=candidate.indices, microlensing_fit=microlensing_fit)
         try:
             light_curve_document["tags"] += candidate.tags
         except AttributeError:
