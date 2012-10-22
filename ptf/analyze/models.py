@@ -44,20 +44,32 @@ microlensing_model = lambda p, x: p["m0"] - 2.5*np.log10(A(p, t))
 # ---------------------------------------------------------
 def microlensing_error_func(p, t, mag, sigma):
     """ Helper for C-based microlensing error function """
-    u0, t0, tE, m0 = p["u0"], p["t0"], p["tE"], p["m0"]
+    try:
+        u0, t0, tE, m0 = p["u0"].value, p["t0"].value, p["tE"].value, p["m0"].value
+    except AttributeError:
+        u0, t0, tE, m0 = p["u0"], p["t0"], p["tE"], p["m0"]
     return _microlensing_error_func((u0, t0, tE, m0), t, mag, sigma)
 
 def gaussian_error_func(p, t, mag, sigma):
     """ Helper for C-based Gaussian error function """
-    A, mu, sig, B = p["A"], p["mu"], p["sigma"], p["B"]
+    try:
+        A, mu, sig, B = p["A"].value, p["mu"].value, p["sigma"].value, p["B"].value
+    except AttributeError:
+        A, mu, sig, B = p["A"], p["mu"], p["sigma"], p["B"]
     return _gaussian_error_func((A, mu, sig, B), t, mag, sigma)
 
 def linear_error_func(p, t, mag, sigma):
-    """ Helper for C-based Gaussian error function """
-    m, b = p["m"], p["b"]
+    """ Helper for C-based linear error function """
+    try:
+        m, b = p["m"].value, p["b"].value
+    except AttributeError:
+        m, b = p["m"], p["b"]
     return _linear_error_func((m, b), t, mag, sigma)
 
 def constant_error_func(p, t, mag, sigma):
-    """ Helper for C-based Gaussian error function """
-    b = p["b"]
+    """ Helper for C-based constant error function """
+    try:
+        b = p["b"].value
+    except AttributeError:
+        b = p["b"]
     return _constant_error_func((b, ), t, mag, sigma)
