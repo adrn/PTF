@@ -6,7 +6,6 @@
 
 # Standard library
 import sys, os
-import logging
 
 # Third-party
 import numpy as np
