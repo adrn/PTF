@@ -11,6 +11,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from ..analyze import microlensing_model
+from ..util import get_logger
+logger = get_logger(__name__)
 
 __all__ = ["PTFLightCurve", "PDBLightCurve", "SimulatedLightCurve"]
 

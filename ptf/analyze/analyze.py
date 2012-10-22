@@ -8,8 +8,6 @@ from __future__ import division
 __author__ = "adrn <adrn@astro.columbia.edu>"
 
 # Standard library
-import os
-import math
 import copy
 
 # Third-party

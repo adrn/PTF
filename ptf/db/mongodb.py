@@ -18,7 +18,7 @@ from __future__ import division
 __author__ = "adrn <adrn@astro.columbia.edu>"
 
 # Standard library
-import os, sys
+import os
 import logging
 
 # Third-party
@@ -30,13 +30,8 @@ from ..ptflightcurve import PDBLightCurve
 from ..globals import config, _base_path
 from ..analyze import analyze as pa
 from ..photometricdatabase import Field
-
-# Create logger for this module
-logger = logging.getLogger(__name__)
-ch = logging.StreamHandler()
-formatter = logging.Formatter("%(name)s / %(levelname)s / %(message)s")
-ch.setFormatter(formatter)
-logger.addHandler(ch)
+from ..util import get_logger
+logger = get_logger(__name__)
 
 # Database connection
 def PTFConnection():

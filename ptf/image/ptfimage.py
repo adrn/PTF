@@ -5,7 +5,6 @@
 __author__ = "adrn <adrn@astro.columbia.edu>"
 
 # Standard library
-import abc
 import base64
 import os
 import pytest

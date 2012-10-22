@@ -2,24 +2,18 @@ from __future__ import division
 
 # Standard library
 import copy
-import logging
 import os
 import sys
 import cPickle as pickle
 import multiprocessing
-
-# Create logger
-logger = logging.getLogger(__name__)
-ch = logging.StreamHandler()
-formatter = logging.Formatter("%(name)s / %(levelname)s / %(message)s")
-ch.setFormatter(formatter)
-logger.addHandler(ch)
 
 # Third-party
 import numpy as np
 
 from .analyze import compute_variability_indices
 from .lightcurve import SimulatedLightCurve
+from .util import get_logger
+logger = get_logger(__name__)
 
 '''
 class VariabilityIndex(object):
