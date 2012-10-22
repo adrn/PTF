@@ -213,7 +213,7 @@ class SimulatedLightCurve(PTFLightCurve):
         self.t0 = None
         self.tE = None
     
-    def addMicrolensingEvent(self, u0=None, t0=None, tE=None, **kwargs):
+    def add_microlensing_event(self, u0=None, t0=None, tE=None, **kwargs):
         """ Adds a simulated microlensing event to the light curve
             
             u0 : float, optional
