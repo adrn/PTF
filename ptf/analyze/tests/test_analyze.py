@@ -1,9 +1,8 @@
+# coding: utf-8
 
 import numpy as np
 import matplotlib.pyplot as plt
 from ptf.simulation.simulatedlightcurve import SimulatedLightCurve
-
-import analyze
 
 def test_fit_microlensing_event():
     true_params = {"u0" : 0.3, "t0" : 100., "tE" : 20., "m0" : 15.}

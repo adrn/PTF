@@ -12,7 +12,7 @@ import os
 import numpy as np
 
 try:
-    import .error_functions
+    import error_functions
 except ImportError, RuntimeError:
     print "Error: C extension error_functions.so not found or unable to import it! Make sure to do 'python setup.py build_ext' before running."
     raise ImportError
