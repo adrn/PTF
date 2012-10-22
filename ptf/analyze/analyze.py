@@ -14,7 +14,6 @@ import copy
 
 # Third-party
 import numpy as np
-import scipy.optimize as so
 from lmfit import minimize, Parameters
 
 # PTF

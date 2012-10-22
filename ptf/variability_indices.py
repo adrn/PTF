@@ -16,11 +16,10 @@ ch.setFormatter(formatter)
 logger.addHandler(ch)
 
 # Third-party
-from apwlib.globals import greenText
 import numpy as np
 
-import ptf.analyze.analyze as analyze
-from ptf.simulation.simulatedlightcurve import SimulatedLightCurve
+from .analyze import compute_variability_indices
+from .lightcurve import SimulatedLightCurve
 
 '''
 class VariabilityIndex(object):
@@ -90,7 +89,7 @@ def simulate_events_worker(sim_light_curve, tE, u0, reference_mag, indices):
     t0 = None
     light_curve.addMicrolensingEvent(tE=tE, u0=u0, t0=t0)
     
-    lc_var_indices = analyze.compute_variability_indices(light_curve, indices, return_tuple=True) + (light_curve.tE, light_curve.u0, reference_mag)
+    lc_var_indices = compute_variability_indices(light_curve, indices, return_tuple=True) + (light_curve.tE, light_curve.u0, reference_mag)
     
     return lc_var_indices
 
@@ -133,7 +132,7 @@ def simulate_light_curves_worker(sim_light_curve, indices):
     light_curve.mag = mag
     light_curve.error += np.random.normal(0., sim_light_curve.error/10.)
     
-    lc_var_indices = analyze.compute_variability_indices(light_curve, indices, return_tuple=True)
+    lc_var_indices = compute_variability_indices(light_curve, indices, return_tuple=True)
     return lc_var_indices
 
 def simulate_light_curves_compute_indices(light_curve, num_simulated, indices):
