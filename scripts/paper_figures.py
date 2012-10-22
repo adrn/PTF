@@ -559,6 +559,7 @@ def num_observations_distribution():
     ax_bottom.set_xlabel(r"Baseline ($t_{max} - t_{min}$)")
     fig.savefig("plots/derp.png")
 
+
 if __name__ == "__main__":
     from argparse import ArgumentParser
 

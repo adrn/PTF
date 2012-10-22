@@ -59,4 +59,16 @@ def convert_all_fields_txt(txt_filename="ptf_allfields.txt", npy_filename="all_f
     np.save(npy_filename, all_fields)
     
     return True
+
+def richards_qso(sdss_colors):
+    if (sdss_colors["g"]-sdss_colors["r"]) > -0.2 and \
+       (sdss_colors["g"]-sdss_colors["r"]) < 0.9 and \
+       (sdss_colors["r"]-sdss_colors["i"]) > -0.2 and \
+       (sdss_colors["r"]-sdss_colors["i"]) > 0.6 and \
+       (sdss_colors["i"]-sdss_colors["z"]) > -0.15 and \
+       (sdss_colors["i"]-sdss_colors["z"]) > 0.5 and \
+       17 < sdss_colors["i"] < 19.1:
+        return True
+    else:
+        return False
     

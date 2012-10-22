@@ -15,6 +15,8 @@ from ..analyze import compute_variability_indices
 from ..util import get_logger
 logger = get_logger(__name__)
 
+__all__ = ["simulate_events_compute_indices"]
+
 def _simulate_events_worker(sim_light_curve, tE, reference_mag, indices):
     """ The function that takes the input light curve and microlensing event parameters and
         simulates new light curves with injected microlensing events. This function is meant 

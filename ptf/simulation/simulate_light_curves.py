@@ -15,6 +15,8 @@ from ..analyze import compute_variability_indices
 from ..util import get_logger
 logger = get_logger(__name__)
 
+__all__ = ["simulate_light_curves_compute_indices"]
+
 def _simulate_light_curves_worker(sim_light_curve, indices):
     """ The function that takes the input light curve and simulates new light curves
         based on the MJD and error arrays. This function is meant to be the 'worker'

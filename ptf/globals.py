@@ -15,6 +15,7 @@ ogle_camera_size = (1.225,0.9) #degrees
 config = dict()
 _base_path = os.path.split(__file__)[0]
 
+"""
 with open(os.path.join(_base_path, "config"), "r") as f:
     for line in f.readlines():
         key,val = line.split()
@@ -22,5 +23,9 @@ with open(os.path.join(_base_path, "config"), "r") as f:
             config[key] = int(val)
         except ValueError:
             config[key] = val
+"""
 
 all_fields = np.load(os.path.join(os.path.split(_base_path)[0], "data", "all_fields.npy"))
+
+# Configuration stuff:
+min_number_of_good_observations = 10

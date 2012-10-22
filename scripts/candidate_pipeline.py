@@ -30,169 +30,10 @@ import ptf.db.photometric_database as pdb
 import ptf.db.mongodb as mongo
 import ptf.analyze as pa
 import ptf.variability_indices as vi
-from ptf.util import get_logger, source_index_name_to_pdb_index
+import ptf.simulation as sim
+from ptf.globals import min_number_of_good_observations
+from ptf.util import get_logger, source_index_name_to_pdb_index, richards_qso
 logger = get_logger(__name__)
-
-def prune_index_distribution(index, index_array):
-    if index == "eta":
-        return np.log10(index_array[index_array > 0])
-    elif index == "sigma_mu":
-        return np.log10(np.fabs(index_array))
-    elif index == "j":
-        return np.log10(index_array[index_array > 0])
-    elif index == "k":
-        return np.log10(index_array)
-    elif index == "delta_chi_squared":
-        return np.log10(index_array[index_array > 0])
-    else:
-        return
-
-def compute_selection_criteria_for_field(field, fpr=0.01, number_of_fpr_light_curves=100, number_of_fpr_simulations_per_light_curve=100, indices=["eta"]):
-    """ Compute the selection criteria for a given field by running false positive rate simulations
-        to get the upper and lower cuts.
-    """
-    
-    # Initialize my PDB statistic dictionary
-    # I use a dictionary here because after doing some sub-selection the index arrays may 
-    #   have difference lengths.
-    pdb_statistics = dict()
-    for index in indices:
-        pdb_statistics[index] = np.array([])
-    
-    if len(field.ccds) == 0:
-        logger.info("FUNKY FIELD {}".format(field))
-        return None
-    
-    for ccd in field.ccds.values():
-        logger.info(greenText("Starting with CCD {}".format(ccd.id)))
-        chip = ccd.read()
-        
-        logger.info("Getting variability statistics from photometric database")
-        source_ids = []
-        pdb_statistics_array = []
-        for source in chip.sources.where("(ngoodobs > {})".format(min_number_of_good_observations)):
-            pdb_statistics_array.append(tuple([source_index_name_to_pdb_index(source,index) for index in indices]))
-            source_ids.append(source["matchedSourceID"])
-        pdb_statistics_array = np.array(pdb_statistics_array, dtype=[(index,float) for index in indices])
-        
-        logger.debug("Selected {} statistics".format(len(pdb_statistics_array)))
-        
-        # I use a dictionary here because after doing some sub-selection the index arrays may 
-        #   have difference lengths.
-        for index in indices:
-            this_index_array = pdb_statistics_array[index]
-            
-            # This is where I need to define the selection distributions for each index.
-            pdb_statistics[index] = np.append(pdb_statistics[index], prune_index_distribution(index, this_index_array))
-        
-        # Randomize the order of source_ids to prune through
-        np.random.shuffle(source_ids)
-        
-        logger.info("Simulating light curves for false positive rate calculation")
-        # Keep track of how many light curves we've used, break after we reach the specified number
-        light_curve_count = 0
-        for source_id in source_ids:
-            light_curve = ccd.light_curve(source_id, barebones=True, clean=True)
-            if light_curve == None or len(light_curve) < min_number_of_good_observations: 
-                #logger.debug("\tRejected source {}".format(source_id))
-                continue
-                
-            #logger.debug("\tSelected source {}".format(source_id))
-            these_indices = vi.simulate_light_curves_compute_indices(light_curve, num_simulated=number_of_fpr_simulations_per_light_curve, indices=indices)
-            try:
-                simulated_light_curve_statistics = np.hstack((simulated_light_curve_statistics, these_indices))
-            except NameError:
-                simulated_light_curve_statistics = these_indices
-                
-            light_curve_count += 1
-            
-            if light_curve_count >= number_of_fpr_light_curves:
-                break
-        
-        #ccd.close()
-    
-    try:
-        a = simulated_light_curve_statistics
-    except NameError:
-        logger.info("FUNKY FIELD {}".format(field))
-        return None
-    
-    logger.info("Starting false positive rate calculation to get Nsigmas")
-    # Now determine the N in N-sigma by computing the false positive rate and getting it to be ~0.01 (1%) for each index
-    selection_criteria = {}
-    for index in indices:
-        logger.debug("\tIndex: {}".format(index))
-        # Get the mean and standard deviation of the 'vanilla' distributions to select with
-        mu,sigma = np.mean(pdb_statistics[index]), np.std(pdb_statistics[index])
-        logger.debug("\t mu={}, sigma={}".format(mu, sigma))
-        
-        # Get the simulated statistics for this index
-        these_statistics = np.log10(simulated_light_curve_statistics[index])
-        
-        # Start by selecting with Nsigma = 0
-        Nsigma = 0.
-        
-        # Nsteps is the number of steps this routine has to take to converge -- just used for diagnostics
-        Nsteps = 0
-        while True:
-            fpr = np.sum((these_statistics > (mu + Nsigma*sigma)) | (these_statistics < (mu - Nsigma*sigma))) / float(len(these_statistics))
-            logger.debug("Step: {}, FPR: {}".format(Nsteps, fpr))
-            
-            # WARNING: If you don't use enough simulations, this may never converge!
-            if fpr > 0.012: 
-                Nsigma += np.random.uniform(0., 0.05)
-            elif fpr < 0.008:
-                Nsigma -= np.random.uniform(0., 0.05)
-            else:
-                break
-            
-            Nsteps += 1
-            
-            if Nsteps > 1000:
-                logger.warn("{} didn't converge!".format(index))
-                break
-            
-        logger.info("{} -- Final Num. steps: {}, Final FPR: {}".format(index, Nsteps, fpr))
-        logger.info("{} -- Final Nsigma={}, Nsigma*sigma={}".format(index, Nsigma, Nsigma*sigma))
-        
-        selection_criteria[index] = dict()
-        selection_criteria[index]["upper"] = mu + Nsigma*sigma
-        selection_criteria[index]["lower"] = mu - Nsigma*sigma
-    
-    return selection_criteria
-
-def save_selection_criteria(field, selection_criteria, selection_criteria_collection, overwrite=False):
-    """ Update the selection criteria database entry for this field """
-    
-    index = "eta"
-    search_existing = selection_criteria_collection.find_one({"field_id" : field.id, "index" : index})
-        
-    if search_existing != None and not overwrite:
-        logger.warning("Criteria already exists in database for field {}, index {}".format(field.id, index))
-        return False
-        
-    if search_existing != None and overwrite:
-        selection_criteria_collection.remove({"field_id" : field.id, "index" : index})
-        
-    document = {"field_id" : field.id, \
-                "index" : index, \
-                "upper" : selection_criteria[index]["upper"], \
-                "lower" : selection_criteria[index]["lower"]}
-    selection_criteria_collection.insert(document)
-    
-    return True
-
-def richards_qso(sdss_colors):
-    if (sdss_colors["g"]-sdss_colors["r"]) > -0.2 and \
-       (sdss_colors["g"]-sdss_colors["r"]) < 0.9 and \
-       (sdss_colors["r"]-sdss_colors["i"]) > -0.2 and \
-       (sdss_colors["r"]-sdss_colors["i"]) > 0.6 and \
-       (sdss_colors["i"]-sdss_colors["z"]) > -0.15 and \
-       (sdss_colors["i"]-sdss_colors["z"]) > 0.5 and \
-       17 < sdss_colors["i"] < 19.1:
-        return True
-    else:
-        return False
 
 def select_candidates(field, selection_criteria):
     """ Select candidates from a field given the log10(selection criteria) from mongodb. 
@@ -303,8 +144,6 @@ def save_candidates_to_mongodb(candidates, collection):
     return True
 
 if __name__ == "__main__":
-    import pymongo
-    from ptf.globals import config
     from argparse import ArgumentParser
 
     parser = ArgumentParser(description="")
@@ -312,10 +151,12 @@ if __name__ == "__main__":
                     help="Be chatty! (default = False)")
     parser.add_argument("-q", "--quiet", action="store_true", dest="quiet", default=False,
                     help="Be quiet! (default = False)")
+    
     parser.add_argument("-o", "--overwrite", action="store_true", dest="overwrite", default=False,
                     help="Overwrite any existing / cached files")
     parser.add_argument("--overwrite-light-curves", action="store_true", dest="overwrite_lcs", default=False,
                     help="Keep the selection criteria, just redo the search.")
+                    
     parser.add_argument("-a", "--all", dest="all", default=False, action="store_true",
                     help="Run on all fields.")
     parser.add_argument("-f", "--field-id", dest="field_id", default=[], nargs="+", type=int,
@@ -325,44 +166,42 @@ if __name__ == "__main__":
                     help="Number of light curves to select from each CCD.")
     parser.add_argument("--num-simulations", dest="num_simulations", default=100, type=int,
                     help="Number of simulations per light curve.")
-    parser.add_argument("--min-observations", dest="min_num_observations", default=10, type=int,
-                    help="The minimum number of observations")
     
     args = parser.parse_args()
     
     if args.verbose:
-        stream_handler.setLevel(logging.DEBUG)
+        logger.setLevel(logging.DEBUG)
     elif args.quiet:
-        stream_handler.setLevel(logging.ERROR)
+        logger.setLevel(logging.ERROR)
     else:
-        stream_handler.setLevel(logging.INFO)
+        logger.setLevel(logging.INFO)
         
     ptf = mongo.PTFConnection()
     light_curve_collection = ptf.light_curves
     field_collection = ptf.fields
-    already_searched = ptf.already_searched #HACK
     
-    fields = args.field_id
-    min_number_of_good_observations = args.min_num_observations
+    field_ids = args.field_id
     
     if args.all:
         all_fields = np.load("data/survey_coverage/fields_observations_R.npy")
-        fields = all_fields[all_fields["num_exposures"] > args.min_num_observations]["field"]
-        logger.info("Chose to run on all fields with >{} observations -- {} fields.".format(args.min_num_observations, len(fields)))
+        field_ids = all_fields[all_fields["num_exposures"] > args.min_num_observations]["field"]
+        logger.info("Chose to run on all fields with >{} observations = {} fields.".format(args.min_num_observations, len(field_ids)))
     
-    for field_id in sorted(fields):
+    for field_id in sorted(field_ids):
         # Skip field 101001 because it breaks the pipeline for some reason!
         if field_id == 101001: continue
         
         field = pdb.Field(field_id, "R")
-        logger.info(redText("Field: {}".format(field.id)))
+        logger.info("Field: {}".format(field.id))
         
+        # There is some strangeness to getting the coordinates for a Field -- this just makes it stupidproof
         try:
             if field.ra == None or field.dec == None:
                 raise AttributeError()
         except AttributeError:
+            logger.warn("Failed to get coordinates for this field!")
             continue
-            
+        
         # See if field is in database, remove it if we need to overwrite
         if args.overwrite:
             field_collection.remove({"_id" : field.id})
@@ -370,28 +209,32 @@ if __name__ == "__main__":
         if args.overwrite_lcs:
             field_collection.update({"_id" : field.id}, {"$set" : {"already_searched" : False}})
             light_curve_collection.remove({"field_id" : field.id})
-            
+        
+        # Try to get field from database, if it doesn't exist, create it and insert
         field_document = field_collection.find_one({"_id" : field.id})
         if field_document == None:
             logger.debug("Field document not found -- creating and loading into mongodb!")
             field_document = mongo.field_to_document(field)
             field_collection.insert(field_document)
         
-        lctest = light_curve_collection.find_one({"field_id" : field.id})
+        # If the field has "already_searched" = True, skip it
         field_doc = field_collection.find_one({"_id" : field.id}, fields=["already_searched"])
-        if lctest != None or field_doc["already_searched"]: 
-            logger.info("Already found in candidate database!")
+        if field_doc["already_searched"]: 
+            logger.info("Field already searched and candidates added to candidate database!")
             continue
-            
+        
+        # Check to see if the selection criteria for this field is already loaded into the database
         selection_criteria = field_collection.find_one({"_id" : field.id}, fields=["selection_criteria"])["selection_criteria"]
         
         if args.overwrite or selection_criteria == None:
             logger.info("Selection criteria not available for field.")
-            selection_criteria = compute_selection_criteria_for_field(field, \
-                                                                      number_of_fpr_light_curves=args.num_light_curves, \
-                                                                      number_of_fpr_simulations_per_light_curve=args.num_simulations)
+            
+            # TODO: Do I want to write var_indices to a file?
+            var_indices = vi.var_indices_for_simulated_light_curves(field, number_of_light_curves=number_of_light_curves, number_of_simulations_per_light_curve=number_of_simulations_per_light_curve, indices=indices)
+            selection_criteria = compute_selection_criteria_for_field(var_indices, indices=args.indices, fpr=0.01)
             
             if selection_criteria == None:
+                # Something went wrong, or there is no good data for this field?
                 field_collection.update({"_id" : field.id}, {"$set" : {"already_searched" : True}})
                 continue
                 
@@ -408,5 +251,4 @@ if __name__ == "__main__":
         logger.info("Selected {} candidates after checking light curve data".format(len(candidates)))
         
         save_candidates_to_mongodb(candidates, light_curve_collection)
-        #already_searched.insert({"field_id" : field.id})
         field_collection.update({"_id" : field.id}, {"$set" : {"already_searched" : True}})
