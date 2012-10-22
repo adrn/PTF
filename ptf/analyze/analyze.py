@@ -15,62 +15,8 @@ import numpy as np
 import scipy.optimize as so
 from lmfit import minimize, Parameters
 
+# PTF
 from ..simulation import simulatedlightcurve as slc
-
-try:
-    from apwlib.globals import greenText, yellowText, redText
-except ImportError:
-    raise ImportError("apwlib not found! \nDo: 'git clone git@github.com:adrn/apwlib.git' and run 'python setup.py install' to install.")
-
-try:
-    import error_functions
-    _constant_error_func = error_functions.constant_error_func
-    _linear_error_func = error_functions.linear_error_func
-    _gaussian_error_func = error_functions.gaussian_error_func
-    _microlensing_error_func = error_functions.microlensing_error_func
-except ImportError, RuntimeError:
-    print redText("**Error**: ") + "C extension error_functions.so not found or unable to import it! Make sure to do 'python setup.py build_ext' before running."
-    raise ImportError
-
-constant_model = lambda p, x: p[0] + np.zeros(len(x))
-linear_model = lambda p, x: p[0]*x + p[1]
-gaussian_model = lambda p, x: p[0]*np.exp(-(x - p[1])**2 / (2*p[2]**2)) + p[3]
-
-# ------
-# Models
-# ------
-
-def A(p, t):
-    """ Microlensing amplifiction factor """
-    u = np.sqrt(p["u0"].value*p["u0"].value + ((t-p["t0"].value)/p["tE"].value)**2)
-    return (u**2 + 2) / (u*np.sqrt(u**2 + 4))
-
-def microlensing_model(p, t):
-    """ """
-    return p["m0"].value - 2.5*np.log10(A(p, t))
-
-# ---------------------------------------------------------
-# Python error functions, wrappers around C error functions
-# ---------------------------------------------------------
-def microlensing_error_func(p, t, mag, sigma):
-    """ Helper for C-based microlensing error function """
-    u0, t0, tE, m0 = p["u0"].value, p["t0"].value, p["tE"].value, p["m0"].value
-    return _microlensing_error_func((u0, t0, tE, m0), t, mag, sigma)
-
-def gaussian_error_func(p, t, mag, sigma):
-    """ Helper for C-based Gaussian error function """
-    A, mu, sig, B = p["A"].value, p["mu"].value, p["sigma"].value, p["B"].value
-    return _gaussian_error_func((A, mu, sig, B), t, mag, sigma)
-
-def linear_error_func(p, t, mag, sigma):
-    """ Helper for C-based Gaussian error function """
-    m, b = p["m"].value, p["b"].value
-    return _linear_error_func((m, b), t, mag, sigma)
-
-def constant_error_func(p, t, mag, sigma):
-    """ Helper for C-based Gaussian error function """
-    b = p["b"].value
-    return _constant_error_func((b, ), t, mag, sigma)
 
 def fit_subtract_microlensing(light_curve, fit_data=None):
     """ Fit and subtract a microlensing event to the light curve """
