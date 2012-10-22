@@ -11,25 +11,23 @@ import logging
 # Third-party
 import numpy as np
 import apwlib.geometry as g
-from apwlib.globals import redText, greenText, yellowText
-import galacticutils
 
-# Create logger for this module
-logger = logging.getLogger(__name__)
-ch = logging.StreamHandler()
-formatter = logging.Formatter("%(name)s / %(levelname)s / %(message)s")
-ch.setFormatter(formatter)
-logger.addHandler(ch)
+# PTF
+from ..globals import ccd_size
+from ..ptflightcurve import PTFLightCurve, PDBLightCurve
+from ..analyze import compute_variability_indices
+from ..util import get_logger
+logger = get_logger(__name__)
 
 try:
     import tables
 except ImportError:
-    logger.warning("PyTables not found! Some functionality won't work.\nTry running with: /scr4/dlevitan/sw/epd-7.1-1-rh5-x86_64/bin/python instead.")
+    logger.warning("PyTables not found! Some functionality won't work.\n (on navtara, try running with: /scr4/dlevitan/sw/epd-7.1-1-rh5-x86_64/bin/python instead.)")
 
-# PTF
-import globals
-from ptflightcurve import PTFLightCurve, PDBLightCurve
-import analyze.analyze as analyze
+try:
+    import galacticutils
+except ImportError:
+    logger.warning("galacticutils not found! SDSS search functionality won't work.")
 
 #all_fields = np.load(os.path.join(ptf_params.config["PROJECTPATH"], "data", "all_fields.npy"))
 all_fields = np.load(os.path.join("data", "all_fields.npy"))
@@ -91,8 +89,8 @@ def quality_cut(sourcedata, source_id=None, ccd_edge_cutoff=15, barebones=True, 
             6     A memory overflow occurred during deblending.
             7     A memory overflow occurred during extraction.
     """
-    x_cut1, x_cut2 = ccd_edge_cutoff, globals.ccd_size[0] - ccd_edge_cutoff
-    y_cut1, y_cut2 = ccd_edge_cutoff, globals.ccd_size[1] - ccd_edge_cutoff
+    x_cut1, x_cut2 = ccd_edge_cutoff, ccd_size[0] - ccd_edge_cutoff
+    y_cut1, y_cut2 = ccd_edge_cutoff, ccd_size[1] - ccd_edge_cutoff
     
     if source_id == None:
         src = ""
@@ -104,20 +102,12 @@ def quality_cut(sourcedata, source_id=None, ccd_edge_cutoff=15, barebones=True, 
     else:
         where_string = ""
     
-    """
-    base_cut = '(x_image > {}) & (x_image < {}) & \
-                (y_image > {}) & (y_image < {}) & \
-                (relPhotFlags < 4) & \
-                ((ipacFlags & 6077) == 0) & \
-                (mag > 14.3) & (mag < 21) & \
-                ((sextractorFlags & 251) == 0)'.format(x_cut1, x_cut2, y_cut1, y_cut2)
-    """
+    # Saturation limit, 14.3, based on email conversation with David Levitan
     base_cut = '(x_image > {}) & (x_image < {}) & \
                 (y_image > {}) & (y_image < {}) & \
                 (relPhotFlags < 4) & \
                 (mag > 14.3) & (mag < 21)'.format(x_cut1, x_cut2, y_cut1, y_cut2)
     
-    # Saturation limit, 14.3, based on email conversation with David Levitan
     if barebones:
         srcdata = [(x["matchedSourceID"], x["mjd"], x["mag"], x["magErr"], x["alpha_j2000"], x["delta_j2000"], x["sextractorFlags"], x["ipacFlags"]) for x in sourcedata.where(src + base_cut + where_string)]
         sourcedata = np.array(srcdata, dtype=[("matchedSourceID", int), ("mjd", float), ("mag", float), ("magErr", float), ("ra", float), ("dec", float), ("sextractorFlags", int), ("ipacFlags", int)])
@@ -156,7 +146,7 @@ class Filter(object):
             self.id = filter_id
             self.name = inv_filter_map[filter_id]
         else:
-            raise ValueError(redText("filter_id must be a number (e.g. 1, 2) or a string (e.g. 'g', 'R')"))
+            raise ValueError("filter_id must be a number (e.g. 1, 2) or a string (e.g. 'g', 'R')")
         
     def __repr__(self):
         return "<Filter: id={}, name={}>".format(self.id, self.name)
@@ -187,7 +177,7 @@ class Field(object):
         try:
             self.id = int(field_id)
         except ValueError:
-            print redText("field_id must be an integer or parseable string, e.g. 110002 or '110002'")
+            print "field_id must be an integer or parseable string, e.g. 110002 or '110002'"
             raise
         
         # Validate filter_id
@@ -196,7 +186,7 @@ class Field(object):
         elif isinstance(filter, str):
             self.filter = Filter(filter)
         else:
-            raise ValueError(redText("filter") + " parameter must be Filter object")
+            raise ValueError("filter parameter must be Filter object")
         
         # Validate number_of_exposures
         if number_of_exposures != None:
@@ -283,7 +273,7 @@ class CCD(object):
         try:
             self.id = int(ccd_id)
         except ValueError:
-            print redText("ccd_id must be an integer or parseable string, e.g. 1 or '03'")
+            print "ccd_id must be an integer or parseable string, e.g. 1 or '03'"
             raise
             
         if isinstance(field, Field):
@@ -404,91 +394,6 @@ def get_light_curve(field_id, ccd_id, source_id, **kwargs):
     field = Field(field_id, "R")
     ccd = field.ccds[ccd_id]
     return ccd.light_curve(source_id, **kwargs)
-
-# ==================================================================================================
-#   Convenience functions
-#
-def convert_all_fields_txt(txt_filename="ptf_allfields.txt", npy_filename="all_fields.npy"):
-    """ Convert the text file containing all PTF Field ID's and positons to a 
-        numpy .npy save file.
-        
-        It is much faster to load the .npy file than to generate an array on 
-        the fly from the text file. The text file can be found here:
-            http://astro.caltech.edu/~eran/PTF_AllFields_ID.txt
-    """
-    all_fields = np.genfromtxt(txt_filename, \
-                           skiprows=4, \
-                           usecols=[0,1,2,5,6,7], \
-                           dtype=[("id", int), ("ra", float), ("dec", float), ("gal_lon", float), ("gal_lat", float), ("Eb_v", float)]).\
-                           view(np.recarray)
-
-    np.save(npy_filename, all_fields)
-    
-    return True
-
-# ==================================================================================================
-#   Test functions
-#
-def test_ptffield():
-    # Test PTFField
-    
-    field_110001 = PTFField(110001)
-    ccd0 = field_110001.ccds[0]
-    print "CCDS: {}".format(",".join([str(x) for x in field_110001.ccds.keys()]))
-    chip = ccd0.read()
-    print "Number of observations on CCD 0:", chip.sources.col("nobs")
-    print "Number of GOOD observations on CCD 0:", chip.sources.col("ngoodobs")
-    ccd0.close()
-    
-    print "Number of observations per ccd:"
-    print field_110001.number_of_exposures
-    print "Baseline per ccd:"
-    print field_110001.baseline
-
-def time_compute_var_indices():
-    # Time computing variability indices for all light curves on a chip
-    
-    field = PTFField(110002)
-    
-    # Try to get light curve generator for a CCD
-    import time
-    a = time.time()
-    N = 0
-    for light_curve in field.ccds[0].light_curves("(ngoodobs > 15) & (matchedSourceID < 1000)"):
-        indices = analyze.compute_variability_indices(light_curve, indices=["j","k","eta","sigma_mu","delta_chi_squared"])
-        N += 1
-    
-    print "Took {} seconds to compute for {} light curves".format(time.time() - a, N)
-    
-def test_field():
-    filter_R = Filter(filter_id="R")
-    filter_g = Filter(filter_id="g")
-    
-    # Test all the various ways to initialize the object
-    field = Field(field_id=110002, filter=filter_R)
-    field = Field(field_id="110002", filter=filter_g)
-    
-    # Test number of exposures and baseline
-    field = Field(field_id=110002, filter=filter_R)
-    print field.number_of_exposures
-    print field.baseline
-
-def test_filter():
-    filter = Filter(filter_id=2)
-    filter = Filter(filter_id=1)
-    
-    filter = Filter(filter_id="R")
-    filter = Filter(filter_id="g")
-    
-if __name__ == "__main__":
-    #test_ptffield()
-    #time_compute_var_indices()
-    #select_most_observed_fields()
-    
-    #logging.basicConfig(level=logging.INFO)
-    #test_filter()
-    #test_field()
-    test_select_most_observed_fields()
 
 """
 sources:
