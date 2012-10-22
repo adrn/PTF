@@ -19,17 +19,16 @@ __author__ = "adrn <adrn@astro.columbia.edu>"
 
 # Standard library
 import os
-import logging
 
 # Third-party
 import numpy as np
 import pymongo
 
 # Project 
-from ..ptflightcurve import PDBLightCurve
+from ..lightcurve import PDBLightCurve
 from ..globals import config, _base_path
 from ..analyze import analyze as pa
-from ..photometricdatabase import Field
+from ..db.photometric_database import Field
 from ..util import get_logger
 logger = get_logger(__name__)
 

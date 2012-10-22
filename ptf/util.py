@@ -3,6 +3,7 @@
 
 # Standard library
 import os, sys
+import logging
 
 # Convert my names for variability indices to the PDB names
 pdb_index_name = dict(eta="vonNeumannRatio", \
