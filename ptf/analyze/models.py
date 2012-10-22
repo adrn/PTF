@@ -37,7 +37,7 @@ def A(p, t):
 constant_model = lambda p, x: p["b"] + np.zeros(len(x))
 linear_model = lambda p, x: p["m"]*x + p["b"]
 gaussian_model = lambda p, x: p["A"]*np.exp(-(x - p["mu"])**2 / (2*p["sigma"]**2)) + p["B"]
-microlensing_model = lambda p, x: p["m0"] - 2.5*np.log10(A(p, t))
+microlensing_model = lambda p, x: p["m0"] - 2.5*np.log10(A(p, x))
 
 # ---------------------------------------------------------
 # Python error functions, wrappers around C error functions
