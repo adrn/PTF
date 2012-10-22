@@ -3,9 +3,8 @@
 __author__ = "adrn <adrn@astro.columbia.edu>"
 
 # Standard Library
-import sys, os
+import os
 import copy
-import logging
 
 # Third-party dependencies
 import numpy as np
@@ -235,9 +234,6 @@ class SimulatedLightCurve(PTFLightCurve):
         # If t0 is not specified, draw from uniform distribution between days
         if t0 == None: self.t0 = np.random.uniform(min(self.mjd), max(self.mjd))
         else: self.t0 = float(t0)
-        
-        if (self.t0 > max(self.mjd)) or (self.t0 < min(self.mjd)):
-            logging.warn("t0 is outside of the mjd range for this light curve!")
         
         # If tE is not specified, draw from tE distribution
         #   I use an estimate of Wood's "observed" distribution for now:
