@@ -21,6 +21,17 @@ def source_index_name_to_pdb_index(source, index_name):
     else:
         return source[pdb_index_name[index_name]]
 
+def index_to_label(index):
+    # Convert variability index to a Latex label
+    mapping = {"j" : "J", \
+               "k" : "K", \
+               "sigma_mu" : r"$\sigma/\mu$", \
+               "eta" : r"$\eta$", \
+               "delta_chi_squared" : r"$\Delta \chi^2$", \
+               "con" : "Con", \
+               "corr" : "Corr"}
+    return mapping[index]
+
 def get_logger(name):
     # Create logger for this module
     logger = logging.getLogger(name)
@@ -48,3 +59,4 @@ def convert_all_fields_txt(txt_filename="ptf_allfields.txt", npy_filename="all_f
     np.save(npy_filename, all_fields)
     
     return True
+    

@@ -12,9 +12,6 @@ camera_size_radius = ((camera_size_degrees[0]/2.)**2 + (camera_size_degrees[1]/2
 # OGLE IV field sizes
 ogle_camera_size = (1.225,0.9) #degrees
 
-# Convert variability index to a Latex label
-index_to_label = {"j" : "J", "k" : "K", "sigma_mu" : r"$\sigma/\mu$", "eta" : r"$\eta$", "delta_chi_squared" : r"$\Delta \chi^2$", "con" : "Con", "corr" : "Corr"}
-
 config = dict()
 _base_path = os.path.split(__file__)[0]
 
