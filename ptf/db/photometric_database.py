@@ -13,7 +13,7 @@ import apwlib.geometry as g
 
 # PTF
 from ..globals import ccd_size
-from ..ptflightcurve import PTFLightCurve, PDBLightCurve
+from ..lightcurve import PTFLightCurve, PDBLightCurve
 from ..analyze import compute_variability_indices
 from ..util import get_logger
 logger = get_logger(__name__)
