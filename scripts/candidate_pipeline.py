@@ -20,37 +20,18 @@ import multiprocessing
 # Third-party
 import numpy as np
 import scipy.optimize as so
-import ptf.aov as aov
-
 try:
     from apwlib.globals import greenText, yellowText, redText
 except ImportError:
     raise ImportError("apwlib not found! \nDo: 'git clone git@github.com:adrn/apwlib.git' and run 'python setup.py install' to install.")
 
 # Project
-import ptf.photometricdatabase as pdb
-import ptf.analyze.analyze as pa
-from ptf.globals import index_to_label, source_index_name_to_pdb_index
-import ptf.variability_indices as vi
+import ptf.db.photometric_database as pdb
 import ptf.db.mongodb as mongo
-try:
-    import ptf.aov as aov
-except:
-    print "Unable to import aov subpackage"
-
-# Create logger
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-stream_handler = logging.StreamHandler()
-formatter = logging.Formatter("%(name)s / %(levelname)s / %(message)s")
-stream_handler.setFormatter(formatter)
-logger.addHandler(stream_handler)
-
-file_hdlr = logging.FileHandler('logs/candidate_pipeline.log', mode="a")
-formatter = logging.Formatter("%(name)s / %(levelname)s / %(message)s")
-file_hdlr.setFormatter(formatter)
-file_hdlr.setLevel(logging.DEBUG)
-logger.addHandler(file_hdlr) 
+import ptf.analyze as pa
+import ptf.variability_indices as vi
+from ptf.util import get_logger, source_index_name_to_pdb_index
+logger = get_logger(__name__)
 
 def prune_index_distribution(index, index_array):
     if index == "eta":
@@ -283,7 +264,7 @@ def select_candidates(field, selection_criteria):
             
             if (indices["eta"] <= lower_cut):
                 try:
-                    fp = aov.findPeaks_aov(light_curve.mjd.copy(), light_curve.mag.copy(), light_curve.error.copy(), 3, 1., 2.*light_curve.baseline, 1., 0.1, 20)
+                    fp = pa.findPeaks_aov(light_curve.mjd.copy(), light_curve.mag.copy(), light_curve.error.copy(), 3, 1., 2.*light_curve.baseline, 1., 0.1, 20)
                 except ZeroDivisionError:
                     continue
                     
