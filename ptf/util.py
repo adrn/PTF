@@ -33,14 +33,13 @@ def index_to_label(index):
                "corr" : "Corr"}
     return mapping[index]
 
+# Create logger for this module
+logger = logging.getLogger("ptf")
+ch = logging.StreamHandler()
+formatter = logging.Formatter("%(name)s / %(levelname)s / %(message)s")
+ch.setFormatter(formatter)
+logger.addHandler(ch)
 def get_logger(name):
-    # Create logger for this module
-    logger = logging.getLogger(name)
-    ch = logging.StreamHandler()
-    formatter = logging.Formatter("%(name)s / %(levelname)s / %(message)s")
-    ch.setFormatter(formatter)
-    logger.addHandler(ch)
-    
     return logger
 
 def convert_all_fields_txt(txt_filename="ptf_allfields.txt", npy_filename="all_fields.npy"):
