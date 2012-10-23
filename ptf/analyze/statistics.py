@@ -7,10 +7,14 @@ __author__ = "adrn <adrn@astro.columbia.edu>"
 
 # Standard library
 import os
+import math
 
 # Third-party
 import numpy as np
+from lmfit import Parameters, minimize
 
+# PTF
+from .models import *
 from .aov import aov_periodogram_asczerny, testperiod_asczerny, findPeaks_aov
 
 __all__ = ["estimate_continuum", "gaussian_constant_delta_chi_squared", "stetson_j", "stetson_k", \

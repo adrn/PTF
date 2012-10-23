@@ -23,7 +23,10 @@ def _parameters_to_dict(parameters):
     """ Convert an lmfit Parameters object to a Python dictionary """
     dict_params = {}
     for key,param in parameters.items():
-        dict_params[key] = param.value
+        try:
+            dict_params[key] = param.value
+        except AttributeError:
+            pass
     return dict_params
 
 def fit_subtract_microlensing(light_curve, fit_data=None):
@@ -33,7 +36,7 @@ def fit_subtract_microlensing(light_curve, fit_data=None):
         fit_data = fit_microlensing_event(light_curve)
     
     light_curve_new = copy.copy(light_curve)
-    light_curve_new.mag = light_curve.mag - microlensing_model(fit_data, light_curve_new.mjd)
+    light_curve_new.mag = light_curve.mag - microlensing_model(_parameters_to_dict(fit_data), light_curve_new.mjd)
     
     light_curve.tE = fit_data["tE"].value
     light_curve.t0 = fit_data["t0"].value
