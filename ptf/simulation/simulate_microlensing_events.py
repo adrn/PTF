@@ -4,6 +4,7 @@
 
 # Standard library
 import sys, os
+import copy
 import multiprocessing
 
 # Third-party
