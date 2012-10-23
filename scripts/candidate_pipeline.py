@@ -16,6 +16,9 @@ import math
 import logging
 import cPickle as pickle
 import multiprocessing
+import warnings
+
+warnings.simplefilter("ignore")
 
 # Third-party
 import numpy as np
@@ -30,7 +33,6 @@ import ptf.db.photometric_database as pdb
 import ptf.db.mongodb as mongo
 import ptf.analyze as pa
 import ptf.variability_indices as vi
-import ptf.simulation as sim
 from ptf.globals import min_number_of_good_observations
 from ptf.util import get_logger, source_index_name_to_pdb_index, richards_qso
 logger = get_logger(__name__)
@@ -175,7 +177,9 @@ if __name__ == "__main__":
         logger.setLevel(logging.ERROR)
     else:
         logger.setLevel(logging.INFO)
-        
+    
+    indices = ["eta", "delta_chi_squared"]
+    
     ptf = mongo.PTFConnection()
     light_curve_collection = ptf.light_curves
     field_collection = ptf.fields
@@ -230,8 +234,8 @@ if __name__ == "__main__":
             logger.info("Selection criteria not available for field.")
             
             # TODO: Do I want to write var_indices to a file?
-            var_indices = vi.var_indices_for_simulated_light_curves(field, number_of_light_curves=number_of_light_curves, number_of_simulations_per_light_curve=number_of_simulations_per_light_curve, indices=indices)
-            selection_criteria = compute_selection_criteria_for_field(var_indices, indices=args.indices, fpr=0.01)
+            var_indices = vi.var_indices_for_simulated_light_curves(field, number_of_light_curves=args.num_light_curves, number_of_simulations_per_light_curve=args.num_simulations, indices=indices)
+            selection_criteria = vi.compute_selection_criteria(var_indices, indices=indices, fpr=0.01)
             
             if selection_criteria == None:
                 # Something went wrong, or there is no good data for this field?
