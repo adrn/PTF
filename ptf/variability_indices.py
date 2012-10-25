@@ -116,33 +116,32 @@ def var_indices_for_simulated_light_curves(field, number_of_light_curves, number
         
         logger.debug(indent_level + "Simulating light curves for false positive rate calculation")
         
-        # Keep count of how many light curves we've used, break after we reach the specified number
-        light_curve_count = 0
+        light_curves = []
         for source_id in source_ids:
-            #for light_curve in ccd.light_curves(source_ids, clean=True): # clean applies a quality cut to the data
+            if len(light_curves) >= number_of_light_curves:
+                break
+                
             light_curve = ccd.light_curve(source_id, barebones=True, clean=True) # clean applies a quality cut to the data
-            #print "loaded"
             
             if light_curve == None or len(light_curve) < min_number_of_good_observations: 
                 # If the light curve is not found, or has too few observations, skip this source_id
                 continue
-                
-            simulated_indices_for_this_light_curve = simulate_light_curves_compute_indices(light_curve, \
-                                                                                num=number_of_simulations_per_light_curve, \
-                                                                                indices=indices)
-            try:
-                simulated_statistics = np.hstack((simulated_statistics, simulated_indices_for_this_light_curve))
-            except NameError:
-                simulated_statistics = simulated_indices_for_this_light_curve
-                
-            light_curve_count += 1
             
-            if light_curve_count >= number_of_light_curves:
-                break
+            light_curves.append(light_curve)
         
         # If we get through all the sources and have gone through less than requested, warn the user
-        if light_curve_count < number_of_light_curves:
+        if len(light_curves) < number_of_light_curves:
             logging.warn(indent_level + "Not enough good light curves on this CCD! Field {}, CCD {}".format(field.id, ccd.id))
+        
+        simulated_statistics = simulate_light_curves_compute_indices(light_curves, \
+                                                                     num=number_of_simulations_per_light_curve, \
+                                                                     indices=indices)
+        """
+        try:
+            simulated_statistics = np.hstack((simulated_statistics, simulated_indices_for_this_light_curve))
+        except NameError:
+            simulated_statistics = simulated_indices_for_this_light_curve
+        """
     
     return {"db" : db_statistic_values, "simulated" : simulated_statistics}
 

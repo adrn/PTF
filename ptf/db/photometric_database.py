@@ -107,6 +107,9 @@ def quality_cut(sourcedata, source_id=None, ccd_edge_cutoff=15, barebones=True, 
                 (relPhotFlags < 4) & \
                 (mag > 14.3) & (mag < 21)'.format(x_cut1, x_cut2, y_cut1, y_cut2)
     
+    print src + base_cut + where_string
+    sys.exit(0)
+    
     if barebones:
         srcdata = [(x["matchedSourceID"], x["mjd"], x["mag"], x["magErr"], x["alpha_j2000"], x["delta_j2000"], x["sextractorFlags"], x["ipacFlags"]) for x in sourcedata.where(src + base_cut + where_string)]
         sourcedata = np.array(srcdata, dtype=[("matchedSourceID", int), ("mjd", float), ("mag", float), ("magErr", float), ("ra", float), ("dec", float), ("sextractorFlags", int), ("ipacFlags", int)])

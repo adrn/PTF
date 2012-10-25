@@ -178,7 +178,7 @@ if __name__ == "__main__":
     else:
         logger.setLevel(logging.INFO)
     
-    indices = ["eta", "delta_chi_squared"]
+    indices = ["eta"]
     
     ptf = mongo.PTFConnection()
     light_curve_collection = ptf.light_curves
