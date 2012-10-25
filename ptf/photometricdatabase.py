@@ -31,7 +31,7 @@ from ptflightcurve import PTFLightCurve, PDBLightCurve
 import analyze.analyze as analyze
 
 #all_fields = np.load(os.path.join(ptf_params.config["PROJECTPATH"], "data", "all_fields.npy"))
-all_fields = np.load(os.path.join("data", "all_fields.npy"))
+all_fields = np.load(os.path.join(os.path.split(globals._base_path)[0], "data", "all_fields.npy"))
 match_path = "/scr4/dlevitan/matches"
 pytable_base_string = os.path.join(match_path, "match_{filter.id:02d}_{field.id:06d}_{ccd.id:02d}.pytable")
 filter_map = {"R" : 2, "g" : 1}
