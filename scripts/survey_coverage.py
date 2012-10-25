@@ -28,18 +28,11 @@ import tables
 import apwlib.geometry as g
 
 # Project
-import ptf.photometricdatabase as pdb
-from ptf.globals import camera_size_degrees
+import ptf.db.photometricdatabase as pdb
+from ptf.globals import camera_size_degrees, all_fields
 import ptf.globals as pg
-
-# Create logger for this module
-logger = logging.getLogger(__name__)
-ch = logging.StreamHandler()
-formatter = logging.Formatter("%(name)s / %(levelname)s / %(message)s")
-ch.setFormatter(formatter)
-logger.addHandler(ch)
-
-all_fields = np.load(os.path.join(os.path.split(pg._base_path)[0], "data", "all_fields.npy"))
+import ptf.util as pu
+logger = pu.get_logger()
 
 class SurveyInfo(object):
     """ Some example use cases for this object:
