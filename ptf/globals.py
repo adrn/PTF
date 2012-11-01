@@ -28,3 +28,4 @@ all_fields = np.load(os.path.join(os.path.split(_base_path)[0], "data", "all_fie
 
 # Configuration stuff:
 min_number_of_good_observations = 10
+ccd_edge_cutoff = 15 # pixels
