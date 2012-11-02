@@ -28,11 +28,11 @@ import tables
 import apwlib.geometry as g
 
 # Project
-import ptf.db.photometricdatabase as pdb
+import ptf.db.photometric_database as pdb
 from ptf.globals import camera_size_degrees, all_fields
 import ptf.globals as pg
 import ptf.util as pu
-logger = pu.get_logger()
+logger = pu.get_logger("survey_coverage")
 
 class SurveyInfo(object):
     """ Some example use cases for this object:
@@ -445,14 +445,14 @@ if __name__ == "__main__":
     g_info = SurveyInfo(filter="g", overwrite=args.overwrite)
     
     if args.print_info:    
-        num_R25_fields = len(R_info.fields(25))
+        num_R10_fields = len(R_info.fields(10))
         num_R100_fields = len(R_info.fields(100))
-        logger.info("Number of R-band fields >25  observations:\t\t{} = {:.2f} sq. deg.".format(num_R25_fields, num_R25_fields*7.26))
+        logger.info("Number of R-band fields >10  observations:\t\t{} = {:.2f} sq. deg.".format(num_R10_fields, num_R10_fields*7.26))
         logger.info("Number of R-band fields >100 observations:\t\t{} = {:.2f} sq. deg.".format(num_R100_fields, num_R100_fields*7.26))
         
-        num_g25_fields = len(g_info.fields(25))
+        num_g10_fields = len(g_info.fields(10))
         num_g100_fields = len(g_info.fields(100))
-        logger.info("Number of g-band fields >25  observations:\t\t{} = {:.2f} sq. deg.".format(num_g25_fields, num_g25_fields*7.26))
+        logger.info("Number of g-band fields >10  observations:\t\t{} = {:.2f} sq. deg.".format(num_g10_fields, num_g10_fields*7.26))
         logger.info("Number of g-band fields >100 observations:\t\t{} = {:.2f} sq. deg.".format(num_g100_fields, num_g100_fields*7.26))
     
     if args.plot:
