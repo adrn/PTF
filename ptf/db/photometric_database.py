@@ -1,4 +1,4 @@
-"""
+ """
     Various classes and functions for interfacing with the PTF photometric
     database (David Levitan's db), as described here:
         http://www.astro.caltech.edu/~dlevitan/ptf/photomdb.html
@@ -145,18 +145,22 @@ class Field(object):
     def __repr__(self):
         return "<Field: id={}, filter={}>".format(self.id, self.filter.id)
 
-    def __init__(self, field_id, filter, number_of_exposures=None):
+    def __init__(self, field_id, filter=None, number_of_exposures=None):
         """ Create a field object given a PTF Field ID
 
             Parameters
             ----------
-            field_id : int
+            field_id : int, Field
                 The PTF Field ID for a field.
             filter : Filter
                 A PTF Filter object (e.g. R = 2, g = 1)
             number_of_exposures : int (optional)
                 The number of exposures this field has in the specified filter.
         """
+
+        if isinstance(field_id, Field):
+            filter = field_id.filter
+            field_id = field_id.id
 
         # Validate Field ID
         try:
@@ -170,8 +174,10 @@ class Field(object):
             self.filter = filter
         elif isinstance(filter, str):
             self.filter = Filter(filter)
+        elif filter == None:
+            raise ValueError("You must specify the filter parameter!")
         else:
-            raise ValueError("filter parameter must be Filter object")
+            raise ValueError("filter parameter must be Filter object or a string (e.g. R, g)")
 
         # Validate number_of_exposures
         if number_of_exposures != None:
@@ -255,6 +261,10 @@ class CCD(object):
 
     def __init__(self, ccd_id, field, filter):
         # Validate CCD ID
+
+        if isinstance(ccd_id, CCD):
+            ccd_id = ccd_id.id
+
         try:
             self.id = int(ccd_id)
         except ValueError:
