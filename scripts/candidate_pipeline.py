@@ -37,7 +37,7 @@ from ptf.globals import min_number_of_good_observations
 from ptf.util import get_logger, source_index_name_to_pdb_index, richards_qso
 logger = get_logger(__name__)
 
-def select_candidates(field, selection_criteria):
+def select_candidates(field, selection_criteria, num_fit_attempts=10):
     """ Select candidates from a field given the log10(selection criteria) from mongodb.
 
         The current selection scheme is to first select on eta, then to sanity check with
@@ -76,16 +76,13 @@ def select_candidates(field, selection_criteria):
                 continue
             light_curve.indices = indices
 
-            # TODO: do something with this num_attempts!
-            num_attempts = 5
             ml_chisq = 1E6
-            for ii in range(num_attempts):
+            for ii in range(num_fit_attempts):
                 params = pa.fit_microlensing_event(light_curve)
                 new_chisq = params["result"].chisqr
 
                 if new_chisq < ml_chisq:
                     ml_chisq = new_chisq
-                    break
 
             # Try to fit a microlensing model, then subtract it, then recompute eta and see
             #   if it is still an outlier
@@ -134,9 +131,9 @@ def select_candidates(field, selection_criteria):
                     unclassified.append(light_curve)
 
                 # Here I can try this: light_curve.sdss_colors
-                #sdss_colors = light_curve.sdss_colors("psf")
-                #if sdss_colors != None and richards_qso(sdss_colors):
-                #    light_curve.tags.append("quasar candidate")
+                sdss_colors = light_curve.sdss_colors("psf")
+                if sdss_colors != None and richards_qso(sdss_colors):
+                    light_curve.tags.append("qso")
 
             if indices["eta"] <= lower_cut:
                 try:
@@ -204,6 +201,8 @@ if __name__ == "__main__":
                     help="Run on all fields.")
     parser.add_argument("-f", "--field-id", dest="field_id", default=[], nargs="+", type=int,
                     help="The PTF field IDs to run on")
+    parser.add_argument("-r", "--field-range", dest="field_range", default=[],
+                    help="A range of PTF field IDs to run on")
 
     parser.add_argument("--num-light-curves", dest="num_light_curves", default=100, type=int,
                     help="Number of light curves to select from each CCD.")
@@ -232,8 +231,15 @@ if __name__ == "__main__":
         field_ids = all_fields[all_fields["num_exposures"] > min_number_of_good_observations]["field"]
         logger.info("Chose to run on all fields with >{} observations = {} fields.".format(min_number_of_good_observations, len(field_ids)))
 
+    if args.field_range:
+        min_field_id, max_field_id = map(int, args.field_range.split("-"))
+
+        all_fields = np.load("data/survey_coverage/fields_observations_R.npy")
+        field_ids = all_fields[all_fields["num_exposures"] > min_number_of_good_observations]["field"]
+        field_ids = field_ids[(field_ids >= min_field_id) & (field_ids < max_field_id)]
+
     for field_id in sorted(field_ids):
-        # Skip field 101001 because it breaks the pipeline for some reason!
+        # Skip field 101001 because the data hasn't been reduced by the PTF pipeline?
         if field_id == 101001: continue
 
         field = pdb.Field(field_id, "R")
