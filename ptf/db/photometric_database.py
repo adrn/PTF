@@ -1,4 +1,4 @@
- """
+"""
     Various classes and functions for interfacing with the PTF photometric
     database (David Levitan's db), as described here:
         http://www.astro.caltech.edu/~dlevitan/ptf/photomdb.html
@@ -352,13 +352,13 @@ class CCD(object):
             #return PTFLightCurve(mjd=mjd, mag=mag, error=mag_err, metadata=sourcedata)
             return PDBLightCurve(mjd=mjd, mag=mag, error=mag_err, field_id=self.field.id, ccd_id=self.id, source_id=source_id, metadata=data, ra=ra, dec=dec)
 
-    def light_curves(self, source_ids, where=[], clean=True):
+    def light_curves(self, source_ids, clean=True):
         """ """
 
         chip = self.read()
 
         if clean:
-            sourcedata = quality_cut(chip.sourcedata, barebones=True, where=where)
+            sourcedata = quality_cut(chip.sourcedata)
 
             for source_id in source_ids:
                 this_sourcedata = sourcedata[sourcedata["matchedSourceID"] == source_id]

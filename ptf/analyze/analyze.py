@@ -60,7 +60,7 @@ def fit_microlensing_event(light_curve, initial_params={}):
     initial_tE = initial_params.get("tE", np.random.uniform(2, 500))
     initial_t0 = initial_params.get("t0", t0)
     #initial_u0 = initial_params.get("u0", np.random.uniform(1E-6, 1.33))
-    initial_u0 = initial_params.get("u0", 10**np.random.uniform(-3, 0.13))
+    initial_u0 = initial_params.get("u0", 10**np.random.uniform(-3, 0.12))
     initial_m0 = initial_params.get("m0", np.random.normal(np.median(light_curve.mag), 0.5))
 
     params = Parameters()
@@ -107,27 +107,33 @@ def iscandidate(light_curve, lower_eta_cut, num_fit_attempts=10):
 
     '''
 
-    # Compute the variability indices for the light curve
-    try:
-        indices = compute_variability_indices(light_curve, indices=["eta", "delta_chi_squared", "j", "k", "sigma_mu"])
-    except ValueError:
-        logger.warning("Failed to compute variability indices for light curve! {0}".format(light_curve))
-        return False
-
     # Make sure that eta still passes the cut, since the light curve may have been 'cleaned'
-    if indices["eta"] > lower_eta_cut:
+    if light_curve.indices["eta"] > lower_eta_cut:
         return False
 
-    light_curve.indices = indices
     ml_chisq = 1E6
     ml_params = None
     for ii in range(num_fit_attempts):
+        # DEBUG
         params = fit_microlensing_event(light_curve)
         new_chisq = params["result"].chisqr
 
         if new_chisq < ml_chisq:
             ml_chisq = new_chisq
             ml_params = params
+
+    try:
+        light_curve.features
+    except AttributeError:
+        light_curve.features = dict()
+
+    # Add all indices as features for the light curve
+    for key,val in light_curve.indices.items():
+        light_curve.features[key] = val
+
+    light_curve.features["N"] = len(light_curve)
+    light_curve.features["median_error"] = np.median(light_curve.error)
+    light_curve.features["chisqr"] = ml_params["result"].chisqr
 
     # Try to fit a microlensing model, then subtract it, then recompute eta and see
     #   if it is still an outlier
@@ -150,8 +156,13 @@ def iscandidate(light_curve, lower_eta_cut, num_fit_attempts=10):
         logger.debug("fit tE > baseline")
         return False
 
-    #print "tE:{0}, t0:{1}, u0:{2}".format(light_curve.tE,light_curve.t0,light_curve.u0)
-    #print "FIT tE:{0}, t0:{1}, u0:{2}".format(ml_params["tE"].value,ml_params["t0"].value,ml_params["u0"].value)
+    #    - if t0 is too close to either end of the light curve
+    if light_curve.t0 < (light_curve.tE + light_curve.mjd.min()):
+        logger.debug("fit tE too close to min mjd")
+        return "subcandidate"
+    elif light_curve.t0 > (light_curve.mjd.max() - light_curve.tE):
+        logger.debug("fit tE too close to min mjd")
+        return "subcandidate"
 
     # If light curve still passes the eta cut after subtracting the microlensing event, it
     #    is probably periodic or has some other variability
@@ -161,15 +172,13 @@ def iscandidate(light_curve, lower_eta_cut, num_fit_attempts=10):
 
     # Slice out only data around microlensing event
     sliced_lc = light_curve.slice_mjd(ml_params["t0"].value-ml_params["tE"].value, ml_params["t0"].value+ml_params["tE"].value)
-
-    # Count number of data points between t0-tE and t0+tE, make sure we have more than 3 brighter than 3sigma
-    if sum(sliced_lc.mag < (np.median(light_curve.mag) - 3.*np.median(sliced_lc.error))) < 3:
-        logger.debug("not enough points in sliced_lc: {0}, {1}".format(len(sliced_lc), sum(sliced_lc.mag < (np.median(light_curve.mag) - 3.*np.std(light_curve.mag)))))
+    if len(sliced_lc) < 5:
         return False
 
-    # If delta chi squared is < 100, it's probably just noisy data
-    #if gaussian_constant_delta_chi_squared(sliced_lc) <= 100:
-    #    return False
+    # Count number of data points between t0-tE and t0+tE, make sure we have more than 3 brighter than 3sigma
+    if sum(sliced_lc.mag < (np.median(light_curve.mag) - 3.*np.median(sliced_lc.error))) < 5:
+        logger.debug("not enough points in sliced_lc: {0}, {1}".format(len(sliced_lc), sum(sliced_lc.mag < (np.median(light_curve.mag) - 3.*np.std(light_curve.mag)))))
+        return False
 
     # Fit another microlensing model to just the data around the event
     sliced_ml_params = fit_microlensing_event(sliced_lc)
@@ -182,6 +191,5 @@ def iscandidate(light_curve, lower_eta_cut, num_fit_attempts=10):
         return "subcandidate"
 
     return "candidate"
-
 
 # If this returns subcandidate, do varstar search, if periodic remove subcandidate tag?

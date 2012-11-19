@@ -114,8 +114,7 @@ def var_indices_for_simulated_light_curves(field, number_of_light_curves, number
         # Randomize the order of source_ids
         np.random.shuffle(source_ids)
 
-        logger.debug(indent_level + "Simulating light curves for false positive rate calculation")
-
+        logger.debug(indent_level + "Reading in light curves")
         light_curves = []
         for source_id in source_ids:
             if len(light_curves) >= number_of_light_curves:
@@ -129,6 +128,8 @@ def var_indices_for_simulated_light_curves(field, number_of_light_curves, number
 
             light_curves.append(light_curve)
 
+        logger.debug(indent_level + "Simulating light curves for false positive rate calculation")
+
         # If we get through all the sources and have gone through less than requested, warn the user
         if len(light_curves) < number_of_light_curves:
             logger.warn(indent_level + "Not enough good light curves on this CCD! Field {}, CCD {}".format(field.id, ccd.id))
@@ -137,13 +138,6 @@ def var_indices_for_simulated_light_curves(field, number_of_light_curves, number
         simulated_statistics = simulate_light_curves_compute_indices(light_curves, \
                                                                      num=number_of_simulations_per_light_curve, \
                                                                      indices=indices)
-
-        """
-        try:
-            simulated_statistics = np.hstack((simulated_statistics, simulated_indices_for_this_light_curve))
-        except NameError:
-            simulated_statistics = simulated_indices_for_this_light_curve
-        """
 
     return {"db" : db_statistic_values, "simulated" : simulated_statistics}
 
@@ -195,7 +189,7 @@ def compute_selection_criteria(var_indices, indices, fpr=0.01):
         Nsteps = 0
         while True:
             computed_fpr = np.sum((these_statistics > (db_mean + Nsigma*db_sigma)) | (these_statistics < (db_mean - Nsigma*db_sigma))) / float(len(these_statistics))
-            logger.debug("Step: {}, FPR: {}".format(Nsteps, fpr))
+            #logger.debug("Step: {}, FPR: {}".format(Nsteps, fpr))
 
             # WARNING: If you don't use enough simulations, this may never converge!
             if computed_fpr > (fpr + 0.002):

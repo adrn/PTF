@@ -37,7 +37,7 @@ def _simulate_light_curves_worker(args):
 
         one_computed_var_indices = compute_variability_indices(new_light_curve, indices, return_tuple=True)
         try:
-            computed_var_indices = np.hstack((computed_var_indices, one_computed_var_indices))
+            computed_var_indices = np.vstack((computed_var_indices, one_computed_var_indices))
         except NameError:
             computed_var_indices = one_computed_var_indices
 
@@ -58,25 +58,27 @@ def simulate_light_curves_compute_indices(light_curves, num, indices):
             Which indices to compute for these light curves.
     """
 
-    # Create a SimulatedLightCurve object for the light_curve
-    #sim_light_curve = SimulatedLightCurve.from_ptflightcurve(light_curve)
+    # Do this because for some reason multiprocessing fails with delta_chi_squared calcuation
+    if "delta_chi_squared" in indices:
+        result = []
+        for light_curve in light_curves:
+            result.append(_simulate_light_curves_worker((SimulatedLightCurve.from_ptflightcurve(light_curve), indices, num)))
 
-    all_indices = []
-    for args in [(SimulatedLightCurve.from_ptflightcurve(light_curve), indices, num) for light_curve in light_curves]:
-        all_indices.append(_simulate_light_curves_worker(args))
+        var_indices_simulated = np.vstack(result).view(dtype=[(index, float) for index in indices])
+    else:
+        pool = multiprocessing.Pool(processes=8)
+        result = pool.map_async(_simulate_light_curves_worker, [(SimulatedLightCurve.from_ptflightcurve(light_curve), indices, num) for light_curve in light_curves])
 
-    pool = multiprocessing.Pool(processes=8)
-    result = pool.map_async(_simulate_light_curves_worker, [(SimulatedLightCurve.from_ptflightcurve(light_curve), indices, num) for light_curve in light_curves])
+        pool.close()
+        pool.join()
 
-    pool.close()
-    pool.join()
+        var_indices_simulated = np.vstack(result.get()).view(dtype=[(index, float) for index in indices])
 
-    #result = []
-    #for ii in range(num):
-    #    result.append(_simulate_light_curves_worker((sim_light_curve, indices)))
-
-    # Create a numpy structured array so I can access the arrays of index values using ["eta"] notation, for example.
-    var_indices_simulated = np.array(np.hstack(result.get()), dtype=[(index, float) for index in indices])
-    #var_indices_simulated = np.array(result, dtype=[(index, float) for index in indices])
+    import matplotlib.pyplot as plt
+    plt.plot(var_indices_simulated["eta"], var_indices_simulated["delta_chi_squared"], 'k.', alpha=0.1)
+    plt.xscale("log")
+    plt.yscale("symlog")
+    plt.savefig("plots/test.png")
+    sys.exit(0)
 
     return var_indices_simulated

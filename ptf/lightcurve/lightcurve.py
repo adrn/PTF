@@ -18,6 +18,8 @@ __all__ = ["PTFLightCurve", "PDBLightCurve", "SimulatedLightCurve"]
 
 class PTFLightCurve(object):
     """ Represents a PTF Light Curve """
+    ra = None
+    dec = None
 
     def __init__(self, mjd, mag, error, metadata=None, exposures=None, **kwargs):
         """ Create a PTFLightCurve by passing equal-length arrays of mjd, magnitude, and
@@ -120,7 +122,7 @@ class PTFLightCurve(object):
     def __len__(self):
         return len(self.mjd)
 
-    def sdss_colors(self, mag_type="psf"):
+    def sdss_colors(self, mag_type="mod"):
         """ Returns a dictionary with SDSS colors for this object. mag_type can be 'psf' or 'mod' """
         import galacticutils
         try:
@@ -139,6 +141,43 @@ class PTFLightCurve(object):
             mags[color+"_err"] = sdssData[color + mag_type.capitalize()][1]
 
         return mags
+
+    def sdss_type(self):
+        """ (taken from querySDSSCatalog)
+        Queries the SDSS catalog for the magnitudes for a particular ra/dec
+        ra and dec should be in degrees
+        Returns a hash of keys (u,g,r,i,z) with each value being a two element
+        list of mag, magErr
+        If no hits, returns None
+        """
+        catFname = '/scr4/dlevitan/sdssdr9_extcat.pytable'
+        matchRadius=2./3600.
+        ra,dec = self.ra, self.dec
+
+        if ra == None or dec == None:
+            return None
+
+        # esutil is in same dir as galacticutil.py
+        import esutil, tables
+        htm = esutil.htm.HTM(10)
+        htmid = htm.lookup_id(ra,dec)[0]
+        sdssCat = tables.openFile(catFname)
+
+        xyzRadius = np.sin(matchRadius*np.pi/180.0)
+        ra, dec = ra*np.pi/180.0, dec*np.pi/180.0
+        x,y,z = np.cos(dec)*np.cos(ra), np.cos(dec)*np.sin(ra), np.sin(dec)
+
+        data = sdssCat.root.sdsscat.readWhere('(htm10 == htms) & (x > xs-xyzRadius) & (x < xs +xyzRadius) & (y > ys-xyzRadius) & (y < ys + xyzRadius) & (z > zs-xyzRadius) & (z < zs + xyzRadius) & (((x-xs)**2+(z-zs)**2+(y-ys)**2)**0.5 < xyzRadius)', {'htms': htmid, 'xs': x, 'ys': y, 'zs': z, 'xyzRadius': xyzRadius})
+        sdssCat.close()
+        mags = {}
+        if data.shape[0] == 0: return None
+
+        if data[0]["type"] == 3:
+            return "galaxy"
+        elif data[0]["type"] == 6:
+            return "star"
+        else:
+            return None
 
     @property
     def baseline(self):
@@ -182,10 +221,12 @@ class SimulatedLightCurve(PTFLightCurve):
         """
 
         self.amjd = self.mjd = np.array(mjd)
-
         if error != None:
-            #error = np.array(error)
-            if not isinstance(error, np.ndarray) or len(error) == 1:
+            error = np.array(error)
+
+            if isinstance(error, np.ndarray) and len(error) == len(self.mjd):
+                self.error = error
+            elif not isinstance(error, np.ndarray) or len(error) == 1:
                 self.error = np.zeros_like(self.mjd) + error
             elif len(error) != len(self.mjd):
                 raise ValueError("Error array should have same shape as mjd")

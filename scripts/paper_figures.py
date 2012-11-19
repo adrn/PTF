@@ -32,6 +32,7 @@ logger.addHandler(ch)
 # Project
 from ptf.lightcurve import PTFLightCurve, SimulatedLightCurve
 import ptf.globals as pg
+import ptf.util as pu
 import ptf.variability_indices as vi
 
 try:
@@ -282,7 +283,7 @@ def maximum_outlier_indices_plot(field_id):
                 elif min_max[index] == "max":
                     idx_vals[idx_vals.argmax()] = -1E8
 
-        axes[ii].set_title(pg.index_to_label[index], fontsize=24)
+        axes[ii].set_title(pu.index_to_label(index), fontsize=24)
         #axes[ii].set_xlim(best_outlier_lightcurve.mjd.min()-2, best_outlier_lightcurve.mjd.max()+2)
         #axes[ii, 1].set_xlim(55350, 55600)
 
@@ -386,6 +387,29 @@ def variability_indices_distributions(field_id=100018, overwrite=False):
     all_pdb_statistics_array, simulated_microlensing_statistics = pickle.load(f)
     f.close()
 
+    selection_criteria = {
+        "k" : {
+			"upper" : -0.06924719810366119,
+			"lower" : -0.1835206338831516
+		},
+		"eta" : {
+			"upper" : 0.45518414391202044,
+			"lower" : 0.08133323392105407
+		},
+		"sigma_mu" : {
+			"upper" : -0.3645565304924334,
+			"lower" : -3.360181679058611
+		},
+		"delta_chi_squared" : {
+			"upper" : 9.466730417088524,
+			"lower" : -8.48364873999283
+		},
+		"j" : {
+			"upper" : 1.59580628971734,
+			"lower" : -3.747264782129393
+		}
+    }
+
     index_pairs = [("eta", "delta_chi_squared"), ("eta", "j"), ("delta_chi_squared", "j")]
 
     nbins = 100
@@ -414,7 +438,7 @@ def variability_indices_distributions(field_id=100018, overwrite=False):
 
         H_pos_boring, xedges_pos, yedges_pos = np.histogram2d(pos_x, pos_y, bins=[xedges_pos, yedges_pos])
 
-        ax1 = axes[0]
+        ax1 = axes[1]
         #ax1.imshow(np.log10(H), interpolation="none", cmap=cm.gist_heat)
         ax1.pcolormesh(xedges_pos, yedges_pos, np.where(H_pos > 0, np.log10(H_pos), 0.).T, cmap=cm.Blues)
         ax1.set_xscale("log")
@@ -422,19 +446,27 @@ def variability_indices_distributions(field_id=100018, overwrite=False):
         ax1.set_xlim(xedges_pos[0], xedges_pos[-1])
         ax1.set_ylim(yedges_pos[0], yedges_pos[-1])
 
-        ax1.set_xlabel(pg.index_to_label[x_index], fontsize=28)
-        ax1.set_ylabel(pg.index_to_label[y_index], fontsize=28)
+        ax1.set_xlabel(pu.index_to_label(x_index), fontsize=28)
+        ax1.axhline(10.**selection_criteria[y_index]["upper"], color='r', linestyle='--')
+        ax1.axhline(10.**selection_criteria[y_index]["lower"], color='g', linestyle='--')
+        ax1.axvline(10.**selection_criteria[x_index]["upper"], color='r', linestyle='--')
+        ax1.axvline(10.**selection_criteria[x_index]["lower"], color='g', linestyle='--')
 
-        ax2 = axes[1]
+        ax2 = axes[0]
         ax2.pcolormesh(xedges_pos, yedges_pos, np.where(H_pos_boring > 0, np.log10(H_pos_boring), 0.).T, cmap=cm.Blues)
         ax2.set_xscale("log")
         ax2.set_yscale("log")
         ax2.set_xlim(xedges_pos[0], xedges_pos[-1])
         ax2.set_ylim(yedges_pos[0], yedges_pos[-1])
 
-        ax2.set_xlabel(pg.index_to_label[x_index], fontsize=28)
+        ax2.set_xlabel(pu.index_to_label(x_index), fontsize=28)
+        ax2.set_ylabel(pu.index_to_label(y_index), fontsize=28)
+        ax2.axhline(10.**selection_criteria[y_index]["upper"], color='r', linestyle='--')
+        ax2.axhline(10.**selection_criteria[y_index]["lower"], color='g', linestyle='--')
+        ax2.axvline(10.**selection_criteria[x_index]["upper"], color='r', linestyle='--')
+        ax2.axvline(10.**selection_criteria[x_index]["lower"], color='g', linestyle='--')
 
-        fig.savefig(os.path.join(pg.plots_path, "var_indices/{}_vs_{}.pdf".format(x_index, y_index), bbox_inches="tight"))
+        fig.savefig(os.path.join(pg.plots_path, "var_indices/{}_vs_{}.pdf".format(x_index, y_index)), bbox_inches="tight")
 
 def variability_indices_distributions_easy(field_id=4588):
     indices = ["eta", "j", "delta_chi_squared", "sigma_mu", "k"]
@@ -506,8 +538,8 @@ def variability_indices_distributions_easy(field_id=4588):
         ax1.set_xlim(xedges_pos[0], xedges_pos[-1])
         ax1.set_ylim(yedges_pos[0], yedges_pos[-1])
 
-        ax1.set_xlabel(pg.index_to_label[x_index], fontsize=28)
-        ax1.set_ylabel(pg.index_to_label[y_index], fontsize=28)
+        ax1.set_xlabel(pu.index_to_label(x_index), fontsize=28)
+        ax1.set_ylabel(pu.index_to_label(y_index), fontsize=28)
 
         ax2 = axes[0]
         ax2.pcolormesh(xedges_pos, yedges_pos, np.where(H_pos_boring > 0, np.log10(H_pos_boring), 0.).T, cmap=cm.Blues)
@@ -516,7 +548,7 @@ def variability_indices_distributions_easy(field_id=4588):
         ax2.set_xlim(xedges_pos[0], xedges_pos[-1])
         ax2.set_ylim(yedges_pos[0], yedges_pos[-1])
 
-        ax2.set_xlabel(pg.index_to_label[x_index], fontsize=28)
+        ax2.set_xlabel(pu.index_to_label(x_index), fontsize=28)
 
         fig.savefig(os.path.join(pg.plots_path, "derp_{}_{}.png".format(x_index, y_index)))
 
@@ -619,6 +651,6 @@ if __name__ == "__main__":
     #microlensing_event_sim()
     #maximum_outlier_indices_plot(100101)
 
-    #variability_indices_distributions()
+    variability_indices_distributions()
     #Don't use this! variability_indices_distributions_easy()
-    num_observations_distribution()
+    #num_observations_distribution()

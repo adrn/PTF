@@ -47,9 +47,7 @@ def select_candidates(field, selection_criteria, num_fit_attempts=10):
 
     lower_cut = 10**selection_criteria["lower"]
 
-    candidates = []
-    unclassified = []
-    var_stars = []
+    light_curves = []
     for ccd in field.ccds.values():
         logger.info(greenText("Starting with CCD {}".format(ccd.id)))
         chip = ccd.read()
@@ -69,73 +67,37 @@ def select_candidates(field, selection_criteria, num_fit_attempts=10):
             # If light curve doesn't have enough clean observations, skip it
             if light_curve != None and len(light_curve) < min_number_of_good_observations: continue
 
-            # Re-compute eta now that we've (hopefully) cleaned out any bad data
+            # Compute the variability indices for the freshly cleaned light curve
             try:
                 indices = pa.compute_variability_indices(light_curve, indices=["eta", "delta_chi_squared", "j", "k", "sigma_mu"])
             except ValueError:
-                continue
+                logger.warning("Failed to compute variability indices for light curve! {0}".format(light_curve))
+                return False
             light_curve.indices = indices
-
-            ml_chisq = 1E6
-            for ii in range(num_fit_attempts):
-                params = pa.fit_microlensing_event(light_curve)
-                new_chisq = params["result"].chisqr
-
-                if new_chisq < ml_chisq:
-                    ml_chisq = new_chisq
-
-            # Try to fit a microlensing model, then subtract it, then recompute eta and see
-            #   if it is still an outlier
-            new_light_curve = pa.fit_subtract_microlensing(light_curve, fit_data=params)
-            new_eta = pa.eta(new_light_curve)
 
             light_curve.tags = []
             light_curve.features = {}
-            if (indices["eta"] <= lower_cut) and (new_eta >= lower_cut) and \
-               (round(light_curve.u0, 2) < 1.34) and (round(light_curve.tE) > 2.) and \
-               (light_curve.tE < 0.5*light_curve.baseline):
 
-                # Count number of data points between t0-2tE and t0+2tE, make sure we have at least a few above 2sigma
-                sliced_lc = light_curve.slice_mjd(params["t0"].value-2.*params["tE"].value, params["t0"].value+2.*params["tE"].value)
+            if light_curve.sdss_type() == "galaxy":
+                light_curve.tags.append("galaxy")
+                continue
 
-                if sum(sliced_lc.mag < (np.median(light_curve.mag) - 3.*np.std(light_curve.mag))) < 3:
-                    logger.debug("Light curve has fewer than 3 observations in a peak > 3sigma: {}".format((field.id, ccd.id, light_curve.source_id)))
-                    continue
+            # If the object is not a Galaxy or has no SDSS data, try to get the SDSS colors
+            #    to see if it passes the Richards et al. QSO color cut.
+            sdss_colors = light_curve.sdss_colors("psf")
+            qso_status = richards_qso(sdss_colors)
+            if sdss_colors != None and qso_status:
+                light_curve.tags.append("qso")
 
-                # TODO: Fit microlensing event model to sliced light curve, do something?
-                if sum(sliced_lc.mag < (np.median(light_curve.mag) - 3.*np.std(light_curve.mag))) > 5:
-                    light_curve.tags.append("candidate")
-                    candidates.append(light_curve)
+            candidate_status = pa.iscandidate(light_curve, lower_eta_cut=lower_cut)
 
-                # TODO: Maybe I could compute everything for the selected light curves, **then** do some clustering algorithm?
-                #   features: eta, delta_chi_squared, corr, number of data points, max_error, min_error, mean_error?
-                for key,val in indices.items():
-                    light_curve.features[key] = val
+            if candidate_status == "candidate" and "qso" not in light_curve.tags:
+                light_curve.tags.append("candidate")
+                light_curves.append(light_curve)
+                continue
 
-                more_indices = pa.compute_variability_indices(light_curve, indices=["corr", "con"])
-                for key,val in more_indices.items():
-                    light_curve.features[key] = val
-
-                light_curve.features["N"] = len(light_curve)
-                light_curve.features["median_error"] = np.median(light_curve.error)
-                light_curve.features["chisqr"] = light_curve.chisqr
-                try:
-                    fp = pa.findPeaks_aov(light_curve.mjd.copy(), light_curve.mag.copy(), light_curve.error.copy(), 3, 1., 2.*light_curve.baseline, 1., 0.1, 20)
-                    light_curve.features["aov_period"] = fp["peak_period"][0]
-                    light_curve.features["aov_power"] = max(fp["peak_period"])
-                except ZeroDivisionError:
-                    light_curve.features["aov_period"] = 0.0
-                    light_curve.features["aov_power"] = 0.0
-
-                if light_curve not in unclassified and light_curve not in candidates:
-                    unclassified.append(light_curve)
-
-                # Here I can try this: light_curve.sdss_colors
-                sdss_colors = light_curve.sdss_colors("psf")
-                if sdss_colors != None and richards_qso(sdss_colors):
-                    light_curve.tags.append("qso")
-
-            if indices["eta"] <= lower_cut:
+            if candidate_status == "subcandidate" and light_curve.indices["eta"] < lower_cut and not qso_status:
+                # Try to do period analysis with AOV
                 try:
                     peak_period = light_curve.features["aov_period"]
                     peak_power = light_curve.features["aov_power"]
@@ -151,17 +113,27 @@ def select_candidates(field, selection_criteria, num_fit_attempts=10):
                 if (peak_period < 2.*light_curve.baseline):
                     if peak_power > 25.:
                         light_curve.tags.append("variable star")
-                        if light_curve not in var_stars:
-                            var_stars.append(light_curve)
+
+                        if "subcandidate" in light_curve.tags:
+                            light_curve.tags.pop(light_curve.tags.index("subcandidate"))
+
+                        if light_curve not in light_curves:
+                            light_curves.append(light_curve)
 
         ccd.close()
 
-    return candidates, unclassified, var_stars # TODO: This is not a permanent solution
+    return light_curves
 
-def save_candidates_to_mongodb(candidates, collection):
+def save_candidates_to_mongodb(candidates, collection, overwrite=False):
     """ Save a list of light curves to the given mongodb collection """
 
     for candidate in candidates:
+        db_lightcurve = mongo.get_light_curve_from_collection(candidate.field_id, candidate.ccd_id, candidate.source_id, collection)
+        if db_lightcurve != None and not overwrite:
+            continue
+        elif db_lightcurve != None and overwrite:
+            collection.remove({"_id" : db_lightcurve["_id"]})
+
         try:
             ra, dec = candidate.ra, candidate.dec
         except AttributeError:
@@ -218,7 +190,9 @@ if __name__ == "__main__":
     else:
         logger.setLevel(logging.INFO)
 
-    indices = ["eta"]
+    #indices = ["eta", "delta_chi_squared", "j", "k", "sigma_mu"]
+    indices = ["eta", "j", "delta_chi_squared"]
+    #indices = ["eta"]
 
     ptf = mongo.PTFConnection()
     light_curve_collection = ptf.light_curves
@@ -260,7 +234,20 @@ if __name__ == "__main__":
 
         if args.overwrite_lcs:
             field_collection.update({"_id" : field.id}, {"$set" : {"already_searched" : False}})
-            light_curve_collection.remove({"field_id" : field.id})
+            #light_curve_collection.remove({"field_id" : field.id})
+
+            for light_curve_document in light_curve_collection.find({"field_id" : field.id}):
+                if "candidate" in light_curve_document["tags"] or \
+                   "cv" in light_curve_document["tags"] or \
+                   "eclipsing" in light_curve_document["tags"] or \
+                   "nova" in light_curve_document["tags"] or \
+                   "periodic" in light_curve_document["tags"] or \
+                   "sinusoidal" in light_curve_document["tags"] or \
+                   "supernova" in light_curve_document["tags"] or \
+                   "transient" in light_curve_document["tags"]:
+                   continue
+                else:
+                    light_curve_collection.remove({"_id" : light_curve_document["_id"]})
 
         # Try to get field from database, if it doesn't exist, create it and insert
         field_document = field_collection.find_one({"_id" : field.id})
@@ -281,7 +268,6 @@ if __name__ == "__main__":
         if args.overwrite or selection_criteria == None:
             logger.info("Selection criteria not available for field.")
 
-            # TODO: Do I want to write var_indices to a file?
             try:
                 var_indices = vi.var_indices_for_simulated_light_curves(field, number_of_light_curves=args.num_light_curves, number_of_simulations_per_light_curve=args.num_simulations, indices=indices)
             except UnboundLocalError:
@@ -299,19 +285,20 @@ if __name__ == "__main__":
 
             logger.debug("Done with selection criteria simulation...saving to database")
             selection_criteria_document = {}
-            selection_criteria_document["upper"] = selection_criteria["eta"]["upper"]
-            selection_criteria_document["lower"] = selection_criteria["eta"]["lower"]
+            for index in indices:
+                selection_criteria_document[index] = dict()
+                selection_criteria_document[index]["upper"] = selection_criteria[index]["upper"]
+                selection_criteria_document[index]["lower"] = selection_criteria[index]["lower"]
+
+            #selection_criteria_document["upper"] = selection_criteria["eta"]["upper"]
+            #selection_criteria_document["lower"] = selection_criteria["eta"]["lower"]
             field_collection.update({"_id" : field.id}, {"$set" : {"selection_criteria" : selection_criteria_document}})
 
         logger.debug("Selection criteria loaded")
-        selection_criteria_document = field_collection.find_one({"_id" : field.id}, fields=["selection_criteria"])["selection_criteria"]
+        selection_criteria_document = field_collection.find_one({"_id" : field.id}, fields=["selection_criteria"])["selection_criteria"]["eta"]
 
-        candidates, unclassified, var_stars = select_candidates(field, selection_criteria_document)
-        logger.info("Selected {} candidates.".format(len(candidates)))
-        logger.info("Selected {} unclassified transients.".format(len(unclassified)))
-        logger.info("Selected {} variable stars.".format(len(var_stars)))
+        selected_light_curves = select_candidates(field, selection_criteria_document)
+        logger.info("Selected {} light curves.".format(len(selected_light_curves)))
 
-        save_candidates_to_mongodb(candidates, light_curve_collection)
-        save_candidates_to_mongodb(unclassified, light_curve_collection)
-        save_candidates_to_mongodb(var_stars, light_curve_collection)
+        save_candidates_to_mongodb(selected_light_curves, light_curve_collection)
         field_collection.update({"_id" : field.id}, {"$set" : {"already_searched" : True}})
