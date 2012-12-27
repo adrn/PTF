@@ -193,7 +193,8 @@ class Field(object):
             try:
                 self.ccds[ccd_id] = CCD(ccd_id, field=self, filter=self.filter)
             except ValueError:
-                logger.debug("CCD {} not found for Field {}.".format(ccd_id, self))
+                #logger.debug("CCD {} not found for Field {}.".format(ccd_id, self))
+                pass
 
         if len(self.ccds) == 0:
             logger.debug("No CCD data found for: {}".format(self))
@@ -385,7 +386,9 @@ def random_light_curve(field_id=100101, *args, **kwargs):
 def get_light_curve(field_id, ccd_id, source_id, **kwargs):
     field = Field(field_id, "R")
     ccd = field.ccds[ccd_id]
-    return ccd.light_curve(source_id, **kwargs)
+    lc = ccd.light_curve(source_id, **kwargs)
+    ccd.close()
+    return lc
 
 """
 sources:

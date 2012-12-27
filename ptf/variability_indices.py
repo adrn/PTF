@@ -174,43 +174,53 @@ def compute_selection_criteria(var_indices, indices, fpr=0.01):
     for index in indices:
         logger.debug(indent_level + "Index: {}".format(index))
 
-        # Get the mean and standard deviation of the 'vanilla' distributions
-        db_mean, db_sigma = np.mean(np.log10(var_indices["db"][index])), np.std(np.log10(var_indices["db"][index]))
-        logger.debug(indent_level + "\t mu={}, sigma={}".format(db_mean, db_sigma))
-
         # Get the simulated statistics for this index
-        #TODO: Check the validity of using prune_ here -- might be some issue with J
         these_statistics = np.log10(prune_index_distribution(var_indices["simulated"][index],index))
 
-        # Start by selecting with Nsigma = 0
-        Nsigma = 0.
-
         # Nsteps is the number of steps this routine has to take to converge -- just used for diagnostics
-        Nsteps = 0
-        while True:
-            computed_fpr = np.sum((these_statistics > (db_mean + Nsigma*db_sigma)) | (these_statistics < (db_mean - Nsigma*db_sigma))) / float(len(these_statistics))
-            #logger.debug("Step: {}, FPR: {}".format(Nsteps, fpr))
+        Nsteps = 1000
+        Nstep = 0
+        if index == "eta":
+            selection_cutoff = 0.
+            while Nstep < Nsteps:
+                computed_fpr = np.sum(these_statistics < selection_cutoff) / float(len(these_statistics))
 
-            # WARNING: If you don't use enough simulations, this may never converge!
-            if computed_fpr > (fpr + 0.002):
-                Nsigma += np.random.uniform(0., 0.05)
-            elif computed_fpr < (fpr - 0.002):
-                Nsigma -= np.random.uniform(0., 0.05)
-            else:
-                break
+                # WARNING: If you don't use enough simulations, this may never converge!
+                if computed_fpr > (fpr + 0.002):
+                    selection_cutoff -= np.random.uniform(0., 0.05)
+                elif computed_fpr < (fpr - 0.002):
+                    selection_cutoff += np.random.uniform(0., 0.05)
+                else:
+                    break
 
-            Nsteps += 1
+                Nstep += 1
 
-            if Nsteps > 1000:
-                logger.warn("{} didn't converge!".format(index))
-                break
+        elif index == "delta_chi_squared" or index == "j":
+            selection_cutoff = 0.
+            while Nstep < Nsteps:
+                computed_fpr = np.sum(these_statistics > selection_cutoff) / float(len(these_statistics))
+
+                # WARNING: If you don't use enough simulations, this may never converge!
+                if computed_fpr > (fpr + 0.002):
+                    selection_cutoff += np.random.uniform(0., 0.05)
+                elif computed_fpr < (fpr - 0.002):
+                    selection_cutoff -= np.random.uniform(0., 0.05)
+                else:
+                    break
+
+                Nstep += 1
+
+        else:
+            raise ValueError("Selection boundaries only available for eta, delta_chi_squared and j!")
+
+        if Nstep == Nsteps:
+            logger.warn("**Selection boundary didn't converge!**")
 
         logger.debug("{} -- Final Num. steps: {}, Final FPR: {}".format(index, Nsteps, computed_fpr))
-        logger.debug("{} -- Final Nsigma={}, Nsigma*sigma={}".format(index, Nsigma, Nsigma*db_sigma))
+        logger.debug("{} -- Final selection boundary: {}".format(index, selection_cutoff))
 
         selection_criteria[index] = dict()
-        selection_criteria[index]["upper"] = db_mean + Nsigma*db_sigma
-        selection_criteria[index]["lower"] = db_mean - Nsigma*db_sigma
+        selection_criteria[index] = selection_cutoff
 
     return selection_criteria
 

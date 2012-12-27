@@ -62,7 +62,10 @@ def simulate_light_curves_compute_indices(light_curves, num, indices):
     if "delta_chi_squared" in indices:
         result = []
         for light_curve in light_curves:
-            result.append(_simulate_light_curves_worker((SimulatedLightCurve.from_ptflightcurve(light_curve), indices, num)))
+            try:
+                result.append(_simulate_light_curves_worker((SimulatedLightCurve.from_ptflightcurve(light_curve), indices, num)))
+            except ValueError:
+                pass
 
         var_indices_simulated = np.vstack(result).view(dtype=[(index, float) for index in indices])
     else:
@@ -73,12 +76,5 @@ def simulate_light_curves_compute_indices(light_curves, num, indices):
         pool.join()
 
         var_indices_simulated = np.vstack(result.get()).view(dtype=[(index, float) for index in indices])
-
-    import matplotlib.pyplot as plt
-    plt.plot(var_indices_simulated["eta"], var_indices_simulated["delta_chi_squared"], 'k.', alpha=0.1)
-    plt.xscale("log")
-    plt.yscale("symlog")
-    plt.savefig("plots/test.png")
-    sys.exit(0)
 
     return var_indices_simulated

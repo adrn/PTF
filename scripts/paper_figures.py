@@ -9,6 +9,7 @@ __author__ = "adrn <adrn@astro.columbia.edu>"
 
 # Standard library
 import os, sys
+import glob
 import logging
 import cPickle as pickle
 import time
@@ -34,6 +35,9 @@ from ptf.lightcurve import PTFLightCurve, SimulatedLightCurve
 import ptf.globals as pg
 import ptf.util as pu
 import ptf.variability_indices as vi
+import ptf.db.mongodb as mongo
+
+import scripts.event_fitter as fit
 
 try:
     import ptf.db.photometric_database as pdb
@@ -41,6 +45,8 @@ try:
     import survey_coverage
 except ImportError:
     logger.warning("photometric database modules failed to load! If this is on Navtara, you made a boo-boo.")
+
+tick_font_size = 14
 
 def make_survey_sampling_figure(N=10):
     """ Generate the survey sampling figure that shows how different the
@@ -96,8 +102,14 @@ def microlensing_event_sim():
     """ Create the multi-panel figure with simulated microlensing events for a single
         'typical' PTF light curve.
     """
-    with open("data/paper_figures/sample_lightcurve.pickle") as f:
-        light_curve = pickle.load(f)
+
+    #field = pdb.Field(100062, "R")
+    #ccd = field.ccds[1]
+    #chip = ccd.read()
+    #sources = chip.sources.readWhere("(ngoodobs > 300) & (vonNeumannRatio > 1.235)")
+    #light_curve = ccd.light_curve(sources["matchedSourceID"][np.random.randint(0, len(sources))], clean=True)
+    #print sources["matchedSourceID"]
+    light_curve = pdb.get_light_curve(100062, 1, 13268, clean=True)
 
     num = 4
     fig, axes = plt.subplots(num,1, sharex=True, figsize=(11,15))
@@ -110,15 +122,16 @@ def microlensing_event_sim():
                         {"u0" : 0.5, "t0" : t0, "tE" : 20},
                         {"u0" : 0.01, "t0" : t0, "tE" : 20}]
 
-    args_list = [(17.3, "a)"), (17., "b)"), (16.6, "c)"), (13, "d)")]
+    args_list = [(16.66, "a)"), (16.4, "b)"), (16.0, "c)"), (12, "d)")]
+    args_list2 = [16.68, 16.5, 16.2, 13]
 
     for ii in range(num):
         axes[ii].xaxis.set_visible(False)
-        # TODO: text letter
 
         if ii != 0:
-            sim_light_curve.reset()
-            sim_light_curve.addMicrolensingEvent(**kwarg_list[ii])
+            #sim_light_curve.reset()
+            sim_light_curve = SimulatedLightCurve(mjd=light_curve.mjd, mag=light_curve.mag, error=light_curve.error)
+            sim_light_curve.add_microlensing_event(**kwarg_list[ii])
 
         sim_light_curve.plot(axes[ii], marker="o", ms=3, alpha=0.75)
 
@@ -129,83 +142,31 @@ def microlensing_event_sim():
         else:
             u0 = kwarg_list[ii]["u0"]
             u0_str = r"$u_0={:.2f}$".format(u0)
-        axes[ii].set_ylabel(u0_str, rotation="horizontal")
+        #axes[ii].set_ylabel(u0_str, rotation="horizontal")
+
+        #for tick in axes[ii].yaxis.get_major_ticks():
+        #    tick.label.set_fontsize(tick_font_size)
 
         if ii % 2 != 0:
             axes[ii].yaxis.tick_right()
         else:
             axes[ii].yaxis.set_label_position("right")
 
-        axes[ii].text(55985, *args_list[ii], fontsize=18)
+        if ii == 0:
+            axes[ii].set_ylabel(r"$R$", rotation="horizontal", fontsize=26)
+            axes[ii].yaxis.set_label_position("left")
 
-    fig.suptitle("PTF light curve with simulated microlensing events", fontsize=24)
+        axes[ii].text(56100, *args_list[ii], fontsize=24)
+        axes[ii].text(56100, args_list2[ii], u0_str, fontsize=24)
+
+    #fig.suptitle("PTF light curve with simulated microlensing events", fontsize=24)
+
+    for ax in fig.axes:
+        for ticklabel in ax.get_yticklabels():
+            ticklabel.set_fontsize(18)
 
     fig.subplots_adjust(hspace=0.0, left=0.1, right=0.9)
-    fig.savefig(os.path.join(pg.plots_path, "simulated_events.pdf", bbox_inches="tight", facecolor="white"))
-
-'''
-def maximum_outlier_indices_plot(field_id, ccd_id=5):
-    """ Given a field ID, produce a figure with light curves for the
-        maximum outlier values of the indices.
-    """
-
-    field = pdb.Field(field_id, "R")
-    ccd = field.ccds[ccd_id]
-
-    pickle_filename = "data/paper_figures/var_indices_field{}_ccd{}.pickle".format(field_id, ccd_id)
-
-    indices = ["eta", "delta_chi_squared", "sigma_mu", "j", "k"]
-    if not os.path.exists(pickle_filename):
-        chip = ccd.read()
-
-        source_ids = chip.sources.readWhere("ngoodobs > 600")["matchedSourceID"]
-        logger.info("{} source ids selected".format(len(source_ids)))
-
-        var_indices = []
-        for source_id in source_ids:
-            light_curve = ccd.light_curve(source_id, clean=True, barebones=True)
-
-            if len(light_curve.mjd) > 500:
-                logger.debug("Source ID {} is good".format(source_id))
-                try:
-                    lc_var_indices = (source_id,) + pa.compute_variability_indices(light_curve, indices, return_tuple=True)
-                except:
-                    logger.warning("Failed to compute variability indices for simulated light curve!")
-                    continue
-
-                var_indices.append(lc_var_indices)
-
-        var_indices = np.array(var_indices, dtype=zip(["source_id"] + indices, [int] + [float]*len(indices)))
-
-        f = open(pickle_filename, "w")
-        pickle.dump(var_indices, f)
-        f.close()
-
-    f = open(pickle_filename, "r")
-    var_indices = pickle.load(f)
-    f.close()
-
-    print "{} light curves from this CCD are good".format(len(var_indices))
-
-    fig, axes = plt.subplots(5, 1, sharex=True, figsize=(20,15))
-
-    lc = ccd.light_curve(var_indices[var_indices["eta"].argmin()]["source_id"], clean=True, barebones=True)
-    lc.plot(axes[0])
-
-    lc = ccd.light_curve(var_indices[var_indices["j"].argmax()]["source_id"], clean=True, barebones=True)
-    lc.plot(axes[1])
-
-    lc = ccd.light_curve(var_indices[var_indices["k"].argmin()]["source_id"], clean=True, barebones=True)
-    lc.plot(axes[2])
-
-    lc = ccd.light_curve(var_indices[var_indices["sigma_mu"].argmax()]["source_id"], clean=True, barebones=True)
-    lc.plot(axes[3])
-
-    lc = ccd.light_curve(var_indices[var_indices["delta_chi_squared"].argmax()]["source_id"], clean=True, barebones=True)
-    lc.plot(axes[4])
-
-    fig.savefig("plots/maximum_outlier_light_curves.pdf", bbox_inches="tight")
-'''
+    fig.savefig(os.path.join(pg.plots_path, "paper_figures", "simulated_events.pdf"), bbox_inches="tight", facecolor="white")
 
 def maximum_outlier_indices_plot(field_id):
     """ Same as above function, but uses variability indices computed by the photometric database instead of my own """
@@ -283,13 +244,21 @@ def maximum_outlier_indices_plot(field_id):
                 elif min_max[index] == "max":
                     idx_vals[idx_vals.argmax()] = -1E8
 
-        axes[ii].set_title(pu.index_to_label(index), fontsize=24)
+        axes[ii].set_title(pu.index_to_label(index), fontsize=28)
         #axes[ii].set_xlim(best_outlier_lightcurve.mjd.min()-2, best_outlier_lightcurve.mjd.max()+2)
         #axes[ii, 1].set_xlim(55350, 55600)
 
-    axes[-1].set_xlabel("MJD", fontsize=24)
+    for ax in fig.axes[:-1]:
+        ax.xaxis.set_visible(False)
+        ax.yaxis.set_visible(False)
+
+    fig.axes[-1].yaxis.set_visible(False)
+    for ticklabel in fig.axes[-1].get_xticklabels():
+        ticklabel.set_fontsize(22)
+
+    axes[-1].set_xlabel("MJD", fontsize=26)
     fig.subplots_adjust(hspace=0.2, top=0.95, bottom=0.08)
-    fig.savefig(os.path.join(pg.plots_path, "max_outlier_light_curves.pdf".format(field_id)))#, bbox_inches="tight")
+    fig.savefig(os.path.join(pg.plots_path, "paper_figures", "max_outlier_light_curves.pdf".format(field_id)))#, bbox_inches="tight")
 
 def intersect_light_curves(light_curve1, light_curve2):
     """ Returns two light curves that have the same time measurements """
@@ -388,33 +357,16 @@ def variability_indices_distributions(field_id=100018, overwrite=False):
     f.close()
 
     selection_criteria = {
-        "k" : {
-			"upper" : -0.06924719810366119,
-			"lower" : -0.1835206338831516
-		},
-		"eta" : {
-			"upper" : 0.45518414391202044,
-			"lower" : 0.08133323392105407
-		},
-		"sigma_mu" : {
-			"upper" : -0.3645565304924334,
-			"lower" : -3.360181679058611
-		},
-		"delta_chi_squared" : {
-			"upper" : 9.466730417088524,
-			"lower" : -8.48364873999283
-		},
-		"j" : {
-			"upper" : 1.59580628971734,
-			"lower" : -3.747264782129393
-		}
-    }
+		"eta" : 0.16167735855516213,
+		"delta_chi_squared" : 1.162994709319348,
+		"j" : 1.601729135628142
+	}
 
     index_pairs = [("eta", "delta_chi_squared"), ("eta", "j"), ("delta_chi_squared", "j")]
 
     nbins = 100
     for x_index, y_index in index_pairs:
-        fig, axes = plt.subplots(1, 2, sharey=True, figsize=(20,10))
+        fig, axes = plt.subplots(1, 2, sharey=True, figsize=(15,7.5))
 
         # Variable data
         x = simulated_microlensing_statistics[x_index]
@@ -447,10 +399,13 @@ def variability_indices_distributions(field_id=100018, overwrite=False):
         ax1.set_ylim(yedges_pos[0], yedges_pos[-1])
 
         ax1.set_xlabel(pu.index_to_label(x_index), fontsize=28)
-        ax1.axhline(10.**selection_criteria[y_index]["upper"], color='r', linestyle='--')
-        ax1.axhline(10.**selection_criteria[y_index]["lower"], color='g', linestyle='--')
-        ax1.axvline(10.**selection_criteria[x_index]["upper"], color='r', linestyle='--')
-        ax1.axvline(10.**selection_criteria[x_index]["lower"], color='g', linestyle='--')
+        ax1.axhline(10.**selection_criteria[y_index], color='r', linestyle='--')
+        ax1.axvline(10.**selection_criteria[x_index], color='r', linestyle='--')
+
+        if x_index == "eta":
+            ax1.fill_between([xedges_pos[0], 10.**selection_criteria[x_index]], 10.**selection_criteria[y_index], yedges_pos[-1], facecolor='red', alpha=0.1)
+        elif x_index == "delta_chi_squared":
+            ax1.fill_between([10.**selection_criteria[x_index], xedges_pos[-1]], 10.**selection_criteria[y_index], yedges_pos[-1], facecolor='red', alpha=0.1)
 
         ax2 = axes[0]
         ax2.pcolormesh(xedges_pos, yedges_pos, np.where(H_pos_boring > 0, np.log10(H_pos_boring), 0.).T, cmap=cm.Blues)
@@ -461,96 +416,19 @@ def variability_indices_distributions(field_id=100018, overwrite=False):
 
         ax2.set_xlabel(pu.index_to_label(x_index), fontsize=28)
         ax2.set_ylabel(pu.index_to_label(y_index), fontsize=28)
-        ax2.axhline(10.**selection_criteria[y_index]["upper"], color='r', linestyle='--')
-        ax2.axhline(10.**selection_criteria[y_index]["lower"], color='g', linestyle='--')
-        ax2.axvline(10.**selection_criteria[x_index]["upper"], color='r', linestyle='--')
-        ax2.axvline(10.**selection_criteria[x_index]["lower"], color='g', linestyle='--')
+        ax2.axhline(10.**selection_criteria[y_index], color='r', linestyle='--')
+        ax2.axvline(10.**selection_criteria[x_index], color='r', linestyle='--')
 
-        fig.savefig(os.path.join(pg.plots_path, "var_indices/{}_vs_{}.pdf".format(x_index, y_index)), bbox_inches="tight")
+        if x_index == "eta":
+            ax2.fill_between([xedges_pos[0], 10.**selection_criteria[x_index]], 10.**selection_criteria[y_index], yedges_pos[-1], facecolor='red', alpha=0.1)
+        elif x_index == "delta_chi_squared":
+            ax2.fill_between([10.**selection_criteria[x_index], xedges_pos[-1]], 10.**selection_criteria[y_index], yedges_pos[-1], facecolor='red', alpha=0.1)
 
-def variability_indices_distributions_easy(field_id=4588):
-    indices = ["eta", "j", "delta_chi_squared", "sigma_mu", "k"]
-    number_of_microlensing_light_curves = 1000
-    number_of_microlensing_simulations_per_light_curve = 100
-    min_number_of_good_observations = 100
+        for ax in fig.axes:
+            for ticklabel in ax.get_xticklabels()+ax.get_yticklabels():
+                ticklabel.set_fontsize(18)
 
-    # This version just uses the PDB statistic values and the microlensing simulated values from the detection efficiency simulation
-    field = pdb.Field(field_id, "R")
-
-    for ccd in field.ccds.values():
-        chip = ccd.read()
-        sources = chip.sources.readWhere("ngoodobs > 100")
-        ccd.close()
-
-        idx = []
-        for source in sources:
-            idx.append((source["vonNeumannRatio"], source["stetsonJ"], source["chiSQ"], source["magRMS"]/source["referenceMag"], source["stetsonK"]))
-
-        arr = np.array(idx, dtype=[(index,float) for index in indices])
-        try:
-            all_pdb_statistics_array = np.hstack((all_pdb_statistics_array, arr))
-        except NameError:
-            all_pdb_statistics_array = arr
-
-    all_pdb_statistics_array = np.array(all_pdb_statistics_array, dtype=[(index,float) for index in indices])
-
-    # Convenience variables for filenames
-    file_base = "field{:06d}_Nperccd{}_Nevents{}".format(field.id, number_of_microlensing_light_curves, number_of_microlensing_simulations_per_light_curve) + ".{ext}"
-    pickle_filename = os.path.join("data", "new_detection_efficiency", file_base.format(ext="pickle"))
-
-    f = open(pickle_filename, "r")
-    (simulated_microlensing_statistics, selection_criteria) = pickle.load(f)
-    f.close()
-
-    index_pairs = [("eta", "delta_chi_squared"), ("eta", "j"), ("delta_chi_squared", "j")]
-
-    nbins = 100
-    for x_index, y_index in index_pairs:
-        fig, axes = plt.subplots(1, 2, sharey=True, figsize=(14,5))
-
-        # Variable data
-        x = simulated_microlensing_statistics[x_index]
-        y = simulated_microlensing_statistics[y_index]
-
-        pos_x = x[(x > 0) & (y > 0)]
-        pos_y = y[(x > 0) & (y > 0)]
-
-        xbins_pos = np.logspace(np.log10(pos_x.min()), np.log10(pos_x.max()), nbins)
-        ybins_pos = np.logspace(np.log10(pos_y.min()), np.log10(pos_y.max()), nbins)
-
-        #print pos_x, pos_y, xbins_pos, ybins_pos
-        H_pos, xedges_pos, yedges_pos = np.histogram2d(pos_x, pos_y, bins=[xbins_pos, ybins_pos])
-
-        # Non-variable data
-        x = all_pdb_statistics_array[x_index]
-        y = all_pdb_statistics_array[y_index]
-
-        pos_x = x[(x > 0) & (y > 0)]
-        pos_y = y[(x > 0) & (y > 0)]
-
-        H_pos_boring, xedges_pos, yedges_pos = np.histogram2d(pos_x, pos_y, bins=[xedges_pos, yedges_pos])
-
-        ax1 = axes[1]
-        #ax1.imshow(np.log10(H), interpolation="none", cmap=cm.gist_heat)
-        ax1.pcolormesh(xedges_pos, yedges_pos, np.where(H_pos > 0, np.log10(H_pos), 0.).T, cmap=cm.Blues)
-        ax1.set_xscale("log")
-        ax1.set_yscale("log")
-        ax1.set_xlim(xedges_pos[0], xedges_pos[-1])
-        ax1.set_ylim(yedges_pos[0], yedges_pos[-1])
-
-        ax1.set_xlabel(pu.index_to_label(x_index), fontsize=28)
-        ax1.set_ylabel(pu.index_to_label(y_index), fontsize=28)
-
-        ax2 = axes[0]
-        ax2.pcolormesh(xedges_pos, yedges_pos, np.where(H_pos_boring > 0, np.log10(H_pos_boring), 0.).T, cmap=cm.Blues)
-        ax2.set_xscale("log")
-        ax2.set_yscale("log")
-        ax2.set_xlim(xedges_pos[0], xedges_pos[-1])
-        ax2.set_ylim(yedges_pos[0], yedges_pos[-1])
-
-        ax2.set_xlabel(pu.index_to_label(x_index), fontsize=28)
-
-        fig.savefig(os.path.join(pg.plots_path, "derp_{}_{}.png".format(x_index, y_index)))
+        fig.savefig(os.path.join(pg.plots_path, "paper_figures", "{}_vs_{}.pdf".format(x_index, y_index)), bbox_inches="tight")
 
 def num_observations_distribution():
     """ This figure is (top) just a histogram of all fields binned by the number of observations,
@@ -583,7 +461,7 @@ def num_observations_distribution():
     num_exp_baseline = pickle.load(f)
     f.close()
 
-    fig = plt.figure(figsize=(15,15))
+    fig = plt.figure(figsize=(11,11))
     # Top panel: binned by number of observations
     gs = gridspec.GridSpec(4,4)
 
@@ -614,12 +492,144 @@ def num_observations_distribution():
     ax_bottom.set_xlim(ax_top.get_xlim())
     ax_bottom.set_ylim(ax_side.get_ylim())
 
-    ax_bottom.set_xlabel(r"Number of $R$-band Exposures", fontsize=18)
-    ax_bottom.set_ylabel(r"Baseline ($t_{max} - t_{min}$)", fontsize=18)
+    ax_bottom.set_xlabel(r"Number of $R$-band Exposures", fontsize=24)
+    ax_bottom.set_ylabel(r"Baseline ($t_{max} - t_{min}$)", fontsize=24)
+
+    for ax in fig.axes:
+        for ticklabel in ax.get_yticklabels()+ax.get_xticklabels():
+            ticklabel.set_fontsize(18)
+
     fig.subplots_adjust(hspace=0.02, wspace=0.02)
     fig.suptitle("Number of Exposures vs. Baseline for all PTF fields ($R$-band)", fontsize=22)
     fig.savefig(plotfile)
 
+def after_eta_cut_num_observations():
+    ptf = mongo.PTFConnection()
+    field_collection = ptf.fields
+
+    field_ids = [3437, 1947, 100031]
+
+    for field_id in field_ids:
+        field = pdb.Field(field_id, "R")
+        print(field)
+        selection_criteria = field_collection.find_one({"_id" : field.id}, fields=["selection_criteria"])["selection_criteria"]["eta"]
+        eta_cut = 10**selection_criteria
+
+        ccd = field.ccds[0]
+        chip = ccd.read()
+
+        sources = chip.sources.readWhere("(ngoodobs > {}) & \
+                                          (vonNeumannRatio > 0.0) & \
+                                          (vonNeumannRatio < {})".format(10, eta_cut))
+
+        apw_ngood = []
+        for source in sources:
+            light_curve = ccd.light_curve(source["matchedSourceID"], barebones=True, clean=True)
+            apw_ngood.append(len(light_curve))
+
+        apw_ngood = np.array(apw_ngood)
+
+        plt.clf()
+        plt.figure(figsize=(14,10))
+        plt.subplot(121)
+        plt.hist(sources["ngoodobs"], bins=25, color="#3182BD", linewidth=2., histtype="step", label=r"$N_{good,PDB}$")
+        plt.hist(apw_ngood, bins=25, color="#CA0020", linewidth=2., histtype="step", label=r"$N_{good,APW}$")
+        plt.xlabel(r"$N_{good}$")
+        plt.xlim()
+
+        plt.subplot(122)
+        plt.hist(sources["ngoodobs"]/sources["nobs"], bins=25, color="#3182BD", linewidth=2., histtype="step", label=r"$N_{good,PDB}/N_{tot}$")
+        plt.hist(apw_ngood/sources["nobs"], bins=25, color="#CA0020", linewidth=2., histtype="step", label=r"$N_{good,APW}/N_{tot}$")
+        plt.xlabel(r"$N_{good}/N_{tot}$")
+        plt.savefig(os.path.join(pg.plots_path, "paper_figures/after_eta_cut_{0}.pdf".format(field.id)))
+
+    return
+    plt.clf()
+    num = 0
+    for source in sources[sources["ngoodobs"] < 25]:
+        light_curve = ccd.light_curve(source["matchedSourceID"], clean=True)
+
+        if len(light_curve) < 10:
+            continue
+
+        num += 1
+        plt.clf()
+        light_curve.plot()
+        plt.savefig("/home/aprice-whelan/projects/ptf/plots/test_lc_{0}_{1}.png".format(field.id, source["matchedSourceID"]))
+
+        if num >= 10: break
+    sys.exit(0)
+
+def ml_parameter_distributions(overwrite=False):
+    """ Compute distributions of microlensing event parameter fits by doing my MCMC
+        fit to all candidate, qso, not interesting, bad data, transient, and supernova
+        tagged light curves.
+
+        There are about ~4500
+
+        NEW: Hmm...maybe forget this, I keep breaking navtara
+    """
+
+    ptf = mongo.PTFConnection()
+    light_curve_collection = ptf.light_curves
+
+    Nwalkers = 100
+    Nsamples = 1000
+    Nburn = 100
+
+    searched = []
+    max_parameters = []
+    for tag in ["candidate", "qso", "not interesting", "transient", "supernova", "bad data"]:
+        for lc_document in list(light_curve_collection.find({"tags" : tag})):
+            if str(lc_document["_id"]) in searched and not overwrite:
+                continue
+
+            light_curve = pdb.get_light_curve(lc_document["field_id"], lc_document["ccd_id"], lc_document["source_id"], clean=True)
+            sampler = fit.fit_model_to_light_curve(light_curve, nwalkers=Nwalkers, nsamples=Nsamples, nburn_in=Nburn)
+            max_idx = np.ravel(sampler.lnprobability).argmax()
+
+            # Turn this on to dump plots for each light curve
+            #fit.make_chain_distribution_figure(light_curve, sampler, filename="{0}_{1}_{2}_dists.png".format(lc_document["field_id"], lc_document["ccd_id"], lc_document["source_id"]))
+            #fit.make_light_curve_figure(light_curve, sampler, filename="{0}_{1}_{2}_lc.png".format(lc_document["field_id"], lc_document["ccd_id"], lc_document["source_id"]))
+
+            max_parameters.append(list(sampler.flatchain[max_idx]))
+            searched.append(str(lc_document["_id"]))
+
+            if len(searched) == 500:
+                break
+
+        if len(searched) == 500:
+            break
+
+    max_parameters = np.array(max_parameters)
+    fig, axes = plt.subplots(2, 2, figsize=(14,14))
+
+    for ii, ax in enumerate(np.ravel(axes)):
+        if ii == 3:
+            bins = np.logspace(min(max_parameters[:,ii]), max(max_parameters[:,ii]), 25)
+            ax.hist(max_parameters[:,ii], bins=bins, color="k", histtype="step")
+        else:
+            ax.hist(max_parameters[:,ii], color="k", histtype="step")
+        ax.set_yscale("log")
+
+    fig.savefig("plots/fit_events/all_parameters.png")
+
+def fit_candidates():
+    candidates = np.genfromtxt("data/candidate_list.txt", names=True, dtype=int)
+
+    ptf = mongo.PTFConnection()
+    light_curve_collection = ptf.light_curves
+
+    Nwalkers = 1000
+    Nsamples = 1000
+    Nburn = 1000
+
+    for candidate in candidates:
+        light_curve = pdb.get_light_curve(candidate["field"], candidate["ccd"], candidate["source_id"], clean=True)
+        sampler = fit.fit_model_to_light_curve(light_curve, nwalkers=Nwalkers, nsamples=Nsamples, nburn_in=Nburn)
+
+        fit.make_chain_distribution_figure(light_curve, sampler, filename="{0}_{1}_{2}_dists.png".format(candidate["field"], candidate["ccd"], candidate["source_id"]))
+        fit.make_light_curve_figure(light_curve, sampler, filename="{0}_{1}_{2}_lc.png".format(candidate["field"], candidate["ccd"], candidate["source_id"]))
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
@@ -650,7 +660,7 @@ if __name__ == "__main__":
     #make_survey_sampling_figure(10)
     #microlensing_event_sim()
     #maximum_outlier_indices_plot(100101)
-
-    variability_indices_distributions()
-    #Don't use this! variability_indices_distributions_easy()
+    #variability_indices_distributions()
     #num_observations_distribution()
+    #after_eta_cut_num_observations()
+    fit_candidates()

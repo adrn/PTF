@@ -11,7 +11,7 @@ from __future__ import division
 __author__ = "adrn <adrn@astro.columbia.edu>"
 
 # Standard library
-import os
+import os, sys
 import math
 import logging
 import cPickle as pickle
@@ -45,7 +45,7 @@ def select_candidates(field, selection_criteria, num_fit_attempts=10):
 
     """
 
-    lower_cut = 10**selection_criteria["lower"]
+    eta_cut = 10**selection_criteria
 
     light_curves = []
     for ccd in field.ccds.values():
@@ -54,11 +54,11 @@ def select_candidates(field, selection_criteria, num_fit_attempts=10):
 
         source_ids = chip.sources.readWhere("(ngoodobs > {}) & \
                                           (vonNeumannRatio > 0.0) & \
-                                          ((vonNeumannRatio > {}) | \
-                                          (vonNeumannRatio < {}))".format(min_number_of_good_observations, 10**selection_criteria["upper"], 10**selection_criteria["lower"]), \
+                                          (vonNeumannRatio < {}) & \
+                                          ((ngoodobs/nobs) > 0.5)".format(min_number_of_good_observations, eta_cut), \
                                           field="matchedSourceID")
 
-        logger.debug("Selected {} candidates from PDB".format(len(source_ids)))
+        logger.info("\tSelected {} pre-candidates from PDB".format(len(source_ids)))
 
         for source_id in source_ids:
             # APW: TODO -- this is still the biggest time hog!!! It turns out it's still faster than reading the whole thing into memory, though!
@@ -89,14 +89,14 @@ def select_candidates(field, selection_criteria, num_fit_attempts=10):
             if sdss_colors != None and qso_status:
                 light_curve.tags.append("qso")
 
-            candidate_status = pa.iscandidate(light_curve, lower_eta_cut=lower_cut)
+            candidate_status = pa.iscandidate(light_curve, lower_eta_cut=eta_cut)
 
             if candidate_status == "candidate" and "qso" not in light_curve.tags:
                 light_curve.tags.append("candidate")
                 light_curves.append(light_curve)
                 continue
 
-            if candidate_status == "subcandidate" and light_curve.indices["eta"] < lower_cut and not qso_status:
+            if candidate_status == "subcandidate" and light_curve.indices["eta"] < eta_cut and not qso_status:
                 # Try to do period analysis with AOV
                 try:
                     peak_period = light_curve.features["aov_period"]
@@ -191,8 +191,8 @@ if __name__ == "__main__":
         logger.setLevel(logging.INFO)
 
     #indices = ["eta", "delta_chi_squared", "j", "k", "sigma_mu"]
-    indices = ["eta", "j", "delta_chi_squared"]
-    #indices = ["eta"]
+    #indices = ["eta", "j", "delta_chi_squared"]
+    indices = ["eta"]
 
     ptf = mongo.PTFConnection()
     light_curve_collection = ptf.light_curves
@@ -230,24 +230,25 @@ if __name__ == "__main__":
         # See if field is in database, remove it if we need to overwrite
         if args.overwrite:
             field_collection.remove({"_id" : field.id})
-            light_curve_collection.remove({"field_id" : field.id})
+            #light_curve_collection.remove({"field_id" : field.id})
+
+            # Only remove light curves that haven't been looked at
+            for light_curve_document in light_curve_collection.find({"field_id" : field.id}):
+                if not light_curve_document.has_key("viewed") or not light_curve_document["viewed"]:
+                    light_curve_collection.remove({"_id" : light_curve_document["_id"]})
+                else:
+                    continue
 
         if args.overwrite_lcs:
             field_collection.update({"_id" : field.id}, {"$set" : {"already_searched" : False}})
             #light_curve_collection.remove({"field_id" : field.id})
 
+            # Only remove light curves that haven't been looked at
             for light_curve_document in light_curve_collection.find({"field_id" : field.id}):
-                if "candidate" in light_curve_document["tags"] or \
-                   "cv" in light_curve_document["tags"] or \
-                   "eclipsing" in light_curve_document["tags"] or \
-                   "nova" in light_curve_document["tags"] or \
-                   "periodic" in light_curve_document["tags"] or \
-                   "sinusoidal" in light_curve_document["tags"] or \
-                   "supernova" in light_curve_document["tags"] or \
-                   "transient" in light_curve_document["tags"]:
-                   continue
-                else:
+                if not light_curve_document.has_key("viewed") or not light_curve_document["viewed"]:
                     light_curve_collection.remove({"_id" : light_curve_document["_id"]})
+                else:
+                    continue
 
         # Try to get field from database, if it doesn't exist, create it and insert
         field_document = field_collection.find_one({"_id" : field.id})
@@ -287,8 +288,7 @@ if __name__ == "__main__":
             selection_criteria_document = {}
             for index in indices:
                 selection_criteria_document[index] = dict()
-                selection_criteria_document[index]["upper"] = selection_criteria[index]["upper"]
-                selection_criteria_document[index]["lower"] = selection_criteria[index]["lower"]
+                selection_criteria_document[index] = selection_criteria[index]
 
             #selection_criteria_document["upper"] = selection_criteria["eta"]["upper"]
             #selection_criteria_document["lower"] = selection_criteria["eta"]["lower"]

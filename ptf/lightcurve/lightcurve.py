@@ -79,7 +79,7 @@ class PTFLightCurve(object):
             ax.set_xlim(min(self.mjd), max(self.mjd))
             ax.set_ylim(ax.get_ylim()[::-1])
             plt.show()
-            return
+            return ax
 
         # APW Hack
         idx = np.where(self.error < 0.5)
@@ -290,8 +290,8 @@ class SimulatedLightCurve(PTFLightCurve):
         if tE == None: self.tE = 10**np.random.normal(1.3, 0.5)
         else: self.tE = float(tE)
 
-        params = {"t0" : self.t0, "tE" : self.tE, "u0" : self.u0, "m0" : 1.}
-        self.amag = self.mag = self.mag+microlensing_model(params, self.mjd)
+        params = {"t0" : self.t0, "tE" : self.tE, "u0" : self.u0, "m0" : 0.}
+        self.amag = self.mag = self.mag + microlensing_model(params, self.mjd)
 
     def _addNoise(self):
         """ Add scatter to the light curve """

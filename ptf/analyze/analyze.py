@@ -52,7 +52,7 @@ def fit_subtract_microlensing(light_curve, fit_data=None):
 def fit_microlensing_event(light_curve, initial_params={}):
     """ Fit a microlensing event to the light curve """
 
-    t0 = np.random.normal(light_curve.mjd[np.argmin(light_curve.mag)], 1.)
+    t0 = np.random.normal(light_curve.mjd[np.argmin(light_curve.mag)], 2.)
     if t0 > light_curve.mjd.max() or t0 < light_curve.mjd.min():
         t0 = light_curve.mjd[np.argmin(light_curve.mag)]
 
@@ -109,6 +109,7 @@ def iscandidate(light_curve, lower_eta_cut, num_fit_attempts=10):
 
     # Make sure that eta still passes the cut, since the light curve may have been 'cleaned'
     if light_curve.indices["eta"] > lower_eta_cut:
+        logger.debug("Didn't pass initial eta cut")
         return False
 
     ml_chisq = 1E6
@@ -119,13 +120,22 @@ def iscandidate(light_curve, lower_eta_cut, num_fit_attempts=10):
         new_chisq = params["result"].chisqr
 
         if new_chisq < ml_chisq:
-            ml_chisq = new_chisq
-            ml_params = params
+            if abs(new_chisq-ml_chisq)/ml_chisq < 0.05: # less than a 5% change
+                ml_chisq = new_chisq
+                ml_params = params
+                break
+            else:
+                ml_chisq = new_chisq
+                ml_params = params
 
     try:
         light_curve.features
     except AttributeError:
         light_curve.features = dict()
+
+    if ml_params == None:
+        logger.debug("Fit didn't converge")
+        return False
 
     # Add all indices as features for the light curve
     for key,val in light_curve.indices.items():
@@ -134,6 +144,10 @@ def iscandidate(light_curve, lower_eta_cut, num_fit_attempts=10):
     light_curve.features["N"] = len(light_curve)
     light_curve.features["median_error"] = np.median(light_curve.error)
     light_curve.features["chisqr"] = ml_params["result"].chisqr
+    light_curve.features["t0"] = ml_params["t0"].value
+    light_curve.features["u0"] = ml_params["u0"].value
+    light_curve.features["tE"] = ml_params["tE"].value
+    light_curve.features["m0"] = ml_params["m0"].value
 
     # Try to fit a microlensing model, then subtract it, then recompute eta and see
     #   if it is still an outlier
@@ -152,22 +166,22 @@ def iscandidate(light_curve, lower_eta_cut, num_fit_attempts=10):
         return False
 
     #     - if tE is too large, it's probably a long-period variable or the baseline is too short
-    if light_curve.tE > light_curve.baseline:
+    if light_curve.tE > 1.5*light_curve.baseline:
         logger.debug("fit tE > baseline")
         return False
 
     #    - if t0 is too close to either end of the light curve
-    if light_curve.t0 < (light_curve.tE + light_curve.mjd.min()):
-        logger.debug("fit tE too close to min mjd")
+    if light_curve.t0 < (light_curve.tE/2. + light_curve.mjd.min()):
+        logger.debug("fit t0 too close to min mjd")
         return "subcandidate"
-    elif light_curve.t0 > (light_curve.mjd.max() - light_curve.tE):
-        logger.debug("fit tE too close to min mjd")
+    elif light_curve.t0 > (light_curve.mjd.max() - light_curve.tE/2.):
+        logger.debug("fit t0 too close to min mjd")
         return "subcandidate"
 
     # If light curve still passes the eta cut after subtracting the microlensing event, it
     #    is probably periodic or has some other variability
     if new_eta <= lower_eta_cut:
-        logger.debug("new_eta cut failed")
+        logger.debug("new_eta cut failed: new eta {0}, cut {1}".format(new_eta, lower_eta_cut))
         return "subcandidate"
 
     # Slice out only data around microlensing event
@@ -175,8 +189,8 @@ def iscandidate(light_curve, lower_eta_cut, num_fit_attempts=10):
     if len(sliced_lc) < 5:
         return False
 
-    # Count number of data points between t0-tE and t0+tE, make sure we have more than 3 brighter than 3sigma
-    if sum(sliced_lc.mag < (np.median(light_curve.mag) - 3.*np.median(sliced_lc.error))) < 5:
+    # Count number of data points between t0-tE and t0+tE, make sure we have more than 5 brighter than 3sigma
+    if sum(sliced_lc.mag < (np.median(light_curve.mag) - 3.*np.mean(sliced_lc.error))) < 5:
         logger.debug("not enough points in sliced_lc: {0}, {1}".format(len(sliced_lc), sum(sliced_lc.mag < (np.median(light_curve.mag) - 3.*np.std(light_curve.mag)))))
         return False
 
@@ -186,7 +200,7 @@ def iscandidate(light_curve, lower_eta_cut, num_fit_attempts=10):
 
     # If the scatter of the event subtracted, sliced light curve is > 2*median(sigma) for the errors in
     #    the sliced light curve, it is probably just bad data
-    if np.std(new_sliced_light_curve.mag) > 2.*np.mean(sliced_lc.error):
+    if np.std(new_sliced_light_curve.mag) > 2.5*np.mean(sliced_lc.error):
         logger.debug("scatter in sliced-subtracted light curve too high")
         return "subcandidate"
 

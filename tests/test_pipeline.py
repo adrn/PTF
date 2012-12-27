@@ -14,6 +14,7 @@ warnings.simplefilter("ignore")
 # Third-party
 import numpy as np
 import matplotlib.pyplot as plt
+from apwlib.globals import greenText
 
 # Project
 import ptf.db.photometric_database as pdb
@@ -26,7 +27,16 @@ logger = get_logger(__name__)
 
 def plot_lc(lc):
     plt.clf()
-    lc.plot()
+    ax = lc.plot()
+
+    try:
+        x = np.linspace(lc.mjd.min(),lc.mjd.max(),1000)
+        mag = pa.microlensing_model(lc.features, x)
+        ax.plot(x, mag, 'r-')
+    except KeyError:
+        logger.debug("Not plotting microlensing fit.")
+        pass
+
     plt.savefig("plots/tests/{0}_{1}_{2}.png".format(lc.field_id,lc.ccd_id, lc.source_id))
 
 def test_slice_peak():
@@ -149,67 +159,67 @@ def test_iscandidate(plot=False):
 
     db = mongo.PTFConnection()
 
+    logger.info("---------------------------------------------------")
+    logger.info(greenText("Periodic light curves"))
+    logger.info("---------------------------------------------------")
+
     # Periodic light curves
-    periodic_light_curve1 = pdb.get_light_curve(2562, 10, 28317, clean=True)
-    assert pa.iscandidate(periodic_light_curve1, lower_eta_cut=10**db.fields.find_one({"_id" : 2562}, {"selection_criteria" : 1})["selection_criteria"]["lower"]) in ["subcandidate" , False]
-    periodic_light_curve2 = pdb.get_light_curve(4721, 8, 11979, clean=True)
-    assert pa.iscandidate(periodic_light_curve2, lower_eta_cut=10**db.fields.find_one({"_id" : 4721}, {"selection_criteria" : 1})["selection_criteria"]["lower"]) in ["subcandidate" , False]
-    periodic_light_curve3 = pdb.get_light_curve(4162, 2, 14360, clean=True)
-    assert pa.iscandidate(periodic_light_curve3, lower_eta_cut=10**db.fields.find_one({"_id" : 4162}, {"selection_criteria" : 1})["selection_criteria"]["lower"]) in ["subcandidate" , False]
+    periodics = [(4588, 7, 13227), (4588, 2, 15432), (4588, 9, 17195), (2562, 10, 28317), (4721, 8, 11979), (4162, 2, 14360)]
+
+    for field_id, ccd_id, source_id in periodics:
+        periodic_light_curve = pdb.get_light_curve(field_id, ccd_id, source_id, clean=True)
+        periodic_light_curve.indices = pa.compute_variability_indices(periodic_light_curve, indices=["eta", "delta_chi_squared", "j", "k", "sigma_mu"])
+        assert pa.iscandidate(periodic_light_curve, lower_eta_cut=10**db.fields.find_one({"_id" : field_id}, {"selection_criteria" : 1})["selection_criteria"]["eta"]) in ["subcandidate" , False]
+        if plot: plot_lc(periodic_light_curve)
+
+    logger.info("---------------------------------------------------")
+    logger.info(greenText("Bad light curves"))
+    logger.info("---------------------------------------------------")
 
     # Bad data
-    bad_light_curve1 = pdb.get_light_curve(3756, 0, 14281, clean=True)
-    if plot: plot_lc(bad_light_curve1)
-    print bad_light_curve1
-    assert not pa.iscandidate(bad_light_curve1, lower_eta_cut=10**db.fields.find_one({"_id" : 3756}, {"selection_criteria" : 1})["selection_criteria"]["lower"])
+    bads = [(3756, 0, 14281), (1983, 10, 1580)]
 
-    bad_light_curve2 = pdb.get_light_curve(1983, 10, 1580, clean=True)
-    if plot: plot_lc(bad_light_curve2)
-    print bad_light_curve2
-    assert not pa.iscandidate(bad_light_curve2, lower_eta_cut=10**db.fields.find_one({"_id" : 1983}, {"selection_criteria" : 1})["selection_criteria"]["lower"])
+    for field_id, ccd_id, source_id in bads:
+        bad_light_curve = pdb.get_light_curve(field_id, ccd_id, source_id, clean=True)
+        bad_light_curve.indices = pa.compute_variability_indices(bad_light_curve, indices=["eta", "delta_chi_squared", "j", "k", "sigma_mu"])
+        assert not pa.iscandidate(bad_light_curve, lower_eta_cut=10**db.fields.find_one({"_id" : field_id}, {"selection_criteria" : 1})["selection_criteria"]["eta"])
+        if plot: plot_lc(bad_light_curve)
 
-    #bad_light_curve3 = pdb.get_light_curve(100049, 11, 24281, clean=True)
-    #if plot: plot_lc(bad_light_curve3)
-    #print bad_light_curve3
-    #assert not pa.iscandidate(bad_light_curve3, lower_eta_cut=10**db.fields.find_one({"_id" : 100049}, {"selection_criteria" : 1})["selection_criteria"]["lower"])
+    logger.info("---------------------------------------------------")
+    logger.info(greenText("Simulated light curves"))
+    logger.info("---------------------------------------------------")
 
     # Simulated light curves
-    for field_id,mjd in [(3756,bad_light_curve1.mjd), (4721,periodic_light_curve2.mjd)]:
+    for field_id,mjd in [(4721,periodic_light_curve.mjd)]:
         for err in [0.01, 0.05, 0.1]:
-            light_curve = SimulatedLightCurve(mjd=mjd, mag=15, error=err)
-            assert not pa.iscandidate(light_curve, lower_eta_cut=10**db.fields.find_one({"_id" : field_id}, {"selection_criteria" : 1})["selection_criteria"]["lower"])
+            logger.debug("field: {0}, err: {1}".format(field_id,err))
+            light_curve = SimulatedLightCurve(mjd=mjd, mag=15, error=[err])
+            light_curve.indices = pa.compute_variability_indices(light_curve, indices=["eta", "delta_chi_squared", "j", "k", "sigma_mu"])
+            assert not pa.iscandidate(light_curve, lower_eta_cut=10**db.fields.find_one({"_id" : field_id}, {"selection_criteria" : 1})["selection_criteria"]["eta"])
 
             light_curve.add_microlensing_event(u0=np.random.uniform(0.2, 0.8), t0=light_curve.mjd[int(len(light_curve)/2)], tE=light_curve.baseline/8.)
+            light_curve.indices = pa.compute_variability_indices(light_curve, indices=["eta", "delta_chi_squared", "j", "k", "sigma_mu"])
             if plot:
                 plt.clf()
                 light_curve.plot()
                 plt.savefig("plots/tests/{0}_{1}.png".format(field_id,err))
-            assert pa.iscandidate(light_curve, lower_eta_cut=10**db.fields.find_one({"_id" : field_id}, {"selection_criteria" : 1})["selection_criteria"]["lower"])
+            assert pa.iscandidate(light_curve, lower_eta_cut=10**db.fields.find_one({"_id" : field_id}, {"selection_criteria" : 1})["selection_criteria"]["eta"])
+
+    logger.info("---------------------------------------------------")
+    logger.info(greenText("Transient light curves"))
+    logger.info("---------------------------------------------------")
 
     # Transients (SN, Novae)
-    transient_light_curve1 = pdb.get_light_curve(4564, 0, 4703, clean=True)
-    if plot: plot_lc(transient_light_curve1)
-    assert pa.iscandidate(transient_light_curve1, lower_eta_cut=10**db.fields.find_one({"_id" : 4564}, {"selection_criteria" : 1})["selection_criteria"]["lower"])
+    transients = [(4564, 0, 4703), (4914, 6, 9673), (100041, 1, 4855), (100082, 5, 7447), (4721, 8, 3208), (4445, 7, 11458),\
+                  (100003, 6, 10741), (100001, 10, 5466), (4789, 6, 11457), (2263, 0, 3214), (4077, 8, 15293), (4330, 10, 6648), \
+                  (4913, 7, 13436), (100090, 7, 2070), (4338, 2, 10330), (5171, 0, 885)]
 
-    transient_light_curve2 = pdb.get_light_curve(4914, 6, 9673, clean=True)
-    if plot: plot_lc(transient_light_curve2)
-    print transient_light_curve2
-    assert pa.iscandidate(transient_light_curve2, lower_eta_cut=10**db.fields.find_one({"_id" : 4914}, {"selection_criteria" : 1})["selection_criteria"]["lower"])
-
-    transient_light_curve3 = pdb.get_light_curve(100041, 1, 4855, clean=True)
-    if plot: plot_lc(transient_light_curve3)
-    print transient_light_curve3
-    assert pa.iscandidate(transient_light_curve3, lower_eta_cut=10**db.fields.find_one({"_id" : 100041}, {"selection_criteria" : 1})["selection_criteria"]["lower"])
-
-    transient_light_curve4 = pdb.get_light_curve(100082, 5, 7447, clean=True)
-    if plot: plot_lc(transient_light_curve4)
-    print transient_light_curve4
-    assert pa.iscandidate(transient_light_curve4, lower_eta_cut=10**db.fields.find_one({"_id" : 100082}, {"selection_criteria" : 1})["selection_criteria"]["lower"])
-
-    transient_light_curve5 = pdb.get_light_curve(4721, 8, 3208, clean=True)
-    if plot: plot_lc(transient_light_curve5)
-    print transient_light_curve5
-    assert pa.iscandidate(transient_light_curve5, lower_eta_cut=10**db.fields.find_one({"_id" : 4721}, {"selection_criteria" : 1})["selection_criteria"]["lower"])
+    for field_id, ccd_id, source_id in transients:
+        transient_light_curve = pdb.get_light_curve(field_id, ccd_id, source_id, clean=True)
+        logger.debug(transient_light_curve)
+        transient_light_curve.indices = pa.compute_variability_indices(transient_light_curve, indices=["eta", "delta_chi_squared", "j", "k", "sigma_mu"])
+        assert pa.iscandidate(transient_light_curve, lower_eta_cut=10**db.fields.find_one({"_id" : field_id}, {"selection_criteria" : 1})["selection_criteria"]["eta"])
+        if plot: plot_lc(transient_light_curve)
 
 if __name__ == "__main__":
     #test_slice_peak()
