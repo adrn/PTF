@@ -12,8 +12,9 @@ import numpy as np
 import apwlib.geometry as g
 
 # PTF
-from ..globals import ccd_size, all_fields
+from ..globals import ccd_size, all_fields, camera_size_radius
 from ..lightcurve import PTFLightCurve, PDBLightCurve
+from ..coverage import SurveyInfo
 from ..analyze import compute_variability_indices
 from ..util import get_logger
 logger = get_logger(__name__)
@@ -396,6 +397,99 @@ def get_light_curve(field_id, ccd_id, source_id, **kwargs):
     field = Field(field_id, "R")
     ccd = field.ccds[ccd_id]
     return ccd.light_curve(source_id, **kwargs)
+
+def get_fields_exposures(filter, filename=None, overwrite=False):
+    """ Given a filter, go to the PTF photometric database and get information about all PTF
+        fields for that filter, and the number of good exposures per field.
+        
+        Parameters
+        ----------
+        filter : ptf.photometricdatabase.Filter
+            Must be a Filter object (see the above module)
+        filename : str (optional)
+            The filename to store this data to.
+        overwrite : bool (optional)
+            Overwrite 'filename' if it already exists.
+        
+    """
+    
+    if not isinstance(filter, pdb.Filter):
+        raise ValueError("Filter must be a valid Filter() object!")
+    
+    if filename == None:
+        filename = os.path.join("data", "survey_coverage", "fields_observations_{}.npy".format(str(filter)))
+    
+    if os.path.exists(filename) and overwrite:
+        logger.debug("Data file already exists, but you want to overwrite it")
+        os.remove(filename)
+        logger.debug("File {} deleted".format(filename))
+    elif os.path.exists(filename) and not overwrite:
+        logger.info("Data file already exists: {}".format(filename))
+    
+    if not os.path.exists(filename):
+        logger.info("Data file doesn't exist -- it could take some time to create it!")
+        
+        fields = []
+        exposures = []
+        
+        pattr = re.compile(".*match_(\d+)_(\d+)_(\d+)")
+        for match_filename in glob.glob("/scr4/dlevitan/matches/match_{:02d}_*.pytable".format(filter.id)):
+            logger.debug("Reading file: {}".format(match_filename))
+            
+            filter_id, field_id, ccd_id = map(int, pattr.search(match_filename).groups())
+            
+            if field_id in fields:
+                continue
+    
+            try:
+                file = tables.openFile(match_filename)
+                chip = getattr(getattr(getattr(file.root, "filter{:02d}".format(filter_id)), "field{:06d}".format(field_id)), "chip{:02d}".format(ccd_id))
+            except:
+                continue
+            
+            fields.append(field_id)
+            exposures.append(len(chip.exposures))
+            
+            file.close()
+        
+        fields_exposures = np.array(zip(fields, exposures), dtype=[("field", int), ("num_exposures", int)])
+        logger.debug("Saving file {}".format(filename))
+        np.save(filename, fields_exposures)
+    
+    fields_exposures = np.load(filename)
+    logger.debug("Data file loaded!")
+    
+    return fields_exposures
+
+def get_overlapping_fields(ra, dec, fields=None, filter="R", size=1.):
+    """ Given a position and a region size (in degrees), get all fields
+        that overlap that region.
+        
+        TODO: Check and document
+    """
+    R = size + camera_size_radius
+    
+    if not isinstance(ra, g.Angle):
+        if isinstance(ra, str):
+            ra = g.RA(ra)
+        else:
+            ra = g.RA.fromDegrees(ra)
+    
+    if not isinstance(dec, g.Angle):
+        # Assume dec is degrees
+        dec = g.Dec(dec)
+    
+    if fields == None:
+        s_info = SurveyInfo(filter=filter)
+        fields = s_info.fields(1)
+    
+    matched_fields = []
+    for field in fields:
+        dist = g.subtends_degrees(ra.degrees, dec.degrees, field.ra.degrees, field.dec.degrees)
+        if dist <= R:
+            matched_fields.append(field)
+    
+    return matched_fields
 
 """
 sources:

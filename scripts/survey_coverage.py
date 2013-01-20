@@ -7,12 +7,8 @@ __author__ = "adrn <adrn@astro.columbia.edu>"
 
 # Standard library
 import os
-import datetime
 import re
 import glob
-import cPickle as pickle
-import logging
-import time, datetime
 import json
 import math
 
@@ -29,219 +25,10 @@ import apwlib.geometry as g
 
 # Project
 import ptf.db.photometricdatabase as pdb
-from ptf.globals import camera_size_degrees, all_fields
-import ptf.globals as pg
+from ptf.globals import camera_size_degrees, camera_size_radius, all_fields
+import ptf.coverage as pc
 import ptf.util as pu
 logger = pu.get_logger()
-
-class SurveyInfo(object):
-    """ Some example use cases for this object:
-        
-        TODO: Fill this in!
-    
-    """
-    def __init__(self, filter, overwrite=False):
-        """ Convenience class for getting information about the PTF survey
-            
-            Parameters
-            ----------
-            filter : int, str, ptf.photometricdatabase.Filter
-                Any parseable, unambiguous filter representation.
-            overwrite : bool (optional)
-                Overwrite any cache files if they already exist
-        """
-        
-        if not isinstance(filter, pdb.Filter):
-            self.filter = pdb.Filter(filter)
-        
-        cache_filename = os.path.join(os.path.split(pg._base_path)[0], "data", "survey_coverage", "fields_observations_{}.npy".format(str(self.filter)))
-        self._fields_exposures = get_fields_exposures(self.filter, filename=cache_filename, overwrite=overwrite)
-        self.timestamp = datetime.datetime.strptime(time.ctime(os.path.getmtime(cache_filename)), "%a %b %d %H:%M:%S %Y")
-        
-    def fields(self, min_num_observations):
-        """ Return a list of fields with more than the above number of observations """
-        
-        rows = self._fields_exposures[self._fields_exposures["num_exposures"] >= min_num_observations]
-        fields = [pdb.Field(row["field"], self.filter, number_of_exposures=row["num_exposures"]) for row in rows]
-        return [f for f in fields if f.ra != None]
-
-def get_fields_exposures(filter, filename=None, overwrite=False):
-    """ Given a filter, go to the PTF photometric database and get information about all PTF
-        fields for that filter, and the number of good exposures per field.
-        
-        Parameters
-        ----------
-        filter : ptf.photometricdatabase.Filter
-            Must be a Filter object (see the above module)
-        filename : str (optional)
-            The filename to store this data to.
-        overwrite : bool (optional)
-            Overwrite 'filename' if it already exists.
-        
-    """
-    
-    if not isinstance(filter, pdb.Filter):
-        raise ValueError("Filter must be a valid Filter() object!")
-    
-    if filename == None:
-        filename = os.path.join("data", "survey_coverage", "fields_observations_{}.npy".format(str(filter)))
-    
-    if os.path.exists(filename) and overwrite:
-        logger.debug("Data file already exists, but you want to overwrite it")
-        os.remove(filename)
-        logger.debug("File {} deleted".format(filename))
-    elif os.path.exists(filename) and not overwrite:
-        logger.info("Data file already exists: {}".format(filename))
-    
-    if not os.path.exists(filename):
-        logger.info("Data file doesn't exist -- it could take some time to create it!")
-        
-        fields = []
-        exposures = []
-        
-        pattr = re.compile(".*match_(\d+)_(\d+)_(\d+)")
-        for match_filename in glob.glob("/scr4/dlevitan/matches/match_{:02d}_*.pytable".format(filter.id)):
-            logger.debug("Reading file: {}".format(match_filename))
-            
-            filter_id, field_id, ccd_id = map(int, pattr.search(match_filename).groups())
-            
-            if field_id in fields:
-                continue
-    
-            try:
-                file = tables.openFile(match_filename)
-                chip = getattr(getattr(getattr(file.root, "filter{:02d}".format(filter_id)), "field{:06d}".format(field_id)), "chip{:02d}".format(ccd_id))
-            except:
-                continue
-            
-            fields.append(field_id)
-            exposures.append(len(chip.exposures))
-            
-            file.close()
-        
-        fields_exposures = np.array(zip(fields, exposures), dtype=[("field", int), ("num_exposures", int)])
-        logger.debug("Saving file {}".format(filename))
-        np.save(filename, fields_exposures)
-    
-    fields_exposures = np.load(filename)
-    logger.debug("Data file loaded!")
-    
-    return fields_exposures
-
-def field_to_feature(field):
-    """ Converts a PTF Field object into a 'feature' object to be stuffed into JSON for the 
-        interactive survey coverage viewer.
-        
-        Parameters
-        ----------
-        field : ptf.photometricdatabase.Field
-            Must be a PTF Field object. See above module for details
-    """
-    feature = dict(type="Feature", id=str(field.id))
-    properties = dict(name=str(field.id))
-    geometry = dict(type="Polygon")
-    
-    ra = field.ra.degrees-180.0
-    dec = field.dec.degrees
-    
-    ra_offset = camera_size_degrees[0]/math.cos(math.radians(dec))/2.
-    dec_offset = camera_size_degrees[1]/2.
-    
-    min_ra = ra - ra_offset
-    max_ra = ra + ra_offset
-    
-    min_dec = dec - dec_offset
-    max_dec = dec + dec_offset
-    
-    coordinates = [[ [min_ra, min_dec], [max_ra, min_dec], [max_ra, max_dec], [min_ra, max_dec], [min_ra, min_dec] ]]
-    geometry["coordinates"] = coordinates
-    feature["geometry"] = geometry
-    feature["properties"] = properties
-
-    return feature
-
-def field_list_to_json(fields, filename=None):
-    """ Given a list of fields, create a FeatureCollection JSON file to use with the 
-        interactive survey coverage viewer.
-        
-        The final structure should look like this, where "name" is the field id,
-        and coordinates are a list of the coordinates of the 4 corners of the field.
-        
-            {"type" : "FeatureCollection",
-                "features": [
-                    {"type" : "Feature",
-                     "properties" : { "name" : "2471"},
-                                      "geometry": { "type" : "Polygon",
-                                                    "coordinates" : [[ [100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0] ]]
-                                                  },
-                     "id":"2471"}, etc.
-                            ]
-            }      
-        
-        Parameters
-        ----------
-        fields : list, iterable
-            Must be a list of PTF Field objects. See: ptf.photometricdatabase.Field
-        filename : str (optional)
-            If filename is specified, will save the JSON to the file. Otherwise, return the JSON
-    """
-    
-    final_dict = dict(type="FeatureCollection", features=[])
-    
-    # Minimum and maximum number of observations for all fields
-    min_obs = 1
-    
-    # There is one crazy outlier: the Orion field 101001, so I remove that for calculating the max...
-    num_exposures = np.array([field.number_of_exposures for field in fields if field.id != 101001])
-    max_obs = num_exposures.max()
-    
-    # Create a matplotlib lognorm scaler between these values
-    scaler = matplotlib.colors.LogNorm(vmin=min_obs, vmax=max_obs)
-    
-    for field in fields:
-        if field.number_of_exposures < 1:
-            logger.debug("Skipping field {}".format(field))
-            continue
-        
-        try:
-            field.ra
-            field.dec
-        except AttributeError:
-            this_field = all_fields[all_fields["id"] == field.id]
-            if len(this_field) != 1: 
-                logger.warning("Field {} is weird".format(field))
-                continue
-                
-            field.ra = g.RA.fromDegrees(this_field["ra"][0])
-            field.dec = g.Dec.fromDegrees(this_field["dec"][0])
-        
-        if field.dec.degrees < -40:
-            logger.warning("Field {} is weird, dec < -40".format(field))
-            continue
-        
-        feature = field_to_feature(field)
-        
-        # Determine color of field
-        #rgb = cm.autumn(scaler(field.number_of_exposures))
-        rgb = cm.gist_heat(scaler(field.number_of_exposures))
-        feature["properties"]["color"] = mc.rgb2hex(rgb)
-        feature["properties"]["alpha"] = scaler(field.number_of_exposures)*0.75 + 0.05
-        feature["properties"]["number_of_observations"] = str(field.number_of_exposures)
-        feature["properties"]["ra"] = "{:.5f}".format(field.ra.degrees)
-        feature["properties"]["dec"] = "{:.5f}".format(field.dec.degrees)
-        
-        final_dict["features"].append(feature)
-    
-    blob = json.dumps(final_dict)
-    
-    if filename != None:
-        f = open(filename, "wb")
-        f.write(blob)
-        f.close()
-        
-        return
-    else:
-        return blob
 
 class CoveragePlot(object):
     
@@ -385,34 +172,6 @@ def fields_to_coverage_plot(fields):
     
     return cov_plot
 
-def get_overlapping_fields(ra, dec, fields=None, filter="R", size=1.):
-    """ Given a position and a region size (in degrees), get all fields
-        that overlap that region.
-    """
-    R = size + pg.camera_size_radius
-    
-    if not isinstance(ra, g.Angle):
-        if isinstance(ra, str):
-            ra = g.RA(ra)
-        else:
-            ra = g.RA.fromDegrees(ra)
-    
-    if not isinstance(dec, g.Angle):
-        # Assume dec is degrees
-        dec = g.Dec(dec)
-    
-    if fields == None:
-        s_info = SurveyInfo(filter=filter)
-        fields = s_info.fields(1)
-    
-    matched_fields = []
-    for field in fields:
-        dist = g.subtends_degrees(ra.degrees, dec.degrees, field.ra.degrees, field.dec.degrees)
-        if dist <= R:
-            matched_fields.append(field)
-    
-    return matched_fields
-
 if __name__ == "__main__":
     from argparse import ArgumentParser
 
@@ -441,8 +200,8 @@ if __name__ == "__main__":
     else:
         logger.setLevel(logging.INFO)
     
-    R_info = SurveyInfo(filter="R", overwrite=args.overwrite)
-    g_info = SurveyInfo(filter="g", overwrite=args.overwrite)
+    R_info = pc.SurveyInfo(filter="R", overwrite=args.overwrite)
+    g_info = pc.SurveyInfo(filter="g", overwrite=args.overwrite)
     
     if args.print_info:    
         num_R25_fields = len(R_info.fields(25))
@@ -468,5 +227,5 @@ if __name__ == "__main__":
     if args.dump_json:
         # dump json file for survey coverage site
         print R_info.timestamp
-        field_list_to_json(R_info.fields(1), filename=args.json_file)
+        pc.field_list_to_json(R_info.fields(1), filename=args.json_file)
     
