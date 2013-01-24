@@ -39,6 +39,7 @@ logger.addHandler(ch)
 # Third-party
 from apwlib.globals import greenText, yellowText, redText
 import numpy as np
+np.seterr(invalid="ignore")
 import emcee
 import matplotlib.gridspec as gridspec
 import matplotlib
@@ -221,9 +222,9 @@ def fit_model_to_light_curve(light_curve, nwalkers=200, nburn_in=100, nsamples=2
                                     args=[light_curve.mag, light_curve.mjd, light_curve.error],
                                     threads=4)
     pos, prob, state = sampler.run_mcmc(p0, nburn_in)
-    sampler.reset()
 
-    sampler.run_mcmc(pos, nsamples)
+    sampler.reset()
+    pos, prob, state = sampler.run_mcmc(pos, nsamples)
 
     logger.info("Mean acceptance fraction: {0:.3f}".format(np.mean(sampler.acceptance_fraction)))
 
@@ -234,10 +235,12 @@ def make_chain_distribution_figure(light_curve, sampler, filename=None):
 
     fig, axes = plt.subplots(2, 2, figsize=(10,14))
     param_to_label = {"m0" : r"$M_0$", "u0" : r"$u_0$", "t0" : r"$t_0$", "tE" : r"$t_E$"}
-    params = np.array([["m0", "u0"], ["t0", "tE"]])
+    params = ["m0", "u0", "t0", "tE"]
 
+    #params = np.array([["m0", "u0"], ["t0", "tE"]])
     max_idx = np.ravel(sampler.lnprobability).argmax()
 
+    """
     for ii in range(2):
         for jj in range(2):
             idx = 2*ii + jj
@@ -249,6 +252,53 @@ def make_chain_distribution_figure(light_curve, sampler, filename=None):
             axes[ii,jj].axvline(chain[:,idx][max_idx], color='r', linestyle='--')
             axes[ii,jj].set_title("{}".format(param_to_label[params[ii,jj]]), fontsize=26)
             axes[ii,jj].yaxis.set_ticks([])
+    """
+
+    # m0
+    idx = 0
+    mn = np.mean(chain,axis=0)[idx]
+    std = np.std(chain,axis=0)[idx]
+    bins = np.linspace(mn - 2*std, mn + 2*std, 100)
+
+    axes[0,0].hist(chain[:,idx], bins=bins, color="k", histtype="step")
+    axes[0,0].axvline(chain[:,idx][max_idx], color='r', linestyle='--')
+    axes[0,0].set_title("{}".format(param_to_label[params[idx]]), fontsize=26)
+
+    # u0
+    idx = 1
+    mn = np.mean(chain,axis=0)[idx]
+    std = np.std(chain,axis=0)[idx]
+    #bins = np.linspace(mn - 5*std, mn + 5*std, 100)
+    bins = np.linspace(0., 1.4, 100)
+
+    axes[0,1].hist(chain[:,idx], bins=bins, color="k", histtype="step")
+    axes[0,1].axvline(chain[:,idx][max_idx], color='r', linestyle='--')
+    axes[0,1].set_title("{}".format(param_to_label[params[idx]]), fontsize=26)
+
+    # t0
+    idx = 2
+    mn = np.mean(chain,axis=0)[idx]
+    std = np.std(chain,axis=0)[idx]
+    bins = np.linspace(mn - 1*std, mn + 1*std, 100)
+
+    axes[1,0].hist(chain[:,idx], bins=bins, color="k", histtype="step")
+    axes[1,0].axvline(chain[:,idx][max_idx], color='r', linestyle='--')
+    axes[1,0].set_title("{}".format(param_to_label[params[idx]]), fontsize=26)
+
+    # tE
+    idx = 3
+    mn = np.mean(chain,axis=0)[idx]
+    std = np.std(chain,axis=0)[idx]
+    bins = np.logspace(0., 3., 100)
+
+    axes[1,1].hist(chain[:,idx], bins=bins, color="k", histtype="step")
+    axes[1,1].axvline(chain[:,idx][max_idx], color='r', linestyle='--')
+    axes[1,1].set_title("{}".format(param_to_label[params[idx]]), fontsize=26)
+    axes[1,1].set_xscale("log")
+
+    for ax in np.ravel(axes):
+        ax.yaxis.set_ticks([])
+        #ax.set_yscale("log")
 
     fig.suptitle("Posterior Probability Distributions\nField: {}, CCD: {}, Source ID: {}".format(light_curve.field_id, light_curve.ccd_id, light_curve.source_id), fontsize=24)
     plt.tight_layout()
@@ -262,27 +312,43 @@ def make_chain_distribution_figure(light_curve, sampler, filename=None):
 def make_light_curve_figure(light_curve, sampler, filename=None):
     chain = sampler.flatchain
 
-    fig = plt.figure(figsize=(8,12))
+    fig = plt.figure(figsize=(12,12))
     fig.suptitle("Field: {}, CCD: {}, Source ID: {}".format(light_curve.field_id, light_curve.ccd_id, light_curve.source_id), fontsize=23)
-    gs = gridspec.GridSpec(2, 1, height_ratios=[3,1])
-    ax = plt.subplot(gs[0])
-    ax2 = plt.subplot(gs[1])
+    gs = gridspec.GridSpec(2, 1, height_ratios=[1,2])
+    ax = plt.subplot(gs[1])
+    ax2 = plt.subplot(gs[0])
+
+    # "best" parameters
+    max_idx = np.ravel(sampler.lnprobability).argmax()
+    best_m0, best_u0, best_t0, best_tE = chain[max_idx]
 
     mjd = np.arange(light_curve.mjd.min()-1000., light_curve.mjd.max()+1000., 0.2)
     first_t0 = None
-    for ii in np.random.randint(len(chain), size=250):
-        link = chain[ii]
+    for ii in range(150):
+        walker_idx = np.random.randint(sampler.k)
+        chain = sampler.chain[walker_idx][-100:]
+        probs = sampler.lnprobability[walker_idx][-100:]
+        link_idx = np.random.randint(len(chain))
+
+        prob = probs[link_idx]
+        link = chain[link_idx]
         m0, u0, t0, tE = link
+
+        if prob/probs.max() > 2:
+            continue
 
         # More than 100% error
         if np.any(np.fabs(link - np.mean(chain,axis=0)) / np.mean(chain,axis=0) > 0.75) or tE < 8:
+            continue
+
+        if np.fabs(t0 - best_t0) > 20.:
             continue
 
         if first_t0 == None:
             first_t0 = t0
         s_light_curve = SimulatedLightCurve(mjd=mjd, error=np.zeros_like(mjd), mag=m0)
         s_light_curve.add_microlensing_event(t0=t0, u0=u0, tE=tE)
-        ax.plot(s_light_curve.mjd-first_t0, s_light_curve.mag, "r-", alpha=0.05)
+        ax.plot(s_light_curve.mjd-first_t0, s_light_curve.mag, linestyle="-", color="#666666", alpha=0.1)
         #ax_inset.plot(s_light_curve.mjd-first_t0, s_light_curve.mag, "r-", alpha=0.05)
 
     mean_m0, mean_u0, mean_t0, mean_tE = np.median(chain,axis=0)
@@ -294,10 +360,14 @@ def make_light_curve_figure(light_curve, sampler, filename=None):
     light_curve.plot(ax2)
     ax.set_xlim(-3.*mean_tE, 3.*mean_tE)
     ax.text(-2.5*mean_tE, np.min(s_light_curve.mag), r"$u_0=${u0:.3f}$\pm${std:.3f}".format(u0=u0, std=std_u0) + "\n" + r"$t_E=${tE:.1f}$\pm${std:.1f} days".format(tE=mean_tE, std=std_tE), fontsize=19)
-    #ax.set_xlabel(r"time-$t_0$ [days]", fontsize=24)
     ax.set_ylabel(r"$R$ (mag)", fontsize=24)
+    ax.set_xlabel(r"time-$t_0$ [days]", fontsize=24)
 
-    ax2.set_xlabel(r"time-$t_0$ [days]", fontsize=24)
+    # Now plot the "best fit" line in red
+    s_light_curve = SimulatedLightCurve(mjd=mjd, error=np.zeros_like(mjd), mag=best_m0)
+    s_light_curve.add_microlensing_event(t0=best_t0, u0=best_u0, tE=best_tE)
+    ax.plot(s_light_curve.mjd-first_t0, s_light_curve.mag, "r-", alpha=0.6, linewidth=2)
+
     ax2.set_ylabel(r"$R$ (mag)", fontsize=24)
 
     #light_curve.plot(ax_inset)
@@ -331,6 +401,9 @@ if __name__ == "__main__":
     parser.add_argument("--clean", dest="clean", action="store_true", default=False,
                     help="Clean the light curve")
 
+    parser.add_argument("-p", dest="plot", action="store_true", default=False,
+                    help="Plot or not")
+
     parser.add_argument("--walkers", dest="walkers", default=200, type=int,
                     help="Number of walkers")
     parser.add_argument("--steps", dest="steps", default=1000, type=int,
@@ -363,3 +436,7 @@ if __name__ == "__main__":
         light_curve.error = light_curve.error[idx]
     sampler = fit_model_to_light_curve(light_curve, nwalkers=args.walkers, nsamples=args.steps, nburn_in=args.burn_in)
     end_chain = sampler.flatchain[-args.walkers*100:]
+
+    if args.plot:
+        make_light_curve_figure(light_curve, sampler, filename="{0}_{1}_{2}_lc.png".format(light_curve.field_id, light_curve.ccd_id, light_curve.source_id))
+        make_chain_distribution_figure(light_curve, sampler, filename="{0}_{1}_{2}_dist.png".format(light_curve.field_id, light_curve.ccd_id, light_curve.source_id))

@@ -65,7 +65,7 @@ def make_survey_sampling_figure(N=10):
     field_ids = [100031, 2794, 4252, 100085, 110002, 3685]
     rand_fields = [pdb.Field(f, "R") for f in field_ids]
 
-    fig = plt.figure(figsize=(10,10))
+    fig = plt.figure(figsize=(12,8))
     ax = fig.add_subplot(111)
 
     min_mjd = 55250
@@ -80,7 +80,7 @@ def make_survey_sampling_figure(N=10):
         source_id = source_ids[0]
 
         logger.info("Reading source {} on {}, {}".format(source_id, field, ccd))
-        light_curve = ccd.light_curve(source_id, clean=False, barebones=True, where=["(mjd >= {})".format(min_mjd), "(mjd <= {})".format(max_mjd)])
+        light_curve = ccd.light_curve(source_id, clean=False, barebones=True)#, where=["(mjd >= {})".format(min_mjd), "(mjd <= {})".format(max_mjd)])
 
         ax.plot(light_curve.mjd, [ii]*len(light_curve.mjd), color="black", alpha=0.3, marker="o", markersize=7, linestyle="none", markeredgecolor="none")
         ax.text(55300, ii+0.1, "{} observations".format(len(light_curve.mjd)), size=14)
@@ -95,8 +95,8 @@ def make_survey_sampling_figure(N=10):
     ax.set_xlim(min_mjd, max_mjd)
     ax.set_ylim(-0.5, ii+0.5)
 
-    ax.set_xlabel("Time [day]", fontsize=20)
-    fig.savefig(os.path.join(pg.plots_path, "sampling_figure.pdf", facecolor="white", bbox_inches="tight"))
+    ax.set_xlabel("Time [days]", fontsize=20)
+    fig.savefig(os.path.join(pg.plots_path, "sampling_figure.pdf"), facecolor="white", bbox_inches="tight")
 
 def microlensing_event_sim():
     """ Create the multi-panel figure with simulated microlensing events for a single
@@ -146,6 +146,9 @@ def microlensing_event_sim():
 
         #for tick in axes[ii].yaxis.get_major_ticks():
         #    tick.label.set_fontsize(tick_font_size)
+
+        if ii == 0:
+            [tick.set_visible(False) for jj,tick in enumerate(axes[ii].get_yticklabels()) if jj % 2 != 0]
 
         if ii % 2 != 0:
             axes[ii].yaxis.tick_right()
@@ -503,6 +506,83 @@ def num_observations_distribution():
     fig.suptitle("Number of Exposures vs. Baseline for all PTF fields ($R$-band)", fontsize=22)
     fig.savefig(plotfile)
 
+def num_observations_distribution_90deg():
+    """ This figure is (bottom) just a histogram of all fields binned by the number of observations,
+        and (top) binned by baseline.
+    """
+    datafile = os.path.join(pg.data_path, "paper_figures/exposures_baselines.pickle")
+    plotfile = os.path.join(pg.plots_path, "paper_figures/num_observations_baseline_90deg.pdf")
+
+    if not os.path.exists(os.path.split(datafile)[0]):
+        os.makedirs(os.path.split(datafile)[0])
+
+    if not os.path.exists(os.path.split(plotfile)[0]):
+        os.makedirs(os.path.split(plotfile)[0])
+
+    if not os.path.exists(datafile):
+        R_info = survey_coverage.SurveyInfo("R")
+        fields = R_info.fields(1)
+
+        num_exp_baseline = []
+        for field in fields:
+            num_exp_baseline.append((field.number_of_exposures, field.baseline[field.baseline.keys()[0]]))
+            field.close()
+
+        num_exp_baseline = np.array(num_exp_baseline, dtype=[("num_exp", int), ("baseline", float)])
+        f = open(datafile, "w")
+        pickle.dump(num_exp_baseline, f)
+        f.close()
+
+    f = open(datafile, "r")
+    num_exp_baseline = pickle.load(f)
+    f.close()
+
+    fig = plt.figure(figsize=(11,11))
+    # Top panel: binned by number of observations
+    gs = gridspec.GridSpec(4,4)
+
+    ax_top = fig.add_subplot(gs[0, 0:-1])
+    ax_side = fig.add_subplot(gs[1:, -1])
+    bins = np.logspace(0, 3.5, 50)
+
+    ax_side.hist(num_exp_baseline["num_exp"], bins=bins, color="k", histtype="step", orientation="horizontal")
+    ax_side.set_ylim((1.,ax_side.get_ylim()[1]))
+    ax_side.set_yscale("log")
+    ax_side.xaxis.tick_top()
+    [tick.set_visible(False) for tick in ax_side.get_yticklabels()]
+    ax_side.get_xticklabels()[0].set_visible(False)
+
+    ax_top.hist(num_exp_baseline["baseline"], bins=np.linspace(0, 1300, 30), color="k", histtype="step")
+    ax_top.set_ylim((-10,ax_top.get_ylim()[1]))
+    ax_top.yaxis.tick_right()
+    [tick.set_visible(False) for tick in ax_top.get_xticklabels()]
+    [tick.set_visible(False) for ii,tick in enumerate(ax_top.get_yticklabels()) if ii % 2 != 0 or ii == 0]
+
+    ax_bottom = fig.add_subplot(gs[1:,:-1])
+    ax_bottom.scatter(num_exp_baseline["baseline"], num_exp_baseline["num_exp"], color='k', marker=".", alpha=0.5)
+    #ax_bottom.hexbin(np.log10(num_exp_baseline["num_exp"]), num_exp_baseline["baseline"])
+    """
+    xbins = np.logspace(np.log10(1), np.log10(ax_top.get_xlim()[1]), 100)
+    ybins = np.linspace(1, ax_side.get_ylim()[1], 100)
+    H, xedges, yedges = np.histogram2d(num_exp_baseline["num_exp"], num_exp_baseline["baseline"], bins=(xbins, ybins), normed=True)
+    ax_bottom.imshow(np.log10(H.T), interpolation="none", origin="lower")
+    """
+    #ax_bottom.set_xlim(map(np.log10, ax_top.get_xlim()))
+    ax_bottom.set_yscale("log")
+    ax_bottom.set_xlim(ax_top.get_xlim())
+    ax_bottom.set_ylim(ax_side.get_ylim())
+
+    ax_bottom.set_xlabel(r"Baseline ($t_{max} - t_{min}$) [days]", fontsize=24)
+    ax_bottom.set_ylabel(r"Number of $R$-band Exposures", fontsize=24)
+
+    for ax in fig.axes:
+        for ticklabel in ax.get_yticklabels()+ax.get_xticklabels():
+            ticklabel.set_fontsize(18)
+
+    fig.subplots_adjust(hspace=0.03, wspace=0.03)
+    fig.suptitle("Number of Exposures vs. Baseline for all PTF fields ($R$-band)", fontsize=22)
+    fig.savefig(plotfile)
+
 def after_eta_cut_num_observations():
     ptf = mongo.PTFConnection()
     field_collection = ptf.fields
@@ -624,12 +704,13 @@ def fit_candidates():
     Nsamples = 1000
     Nburn = 1000
 
-    for candidate in candidates:
+    for ii, candidate in enumerate(candidates):
+        logger.info("Fitting #{0}: {1},{2},{3}".format(ii+1, candidate["field"], candidate["ccd"], candidate["source_id"]))
         light_curve = pdb.get_light_curve(candidate["field"], candidate["ccd"], candidate["source_id"], clean=True)
         sampler = fit.fit_model_to_light_curve(light_curve, nwalkers=Nwalkers, nsamples=Nsamples, nburn_in=Nburn)
 
-        fit.make_chain_distribution_figure(light_curve, sampler, filename="{0}_{1}_{2}_dists.png".format(candidate["field"], candidate["ccd"], candidate["source_id"]))
-        fit.make_light_curve_figure(light_curve, sampler, filename="{0}_{1}_{2}_lc.png".format(candidate["field"], candidate["ccd"], candidate["source_id"]))
+        fit.make_chain_distribution_figure(light_curve, sampler, filename="c{3}_{0}_{1}_{2}_dists.png".format(candidate["field"], candidate["ccd"], candidate["source_id"], ii+1))
+        fit.make_light_curve_figure(light_curve, sampler, filename="c{3}_{0}_{1}_{2}_lc.png".format(candidate["field"], candidate["ccd"], candidate["source_id"], ii+1))
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
@@ -657,10 +738,11 @@ if __name__ == "__main__":
     # TODO: better interface here!!
 
     np.random.seed(104)
-    #make_survey_sampling_figure(10)
+    make_survey_sampling_figure(10)
     #microlensing_event_sim()
     #maximum_outlier_indices_plot(100101)
     #variability_indices_distributions()
     #num_observations_distribution()
+    #num_observations_distribution_90deg()
     #after_eta_cut_num_observations()
-    fit_candidates()
+    #fit_candidates()
