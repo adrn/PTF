@@ -277,7 +277,7 @@ class SimulatedLightCurve(PTFLightCurve):
 
         # If u0 is not specified, draw from u0 distribution
         #   - see for example Popowski & Alcock
-        if u0 == None: self.u0 = np.random.uniform(0., 1.34)
+        if u0 == None: self.u0 = np.random.uniform(0., 1.5)
         else: self.u0 = float(u0)
 
         # If t0 is not specified, draw from uniform distribution between days
