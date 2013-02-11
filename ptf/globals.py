@@ -25,6 +25,8 @@ with open(os.path.join(_base_path, "config"), "r") as f:
             config[key] = val
 
 all_fields = np.load(os.path.join(os.path.split(_base_path)[0], "data", "all_fields.npy"))
+data_path = os.path.join(os.path.split(_base_path)[0], "data")
+plots_path = os.path.join(os.path.split(_base_path)[0], "plots")
 
 # Configuration stuff:
 min_number_of_good_observations = 10

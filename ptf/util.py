@@ -18,7 +18,7 @@ def source_index_name_to_pdb_index(source, index_name):
         computed index like sigma_mu.
     """
     if index_name == "sigma_mu":
-        return source[pdb_index_name[index_name][0]] / source[pdb_index_name[index_name][1]]            
+        return source[pdb_index_name[index_name][0]] / source[pdb_index_name[index_name][1]]
     else:
         return source[pdb_index_name[index_name]]
 
@@ -43,10 +43,10 @@ def get_logger(name):
     return logger
 
 def convert_all_fields_txt(txt_filename="ptf_allfields.txt", npy_filename="all_fields.npy"):
-    """ Convert the text file containing all PTF Field ID's and positons to a 
+    """ Convert the text file containing all PTF Field ID's and positons to a
         numpy .npy save file.
-        
-        It is much faster to load the .npy file than to generate an array on 
+
+        It is much faster to load the .npy file than to generate an array on
         the fly from the text file. The text file can be found here:
             http://astro.caltech.edu/~eran/PTF_AllFields_ID.txt
     """
@@ -57,10 +57,13 @@ def convert_all_fields_txt(txt_filename="ptf_allfields.txt", npy_filename="all_f
                            view(np.recarray)
 
     np.save(npy_filename, all_fields)
-    
+
     return True
 
 def richards_qso(sdss_colors):
+    if sdss_colors == None:
+        return False
+
     if (sdss_colors["g"]-sdss_colors["r"]) > -0.2 and \
        (sdss_colors["g"]-sdss_colors["r"]) < 0.9 and \
        (sdss_colors["r"]-sdss_colors["i"]) > -0.2 and \
@@ -71,4 +74,3 @@ def richards_qso(sdss_colors):
         return True
     else:
         return False
-    
