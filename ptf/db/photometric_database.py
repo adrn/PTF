@@ -346,13 +346,12 @@ class CCD(object):
                 ra, dec = data[0]["ra"], data[0]["dec"]
             except IndexError:
                 ra, dec = None, None
-
+        
         if barebones:
-            #return PTFLightCurve(mjd=mjd, mag=mag, error=mag_err)
             return PDBLightCurve(mjd=mjd, mag=mag, error=mag_err, field_id=self.field.id, ccd_id=self.id, source_id=source_id, ra=ra, dec=dec)
         else:
-            #return PTFLightCurve(mjd=mjd, mag=mag, error=mag_err, metadata=sourcedata)
-            return PDBLightCurve(mjd=mjd, mag=mag, error=mag_err, field_id=self.field.id, ccd_id=self.id, source_id=source_id, metadata=data, ra=ra, dec=dec)
+            lc = PDBLightCurve(mjd=mjd, mag=mag, error=mag_err, field_id=self.field.id, ccd_id=self.id, source_id=source_id, metadata=data, ra=ra, dec=dec)
+            return lc
 
     def light_curves(self, source_ids, clean=True):
         """ """
