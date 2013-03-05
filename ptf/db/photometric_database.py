@@ -101,10 +101,11 @@ def quality_cut(sourcedata, source_id=None):
         data = np.array(data, dtype=sourcedata.dtype)
 
     # Saturation limit, 14.3, based on email conversation with David Levitan
+    # UPDATE: I NO LONGER CUT ON SATURATION LIMIT (data["mag"] > 14.3) &
     cut_data = data[(data["x_image"] > 15) & (data["x_image"] < 2033) & \
                     (data["y_image"] > 15) & (data["y_image"] < 4081) & \
                     (data["relPhotFlags"] < 4) & \
-                    (data["mag"] > 14.3) & (data["mag"] < 21) & \
+                    (data["mag"] < 21) & \
                     ((data["sextractorFlags"] & 251) == 0) & \
                     ((data["ipacFlags"] & 6077) == 0) & \
                     np.isfinite(data["mag"]) & np.isfinite(data["mjd"]) & np.isfinite(data["magErr"])]
@@ -146,18 +147,22 @@ class Field(object):
     def __repr__(self):
         return "<Field: id={}, filter={}>".format(self.id, self.filter.id)
 
-    def __init__(self, field_id, filter, number_of_exposures=None):
+    def __init__(self, field_id, filter=None, number_of_exposures=None):
         """ Create a field object given a PTF Field ID
 
             Parameters
             ----------
-            field_id : int
+            field_id : int, Field
                 The PTF Field ID for a field.
             filter : Filter
                 A PTF Filter object (e.g. R = 2, g = 1)
             number_of_exposures : int (optional)
                 The number of exposures this field has in the specified filter.
         """
+
+        if isinstance(field_id, Field):
+            filter = field_id.filter
+            field_id = field_id.id
 
         # Validate Field ID
         try:
@@ -171,8 +176,10 @@ class Field(object):
             self.filter = filter
         elif isinstance(filter, str):
             self.filter = Filter(filter)
+        elif filter == None:
+            raise ValueError("You must specify the filter parameter!")
         else:
-            raise ValueError("filter parameter must be Filter object")
+            raise ValueError("filter parameter must be Filter object or a string (e.g. R, g)")
 
         # Validate number_of_exposures
         if number_of_exposures != None:
@@ -187,7 +194,8 @@ class Field(object):
             try:
                 self.ccds[ccd_id] = CCD(ccd_id, field=self, filter=self.filter)
             except ValueError:
-                logger.debug("CCD {} not found for Field {}.".format(ccd_id, self))
+                #logger.debug("CCD {} not found for Field {}.".format(ccd_id, self))
+                pass
 
         if len(self.ccds) == 0:
             logger.debug("No CCD data found for: {}".format(self))
@@ -256,6 +264,10 @@ class CCD(object):
 
     def __init__(self, ccd_id, field, filter):
         # Validate CCD ID
+
+        if isinstance(ccd_id, CCD):
+            ccd_id = ccd_id.id
+
         try:
             self.id = int(ccd_id)
         except ValueError:
@@ -342,13 +354,13 @@ class CCD(object):
             #return PTFLightCurve(mjd=mjd, mag=mag, error=mag_err, metadata=sourcedata)
             return PDBLightCurve(mjd=mjd, mag=mag, error=mag_err, field_id=self.field.id, ccd_id=self.id, source_id=source_id, metadata=data, ra=ra, dec=dec)
 
-    def light_curves(self, source_ids, where=[], clean=True):
+    def light_curves(self, source_ids, clean=True):
         """ """
 
         chip = self.read()
 
         if clean:
-            sourcedata = quality_cut(chip.sourcedata, barebones=True, where=where)
+            sourcedata = quality_cut(chip.sourcedata)
 
             for source_id in source_ids:
                 this_sourcedata = sourcedata[sourcedata["matchedSourceID"] == source_id]
@@ -375,7 +387,9 @@ def random_light_curve(field_id=100101, *args, **kwargs):
 def get_light_curve(field_id, ccd_id, source_id, **kwargs):
     field = Field(field_id, "R")
     ccd = field.ccds[ccd_id]
-    return ccd.light_curve(source_id, **kwargs)
+    lc = ccd.light_curve(source_id, **kwargs)
+    ccd.close()
+    return lc
 
 def get_fields_exposures(filter, filename=None, overwrite=False):
     """ Given a filter, go to the PTF photometric database and get information about all PTF
