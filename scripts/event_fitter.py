@@ -230,7 +230,7 @@ def fit_model_to_light_curve(light_curve, nwalkers=200, nburn_in=100, nsamples=2
 
     return sampler
 
-def make_chain_distribution_figure(light_curve, sampler, filename=None):
+def make_chain_distribution_figure(light_curve, sampler, title="", filename=None):
     chain = sampler.flatchain
 
     fig, axes = plt.subplots(2, 2, figsize=(10,14))
@@ -240,25 +240,11 @@ def make_chain_distribution_figure(light_curve, sampler, filename=None):
     #params = np.array([["m0", "u0"], ["t0", "tE"]])
     max_idx = np.ravel(sampler.lnprobability).argmax()
 
-    """
-    for ii in range(2):
-        for jj in range(2):
-            idx = 2*ii + jj
-            mn = np.mean(chain,axis=0)[idx]
-            std = np.std(chain,axis=0)[idx]
-            bins = np.linspace(mn - 5*std, mn + 5*std, 100)
-
-            axes[ii,jj].hist(chain[:,idx], bins=bins, color="k", histtype="step")
-            axes[ii,jj].axvline(chain[:,idx][max_idx], color='r', linestyle='--')
-            axes[ii,jj].set_title("{}".format(param_to_label[params[ii,jj]]), fontsize=26)
-            axes[ii,jj].yaxis.set_ticks([])
-    """
-
     # m0
     idx = 0
     mn = np.mean(chain,axis=0)[idx]
     std = np.std(chain,axis=0)[idx]
-    bins = np.linspace(mn - 2*std, mn + 2*std, 100)
+    bins = np.linspace(mn - 1.5*std, mn + 1.5*std, 100)
 
     axes[0,0].hist(chain[:,idx], bins=bins, color="k", histtype="step")
     axes[0,0].axvline(chain[:,idx][max_idx], color='r', linestyle='--')
@@ -269,7 +255,7 @@ def make_chain_distribution_figure(light_curve, sampler, filename=None):
     mn = np.mean(chain,axis=0)[idx]
     std = np.std(chain,axis=0)[idx]
     #bins = np.linspace(mn - 5*std, mn + 5*std, 100)
-    bins = np.linspace(0., 1.4, 100)
+    bins = np.linspace(0., 1.5, 100)
 
     axes[0,1].hist(chain[:,idx], bins=bins, color="k", histtype="step")
     axes[0,1].axvline(chain[:,idx][max_idx], color='r', linestyle='--')
@@ -300,7 +286,7 @@ def make_chain_distribution_figure(light_curve, sampler, filename=None):
         ax.yaxis.set_ticks([])
         #ax.set_yscale("log")
 
-    fig.suptitle("Posterior Probability Distributions\nField: {}, CCD: {}, Source ID: {}".format(light_curve.field_id, light_curve.ccd_id, light_curve.source_id), fontsize=24)
+    fig.suptitle(title, fontsize=24)
     plt.tight_layout()
     fig.subplots_adjust(top=0.9)
 
@@ -309,11 +295,11 @@ def make_chain_distribution_figure(light_curve, sampler, filename=None):
     else:
         fig.savefig(os.path.join("plots/fit_events", filename))
 
-def make_light_curve_figure(light_curve, sampler, filename=None):
+def make_light_curve_figure(light_curve, sampler, filename=None, title="", x_axis_labels=True, y_axis_labels=True, chains=True):
     chain = sampler.flatchain
 
     fig = plt.figure(figsize=(12,12))
-    fig.suptitle("Field: {}, CCD: {}, Source ID: {}".format(light_curve.field_id, light_curve.ccd_id, light_curve.source_id), fontsize=23)
+    fig.suptitle(title, fontsize=23)
     gs = gridspec.GridSpec(2, 1, height_ratios=[1,2])
     ax = plt.subplot(gs[1])
     ax2 = plt.subplot(gs[0])
@@ -321,54 +307,70 @@ def make_light_curve_figure(light_curve, sampler, filename=None):
     # "best" parameters
     max_idx = np.ravel(sampler.lnprobability).argmax()
     best_m0, best_u0, best_t0, best_tE = chain[max_idx]
-
+    
     mjd = np.arange(light_curve.mjd.min()-1000., light_curve.mjd.max()+1000., 0.2)
-    first_t0 = None
-    for ii in range(150):
-        walker_idx = np.random.randint(sampler.k)
-        chain = sampler.chain[walker_idx][-100:]
-        probs = sampler.lnprobability[walker_idx][-100:]
-        link_idx = np.random.randint(len(chain))
-
-        prob = probs[link_idx]
-        link = chain[link_idx]
-        m0, u0, t0, tE = link
-
-        if prob/probs.max() > 2:
-            continue
-
-        # More than 100% error
-        if np.any(np.fabs(link - np.mean(chain,axis=0)) / np.mean(chain,axis=0) > 0.75) or tE < 8:
-            continue
-
-        if np.fabs(t0 - best_t0) > 20.:
-            continue
-
-        if first_t0 == None:
-            first_t0 = t0
-        s_light_curve = SimulatedLightCurve(mjd=mjd, error=np.zeros_like(mjd), mag=m0)
-        s_light_curve.add_microlensing_event(t0=t0, u0=u0, tE=tE)
-        ax.plot(s_light_curve.mjd-first_t0, s_light_curve.mag, linestyle="-", color="#666666", alpha=0.1)
-        #ax_inset.plot(s_light_curve.mjd-first_t0, s_light_curve.mag, "r-", alpha=0.05)
+    
+    if chains:
+        first_t0 = None
+        for ii in range(150):
+            walker_idx = np.random.randint(sampler.k)
+            chain = sampler.chain[walker_idx][-100:]
+            probs = sampler.lnprobability[walker_idx][-100:]
+            link_idx = np.random.randint(len(chain))
+    
+            prob = probs[link_idx]
+            link = chain[link_idx]
+            m0, u0, t0, tE = link
+    
+            if prob/probs.max() > 2:
+                continue
+    
+            # More than 100% error
+            if np.any(np.fabs(link - np.mean(chain,axis=0)) / np.mean(chain,axis=0) > 0.25) or tE < 8 or tE > 250.:
+                continue
+    
+            if np.fabs(t0 - best_t0) > 20.:
+                continue
+    
+            if first_t0 == None:
+                first_t0 = t0
+            s_light_curve = SimulatedLightCurve(mjd=mjd, error=np.zeros_like(mjd), mag=m0)
+            s_light_curve.add_microlensing_event(t0=t0, u0=u0, tE=tE)
+            ax.plot(s_light_curve.mjd-first_t0, s_light_curve.mag, linestyle="-", color="#666666", alpha=0.1)
+            #ax_inset.plot(s_light_curve.mjd-first_t0, s_light_curve.mag, "r-", alpha=0.05)
 
     mean_m0, mean_u0, mean_t0, mean_tE = np.median(chain,axis=0)
     std_m0, std_u0, std_t0, std_tE = np.std(chain,axis=0)
-
+    
     light_curve.mjd -= mean_t0
     zoomed_light_curve = light_curve.slice_mjd(-3.*mean_tE, 3.*mean_tE)
+    if len(zoomed_light_curve) == 0:
+        mean_t0 = light_curve.mjd.min()
+        mean_tE = 10.
+        
+        light_curve.mjd -= mean_t0
+        zoomed_light_curve = light_curve.slice_mjd(-3.*mean_tE, 3.*mean_tE)
+    
     zoomed_light_curve.plot(ax)
     light_curve.plot(ax2)
     ax.set_xlim(-3.*mean_tE, 3.*mean_tE)
-    ax.text(-2.5*mean_tE, np.min(s_light_curve.mag), r"$u_0=${u0:.3f}$\pm${std:.3f}".format(u0=u0, std=std_u0) + "\n" + r"$t_E=${tE:.1f}$\pm${std:.1f} days".format(tE=mean_tE, std=std_tE), fontsize=19)
-    ax.set_ylabel(r"$R$ (mag)", fontsize=24)
-    ax.set_xlabel(r"time-$t_0$ [days]", fontsize=24)
+    #ax.text(-2.5*mean_tE, np.min(s_light_curve.mag), r"$u_0=${u0:.3f}$\pm${std:.3f}".format(u0=u0, std=std_u0) + "\n" + r"$t_E=${tE:.1f}$\pm${std:.1f} days".format(tE=mean_tE, std=std_tE), fontsize=19)
+    fig.text(0.15, 0.48,
+             r"$u_0=${u0:.3f}$\pm${std:.3f}".format(u0=mean_u0, std=std_u0) + 
+             "\n" + r"$t_E=${tE:.1f}$\pm${std:.1f} days".format(tE=mean_tE, std=std_tE), fontsize=19)
+    
+    if y_axis_labels:
+        ax.set_ylabel(r"$R$ (mag)", fontsize=24)
+    if x_axis_labels:
+        ax.set_xlabel(r"time-$t_0$ [days]", fontsize=24)
 
     # Now plot the "best fit" line in red
     s_light_curve = SimulatedLightCurve(mjd=mjd, error=np.zeros_like(mjd), mag=best_m0)
     s_light_curve.add_microlensing_event(t0=best_t0, u0=best_u0, tE=best_tE)
-    ax.plot(s_light_curve.mjd-first_t0, s_light_curve.mag, "r-", alpha=0.6, linewidth=2)
+    ax.plot(s_light_curve.mjd-best_t0, s_light_curve.mag, "r-", alpha=0.6, linewidth=2)
 
-    ax2.set_ylabel(r"$R$ (mag)", fontsize=24)
+    if y_axis_labels:
+        ax2.set_ylabel(r"$R$ (mag)", fontsize=24)
 
     #light_curve.plot(ax_inset)
     #ax_inset.set_ylim(s_light_curve.mag.min()+abs(s_light_curve.mag.min()-m0)/5., s_light_curve.mag.min()-0.05)
