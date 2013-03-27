@@ -35,14 +35,14 @@ from ptf.lightcurve import PTFLightCurve, SimulatedLightCurve
 import ptf.globals as pg
 import ptf.util as pu
 import ptf.variability_indices as vi
-import ptf.db.mongodb as mongo
 
-import scripts.event_fitter as fit
+#import scripts.event_fitter as fit
 
 try:
-    import ptf.db.photometric_database as pdb
-    import ptf.analyze as pa
-    import survey_coverage
+    #import ptf.db.photometric_database as pdb
+    #import ptf.analyze as pa
+    #import survey_coverage
+    pass
 except ImportError:
     logger.warning("photometric database modules failed to load! If this is on Navtara, you made a boo-boo.")
 
@@ -712,6 +712,38 @@ def fit_candidates():
         fit.make_chain_distribution_figure(light_curve, sampler, filename="c{3}_{0}_{1}_{2}_dists.png".format(candidate["field"], candidate["ccd"], candidate["source_id"], ii+1))
         fit.make_light_curve_figure(light_curve, sampler, filename="c{3}_{0}_{1}_{2}_lc.png".format(candidate["field"], candidate["ccd"], candidate["source_id"], ii+1))
 
+def spectra():
+    
+    # Read in spectra
+    from astropy.io import ascii
+    import glob
+    
+    if not os.path.exists("plots/spectra"):
+        os.mkdir("plots/spectra")
+        
+    for file in glob.glob("data/spectra/*.dat"):
+        basename = os.path.splitext(os.path.basename(file))[0]
+        
+        try:
+            spectrum = ascii.read(file, names=["wvln", "flux"])
+        except ascii.InconsistentTableError:
+            spectrum = ascii.read(file, names=["wvln", "flux", "error"])
+        
+        fig, ax = plt.subplots(1, 1, figsize=(12,7))
+        
+        if "1203" in basename or "1215" in basename:
+            flux = spectrum["flux"]*1E17
+        else:
+            flux = spectrum["flux"]
+            
+        ax.plot(spectrum["wvln"], flux, drawstyle="steps")
+        ax.set_xlabel(r"Wavelength [$\AA$]")
+        ax.set_ylabel(r"Flux [$10^{-17}$ erg/cm$^2$/s/$\AA$]")
+        
+        ax.set_xlim(spectrum["wvln"].min()-20, spectrum["wvln"].max()+20)
+        
+        fig.savefig("plots/spectra/{0}.pdf".format(basename))
+
 if __name__ == "__main__":
     from argparse import ArgumentParser
 
@@ -738,7 +770,7 @@ if __name__ == "__main__":
     # TODO: better interface here!!
 
     np.random.seed(104)
-    make_survey_sampling_figure(10)
+    #make_survey_sampling_figure(10)
     #microlensing_event_sim()
     #maximum_outlier_indices_plot(100101)
     #variability_indices_distributions()
@@ -746,3 +778,4 @@ if __name__ == "__main__":
     #num_observations_distribution_90deg()
     #after_eta_cut_num_observations()
     #fit_candidates()
+    spectra()
