@@ -16,7 +16,7 @@ import time
 
 # Third-party
 import matplotlib
-matplotlib.use("Agg")
+matplotlib.use("TkAgg")
 import matplotlib.cm as cm
 import matplotlib.colors as mc
 import matplotlib.pyplot as plt
@@ -47,6 +47,18 @@ except ImportError:
     logger.warning("photometric database modules failed to load! If this is on Navtara, you made a boo-boo.")
 
 tick_font_size = 14
+
+ptfid_to_longname = {"PTFS1203am" : "PTF1J033545.80-041849.1",
+                     "PTFS1206i" : "PTF1J061800.25+203142.5",
+                     "PTFS1212ak" : "PTF1J120642.60-192016.4", 
+                     "PTFS1213ap" : "PTF1J131500.09+715032.5",
+                     "PTFS1215aj" : "PTF1J153202.91+674825.1",
+                     "PTFS1216bt" : "PTF1J161502.39+540053.8",
+                     "PTFS1217ce" : "PTF1J171606.82+474423.7",
+                     "PTFS1217cv" : "PTF1J172826.08+692501.1",
+                     "PTFS1217df" : "PTF1J173301.07+374311.9",
+                     "PTFS1217dk" : "PTF1J174736.51+300506.9",
+                     "PTFS1219ad" : "PTF1J193330.11+451501.1"}
 
 def make_survey_sampling_figure(N=10):
     """ Generate the survey sampling figure that shows how different the
@@ -694,24 +706,307 @@ def ml_parameter_distributions(overwrite=False):
 
     fig.savefig("plots/fit_events/all_parameters.png")
 
-def fit_candidates():
-    candidates = np.genfromtxt("data/candidate_list.txt", names=True, dtype=int)
+def lightcurve_from_filename(filename):
+    import astropy.io.ascii as ascii
+    
+    with open(filename) as f:
+        data_start = 0
+        for line in f:
+            if line.startswith("#"):
+                data_start += 1
+    
+    candidate = ascii.read(filename, header_start=data_start-1)#, data_start=data_start)
+    c = candidate[(candidate['filterID'] == 2) & (candidate['mag'] > 0.)]
+    flag_idx = c['relPhotFlags']==0
+    
+    light_curve = PTFLightCurve(mjd=c['epoch'], mag=c['mag'], error=c['magerr'])
+    
+    return light_curve
 
-    ptf = mongo.PTFConnection()
-    light_curve_collection = ptf.light_curves
+def fit_candidates(Nburn, Nsamples, Nwalkers, seed=None):
+    final_candidates = ["PTFS1206i", "PTFS1216bt", "PTFS1217cv"]
+    
+    fig1 = plt.figure(figsize=(32,12))
+    gs = gridspec.GridSpec(2, 3, height_ratios=[1,2])
+    
+    u0s,t0s,m0s,tEs = [],[],[],[]
+    du0s,dt0s,dm0s,dtEs = [],[],[],[]
+    
+    # Make 3-panel figure with candidates
+    for ii,PTFID in enumerate(final_candidates):
+        if ii == 2:
+            Nsamples = 1000
+            
+        chains = True
+        filename = "data/candidates/lc_{0}.dat".format(PTFID)
+        figtext = ptfid_to_longname[PTFID] #candidate["long_ptf_name"]
+        light_curve = lightcurve_from_filename(filename)
+        
+        if ii == 0:
+            y_axis_labels = True
+        else:
+            y_axis_labels = False
+        
+        if ii == 1:
+            x_axis_labels = True
+        else:
+            x_axis_labels = False
+            
+        logger.info("Fitting {0}".format(PTFID))
+        sampler = fit.fit_model_to_light_curve(light_curve, nwalkers=Nwalkers, nsamples=Nsamples, nburn_in=Nburn, seed=seed)
+        chain = sampler.flatchain
+        print "Mean acceptance fraction: {0:.3f}".format(np.mean(sampler.acceptance_fraction))
 
-    Nwalkers = 1000
-    Nsamples = 1000
-    Nburn = 1000
+        ax = plt.subplot(gs[1,ii])
+        ax2 = plt.subplot(gs[0,ii])
+    
+        # "best" parameters
+        flatchain = np.vstack(sampler.chain)
+        best_m0, best_u0, best_t0, best_tE = np.median(flatchain, axis=0)
+        
+        mjd = np.arange(light_curve.mjd.min()-1000., light_curve.mjd.max()+1000., 0.2)
+        
+        first_t0 = None
+        for jj in range(100):
+            walker_idx = np.random.randint(sampler.k)
+            chain = sampler.chain[walker_idx][-100:]
+            probs = sampler.lnprobability[walker_idx][-100:]
+            link_idx = np.random.randint(len(chain))
+    
+            prob = probs[link_idx]
+            link = chain[link_idx]
+            m0, u0, t0, tE = link
+    
+            if prob/probs.max() > 2:
+                continue
+    
+            # More than 100% error
+            if np.any(np.fabs(link - np.mean(chain,axis=0)) / np.mean(chain,axis=0) > 0.25) or tE < 8 or tE > 250.:
+                continue
+    
+            if np.fabs(t0 - best_t0) > 20.:
+                continue
+    
+            if first_t0 == None:
+                first_t0 = t0
+            s_light_curve = SimulatedLightCurve(mjd=mjd, error=np.zeros_like(mjd), mag=m0)
+            s_light_curve.add_microlensing_event(t0=t0, u0=u0, tE=tE)
+            ax.plot(s_light_curve.mjd-first_t0, s_light_curve.mag, linestyle="-", color="#ababab", alpha=0.05, marker=None)
+            #ax_inset.plot(s_light_curve.mjd-first_t0, s_light_curve.mag, "r-", alpha=0.05)
+    
+        mean_m0, mean_u0, mean_t0, mean_tE = np.median(chain,axis=0)
+        std_m0, std_u0, std_t0, std_tE = np.std(chain,axis=0)
+        
+        m0s.append(mean_m0)
+        dm0s.append(std_m0)
+        t0s.append(mean_t0+54832.) # HJD to MJD
+        dt0s.append(std_t0)
+        tEs.append(mean_tE)
+        dtEs.append(std_tE)
+        u0s.append(mean_u0)
+        du0s.append(std_u0)
+        print("m0 = ", mean_m0, std_m0)
+        print("u0 = ", mean_u0, std_u0)
+        print("tE = ", mean_tE, std_tE)
+        print("t0 = ", mean_t0, std_t0)
+        
+        light_curve.mjd -= mean_t0
+        zoomed_light_curve = light_curve.slice_mjd(-3.*mean_tE, 3.*mean_tE)
+        if len(zoomed_light_curve) == 0:
+            mean_t0 = light_curve.mjd.min()
+            mean_tE = 10.
+            
+            light_curve.mjd -= mean_t0
+            zoomed_light_curve = light_curve.slice_mjd(-3.*mean_tE, 3.*mean_tE)
+        
+        zoomed_light_curve.plot(ax)
+        light_curve.plot(ax2)
+        ax.set_xlim(-3.*mean_tE, 3.*mean_tE)
+        #ax.text(-2.5*mean_tE, np.min(s_light_curve.mag), r"$u_0=${u0:.3f}$\pm${std:.3f}".format(u0=u0, std=std_u0) + "\n" + r"$t_E=${tE:.1f}$\pm${std:.1f} days".format(tE=mean_tE, std=std_tE), fontsize=19)
+        
+        ylim, xlim = ax.get_ylim(), ax.get_xlim()
+        dx, dy = (xlim[1]-xlim[0]), (ylim[0]-ylim[1])
+        ax.text(xlim[0]+dx/20., ylim[1]+dy/8., 
+                 r"$u_0=${u0:.3f}$\pm${std:.3f}".format(u0=mean_u0, std=std_u0) + 
+                 "\n" + r"$t_E=${tE:.1f}$\pm${std:.1f} days".format(tE=mean_tE, std=std_tE), fontsize=22)
+        
+        ylim, xlim = ax2.get_ylim(), ax2.get_xlim()
+        dx, dy = (xlim[1]-xlim[0]), (ylim[0]-ylim[1])
+        if ii == 2:
+            ax2.text((xlim[0]+xlim[1])/2.,ylim[1]+dy/8.,figtext,fontsize=22)
+        else:
+            ax2.text(xlim[0]+dx/20., ylim[1]+dy/8., figtext,fontsize=22)
+        
+        if y_axis_labels:
+            ax.set_ylabel(r"$R$ (mag)", fontsize=24)
+        if x_axis_labels:
+            ax.set_xlabel(r"time-$t_0$ [days]", fontsize=24)
+    
+        # Now plot the "best fit" line in red
+        s_light_curve = SimulatedLightCurve(mjd=mjd, error=np.zeros_like(mjd), mag=best_m0)
+        s_light_curve.add_microlensing_event(t0=best_t0, u0=best_u0, tE=best_tE)
+        ax.plot(s_light_curve.mjd-best_t0, s_light_curve.mag, "k-", alpha=0.6, linewidth=3)
+    
+        if y_axis_labels:
+            ax2.set_ylabel(r"$R$ (mag)", fontsize=24)
+    
+    import astropy.table as at
+    from astropy.io import ascii
+    tbl = at.Table([at.Column(data=u0s, name="u0"),
+                    at.Column(data=du0s, name="e_u0"),
+                    at.Column(data=tEs, name="tE"),
+                    at.Column(data=dtEs, name="e_tE"),
+                    at.Column(data=t0s, name="t0"),
+                    at.Column(data=dt0s, name="e_t0"),
+                    at.Column(data=m0s, name="m0"),
+                    at.Column(data=dm0s, name="e_m0")])
+    
+    ascii.write(tbl, output=os.path.join("plots/fit_events/metadata.tex"), Writer=ascii.Latex)
+    
+    fig1.subplots_adjust(hspace=0.1, wspace=0.12, left=0.04, right=0.98, top=0.98, bottom=0.07)
+    fig1.savefig(os.path.join("plots/fit_events", "fig10.eps"))     
+    
+    # ----------------------------------------------------------------
 
-    for ii, candidate in enumerate(candidates):
-        logger.info("Fitting #{0}: {1},{2},{3}".format(ii+1, candidate["field"], candidate["ccd"], candidate["source_id"]))
-        light_curve = pdb.get_light_curve(candidate["field"], candidate["ccd"], candidate["source_id"], clean=True)
+def fit_non_candidates(Nburn, Nsamples, Nwalkers):
+    # Now, the other ones...
+    
+    
+    non_candidates = [("PTFS1203am", "PTFS1212ak", "PTFS1213ap"), 
+                      ("PTFS1215aj","PTFS1217ce", "PTFS1217df"), 
+                      ("PTFS1217dk", "PTFS1219ad")]
+    
+    for kk,row in enumerate(non_candidates):
+        fig1 = plt.figure(figsize=(32,12))
+        gs = gridspec.GridSpec(2, 3, height_ratios=[1,2])
+        
+        # Make 6-panel figure with non-candidates
+        for ii,PTFID in enumerate(row):
+            if ii == 1 and kk == 2:
+                Nsamples = 1000
+                
+            filename = "data/candidates/lc_{0}.dat".format(PTFID)
+            figtext = ptfid_to_longname[PTFID] #candidate["long_ptf_name"]
+            
+            light_curve = lightcurve_from_filename(filename)
+            
+            if ii == 0:
+                y_axis_labels = True
+            else:
+                y_axis_labels = False
+            
+            if kk == 2 or (kk == 1 and ii == 2):
+                x_axis_labels = True
+            else:
+                x_axis_labels = False
+                
+            logger.info("Fitting {0}".format(PTFID))
+            sampler = fit.fit_model_to_light_curve(light_curve, nwalkers=Nwalkers, nsamples=Nsamples, nburn_in=Nburn)
+            chain = sampler.flatchain
+            print "Mean acceptance fraction: {0:.3f}".format(np.mean(sampler.acceptance_fraction))
+    
+            ax = plt.subplot(gs[1,ii])
+            ax2 = plt.subplot(gs[0,ii])
+        
+            # "best" parameters
+            flatchain = np.vstack(sampler.chain)
+            best_m0, best_u0, best_t0, best_tE = np.median(flatchain, axis=0)
+            
+            mjd = np.arange(light_curve.mjd.min()-1000., light_curve.mjd.max()+1000., 0.2)
+        
+            mean_m0, mean_u0, mean_t0, mean_tE = np.median(chain,axis=0)
+            std_m0, std_u0, std_t0, std_tE = np.std(chain,axis=0)
+            
+            print("m0 = ", mean_m0, std_m0)
+            print("u0 = ", mean_u0, std_u0)
+            print("tE = ", mean_tE, std_tE)
+            print("t0 = ", mean_t0, std_t0)
+            
+            light_curve.mjd -= mean_t0
+            zoomed_light_curve = light_curve.slice_mjd(-3.*mean_tE, 3.*mean_tE)
+            if len(zoomed_light_curve) == 0:
+                mean_t0 = light_curve.mjd.min()
+                mean_tE = 10.
+                
+                light_curve.mjd -= mean_t0
+                zoomed_light_curve = light_curve.slice_mjd(-3.*mean_tE, 3.*mean_tE)
+            
+            zoomed_light_curve.plot(ax)
+            light_curve.plot(ax2)
+            ax.set_xlim(-3.*mean_tE, 3.*mean_tE)
+            #ax.text(-2.5*mean_tE, np.min(s_light_curve.mag), r"$u_0=${u0:.3f}$\pm${std:.3f}".format(u0=u0, std=std_u0) + "\n" + r"$t_E=${tE:.1f}$\pm${std:.1f} days".format(tE=mean_tE, std=std_tE), fontsize=19)
+            
+            ylim, xlim = ax2.get_ylim(), ax2.get_xlim()
+            dx, dy = (xlim[1]-xlim[0]), (ylim[0]-ylim[1])
+            if (kk == 0 and ii == 1) or (kk == 1 and ii == 0) or (kk == 2 and ii == 0):
+                ax2.text((xlim[0]+xlim[1])/2.,ylim[1]+dy/8.,figtext,fontsize=22)
+            else:
+                ax2.text(xlim[0]+dx/20., ylim[1]+dy/8., figtext,fontsize=22)
+            
+            if y_axis_labels:
+                ax.set_ylabel(r"$R$ (mag)", fontsize=24)
+            if x_axis_labels:
+                ax.set_xlabel(r"time-$t_0$ [days]", fontsize=24)
+        
+            if y_axis_labels:
+                ax2.set_ylabel(r"$R$ (mag)", fontsize=24)
+            
+        fig1.subplots_adjust(hspace=0.1, wspace=0.12, left=0.04, right=0.98, top=0.98, bottom=0.07)
+        #fig1.savefig(os.path.join("plots/fit_events", "non_candidates_{0}.eps".format(kk)))
+        fig1.savefig(os.path.join("plots/fit_events", "fig13_{0}.eps".format(kk)))
+    
+    
+    
+    """
+    for ii,filename in enumerate(glob.glob("data/candidates/*.dat")):
+        basename,ext = os.path.splitext(os.path.basename(filename))
+        xx, PTFID = basename.split("_")
+        
+        if PTFID in final_candidates:
+            chains = True
+        else:
+            chains = False
+        
+        with open(filename) as f:
+            data_start = 0
+            for line in f:
+                if line.startswith("#"):
+                    data_start += 1
+        
+        candidate = ascii.read(filename, header_start=data_start-1)#, data_start=data_start)
+        c = candidate[(candidate['filterID'] == 2) & (candidate['mag'] > 0.)]
+        flag_idx = c['relPhotFlags']==0
+        
+        light_curve = PTFLightCurve(mjd=c['epoch'], mag=c['mag'], error=c['magerr'])
+        
+        if PTFID in ["PTFS1203am", "PTFS1213ap", "PTFS1217ce", "PTFS1217dk"] \
+            or PTFID in final_candidates:
+            y_axis_labels = True
+        else:
+            y_axis_labels = False
+        
+        if PTFID in ["PTFS1215aj", "PTFS1213ap", "PTFS1219ad", "PTFS1217dk"] \
+            or PTFID in final_candidates:
+            x_axis_labels = True
+        else:
+            x_axis_labels = False
+            
+        logger.info("Fitting {0}".format(PTFID))
         sampler = fit.fit_model_to_light_curve(light_curve, nwalkers=Nwalkers, nsamples=Nsamples, nburn_in=Nburn)
+        print "Mean acceptance fraction: {0:.3f}".format(np.mean(sampler.acceptance_fraction))
+        
+        title = ptfid_to_longname[PTFID] #candidate["long_ptf_name"]
 
-        fit.make_chain_distribution_figure(light_curve, sampler, filename="c{3}_{0}_{1}_{2}_dists.png".format(candidate["field"], candidate["ccd"], candidate["source_id"], ii+1))
-        fit.make_light_curve_figure(light_curve, sampler, filename="c{3}_{0}_{1}_{2}_lc.png".format(candidate["field"], candidate["ccd"], candidate["source_id"], ii+1))
-
+        fit.make_chain_distribution_figure(light_curve, sampler, 
+            filename="{0}_dists.png".format(PTFID),
+            title=title)
+        fit.make_light_curve_figure(light_curve, sampler, 
+            filename="{0}_lc.png".format(PTFID),
+            title=title,
+            x_axis_labels=x_axis_labels, y_axis_labels=y_axis_labels,
+            chains=chains)
+    """
+    
 if __name__ == "__main__":
     from argparse import ArgumentParser
 
@@ -734,15 +1029,19 @@ if __name__ == "__main__":
 
     if not os.path.exists(os.path.join(pg.plots_path)):
         os.mkdir(pg.plots_path)
-
+        
     # TODO: better interface here!!
 
-    np.random.seed(104)
-    make_survey_sampling_figure(10)
+    #make_survey_sampling_figure(10)
     #microlensing_event_sim()
     #maximum_outlier_indices_plot(100101)
     #variability_indices_distributions()
     #num_observations_distribution()
     #num_observations_distribution_90deg()
     #after_eta_cut_num_observations()
-    #fit_candidates()
+    
+    #np.random.seed(400)
+    fit_candidates(Nsamples=1000, Nburn=500, Nwalkers=100)
+    
+    #np.random.seed(104)
+    #fit_non_candidates(Nsamples=500, Nburn=500, Nwalkers=100)
