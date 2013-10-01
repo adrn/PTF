@@ -1,0 +1,73 @@
+
+
+==============================================================================
+
+This paper examines variability parameters to search for microlensing events. The variability measures were used as a filtering to reduce the number of candidates. The authors use visual inspection and contextual information to determine whether the events are real microlensing. Finally, the final list is scrutinized further with additional observations.
+
+The paper is well written and most concepts are very well explained. I also find the fact that the paper does not stop short with just methodology, but pursues the analysis to discovery.  I recommend relatively minor modifications before I can recommend it for publication.
+
+
+Abstract
+"...simple predictions for the microlensing event rate in the PTF footprint over the survey's three years of operations."
+Provide some insight to what simple means.
+
+Response:
+We have added a clarifying statement referencing the work that this estimate was based on.
+
+Text changes:
+"While these candidates cannot be confirmed, as we lack simultaneous, multi-color photometry of the events, this number is consistent with predictions for the microlensing event rate in the PTF footprint over the survey's three years of operations, as estimated from the model proposed in \citet{han2008}."
+
+1. Introduction
+
+A review of the methodologies in discovering microlensing is missing. The authors need to provide a review of other methods. The treatment on page 4 is not adequate. I would also recommend mentioning event detection algorithms.
+
+Otherwise very well written. I would like to see references to a few concepts:
+
+a) "but thanks to advances in CCD technology and the development of dedicated microlensing surveys, a few thousand events are now observed each year"
+Provide a reference or URL
+
+b) "By contrast, high-Galactic-latitude events probe lenses with distances 1 kpc; the Einstein radii, therefore, tend to be larger (&#x223C;milliarcseconds) and may cause detectable astrometric signatures."
+Provide reference
+
+Also I recommend removing the comment about future work from the introduction.
+
+
+2. PTF
+
+Are the PTF data publicly available? If not, this has to be stated. Also can the author provide a small dataset. Other authors may want to compare their methodology to this one.  I would personally like to test the proposed method.
+
+The material starting with "What would a microlensing event look like ..." and beyond do not belong in this section and I think should be moved into section 3.
+u_0 is in units of Einstein radius and it is dimensionless.
+
+
+3 MICROLENSING EVENT RECOVERY
+
+[Scientific Editor comment: The von Neumann ratio in sec 3.1 is more commonly known as the Durbin-Watson statistic and is extensively used in econometrics. The paper should make this link, and summarize its mathematical properties (cf. Wikipedia and volumes such as `Analysis of Financial Time Series', 3rd ed, R. S. Tsay, 2010). Most relevant, the statistic has known mean and variance under certain assumptions (e.g. evenly spaced data, normal errors), and can thus be used for probabilistic statements.]
+
+"Compared to flat or linear light-curve models, a microlensing model best describe the data, as determined by using a &#x2206;&#x03C7;2 test, and.."
+It is not obvious what a Delta_chi^2 test is at this point.
+
+"we add one more index, &#x2206;&#x03C7;2, the difference in &#x03C7;2 between fitting a Gaussian model and fitting a linear model to a light curve.  "
+Does this mean fitting a Gaussian shape to a microlensing? How is this done? Is this a likelihood ratio run in a sequential manner to all the light curve? I think this should be explained more with references to this `standard' approach.
+
+[Scientific Editor comment:  The astronomers' common use of delta chi^2 for model selection in nonlinear regression is nonstandard in statistics.  I assume it is meant to be a simplified likelihood ratio test, but this too is inadequate when the two models under consideration have different numbers of parameters.  The AIC or BIC (Bayesian Information Criterion) in maximum likelihood estimation is preferred (see Wikipedia).  In particular: What is in the denominator of the chi^2-like statistic?  If it is measurement errors, then the errors must account for the full variance about the model, and the errors must be normally distributed (I see outliers in Fig 5).]
+
+I do not understand figure 5. First the y axes need labels.  Second the parameters do not have time dependency. How do they depend on time? Are you introducing a window? If so, this should be explained.
+
+I would have prefered a multidimensional classification using all the parameters and optimize False Positives and efficiency. Many off-the-shelf methods like Support Vector Machines and Random Forests can be used very easily. I suggest the authors try one of those approaches. It is very simple to use. Software such as RapidMiner can be set and run within minutes.
+
+Figure 7-9. What is the "normalized" input distribution?
+
+
+4. SEARCHING FOR EVENTS ...
+
+What is the number of light-curves selected after step#2? Is it consistent with the 1% FPR?  At this stage, I estimate you should have about 1x10^6 light-curves if 1% FPR is set.
+
+After step#5, the method identifies 2377 candidates which is 0.0002%. If we assume most of them are FPs as it is shown in the following section, then it seems most of the light-curves are rejected at step#3. I suspect that the number of light-curves with N>10 is much smaller than 10^9.   This needs to be explained better: please provide the number of light-curves at each step.
+
+4.1 and 4.2 are well written and clear.
+
+
+5. CONCLUSIONS
+
+My only concern is that the authors claim they have characterize the detection efficiency. In my opinion they have only characterize the detection efficiency of only a part of the process. I would like to see an addition that describes the detection efficiency of all steps.
