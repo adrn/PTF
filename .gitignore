@@ -18,6 +18,7 @@
 *.eps
 *.ps
 *.zip
+*Notes.bib
 config
 aov.c
 lc_merged*.txt
