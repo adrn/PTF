@@ -1,8 +1,6 @@
 *.pyc
 *.pickle
 *.png
-lc_merged*.txt
-2011\ Report/
 #*
 *.tar.gz
 *.log
@@ -22,3 +20,6 @@ lc_merged*.txt
 *.zip
 config
 aov.c
+lc_merged*.txt
+2011\ Report/
+data
