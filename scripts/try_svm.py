@@ -27,13 +27,14 @@ index = np.load(indexFile)
 
 np.random.seed(142)
 idx = np.random.randint(len(all_fields))
-print(all_fields[idx])
 
 sys.exit(0)
-#filterID = 
+filterID = 2
+fieldID = all_fields[idx][0]
+chipID = 1
 
 matchFile = os.path.join(lcBaseDir, 'match_{:02d}_{:06d}_{:02d}.pytable'\
-                          .format(filterID, fieldID, chip))
+                          .format(filterID, fieldID, chipID))
 chip = tables.openFile(matchFile)
 
 sourceTable = chip.getNode('/filter{:02d}/field{:06d}/chip{:02d}/sources'\
