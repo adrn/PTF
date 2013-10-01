@@ -17,5 +17,8 @@ lc_merged*.txt
 *.blg
 *.top
 *.tui
+*.eps
+*.ps
+*.zip
 config
 aov.c
