@@ -19,3 +19,7 @@ setup(name='PTF',
       description="adrn's PTF project",
       cmdclass={'build_ext': build_ext},
       ext_modules=[error_func, aov])
+
+# Now generate various data files:
+from ptf.util import cache_all_fields
+cache_all_fields()

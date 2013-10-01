@@ -21,17 +21,26 @@ logger = get_logger(__name__)
 try:
     import tables
 except ImportError:
-    logger.warning("PyTables not found! Some functionality won't work.\n (on navtara, try running with: /scr4/dlevitan/sw/epd-7.1-1-rh5-x86_64/bin/python instead.)")
+    logger.warning("PyTables not found! Some functionality won't work."
+                   "\n (on navtara, try running with: /scr4/dlevitan/sw/"
+                    "epd-7.1-1-rh5-x86_64/bin/python instead.)")
 
 try:
     import galacticutils
 except ImportError:
-    logger.warning("galacticutils not found! SDSS search functionality won't work.")
+    logger.warning("galacticutils not found! SDSS search functionality "
+                   "won't work.")
 
-#all_fields = np.load(os.path.join(ptf_params.config["PROJECTPATH"], "data", "all_fields.npy"))
-all_fields = np.load(os.path.join(os.path.split(globals._base_path)[0], "data", "all_fields.npy"))
+# Path to npy file containing all field IDs
+#_all_fields = os.path.join(ptf_params.config["PROJECTPATH"], 
+#                           "data", "all_fields.npy")
+_all_fields = os.path.join(os.path.split(globals._base_path)[0], 
+                           "data", "all_fields.npy")
+all_fields = np.load(_all_fields)
+
 match_path = "/scr4/dlevitan/matches"
-pytable_base_string = os.path.join(match_path, "match_{filter.id:02d}_{field.id:06d}_{ccd.id:02d}.pytable")
+pytable_base_string = os.path.join(match_path, "match_{filter.id:02d}"
+                                   "_{field.id:06d}_{ccd.id:02d}.pytable")
 filter_map = {"R" : 2, "g" : 1}
 inv_filter_map = {2 : "R", 1 : "g"}
 

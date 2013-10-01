@@ -3,7 +3,11 @@
 
 # Standard library
 import os, sys
+import re
 import logging
+
+# Third-party
+import numpy as np
 
 # Convert my names for variability indices to the PDB names
 pdb_index_name = dict(eta="vonNeumannRatio", \
@@ -11,6 +15,18 @@ pdb_index_name = dict(eta="vonNeumannRatio", \
                       k="stetsonK", \
                       delta_chi_squared="chiSQ", \
                       sigma_mu=["magRMS","referenceMag"])
+
+# This code will find the root directory of the project
+_pattr = re.compile("(.*)\/ptf")
+try:
+    matched_path = _pattr.search(os.getcwd()).groups()[0]
+except AttributeError: # match not found, try __file__ instead
+    matched_path = _pattr.search(__file__).groups()[0]
+
+if os.path.basename(matched_path) == "ptf":
+    project_root = matched_path
+else:
+    project_root = os.path.join(matched_path, "ptf")
 
 def source_index_name_to_pdb_index(source, index_name):
     """ Given a source (a row from chip.sources) and an index name (e.g. eta),
@@ -39,26 +55,41 @@ ch = logging.StreamHandler()
 formatter = logging.Formatter("%(name)s / %(levelname)s / %(message)s")
 ch.setFormatter(formatter)
 logger.addHandler(ch)
+
 def get_logger(name):
     return logger
 
-def convert_all_fields_txt(txt_filename="ptf_allfields.txt", npy_filename="all_fields.npy"):
-    """ Convert the text file containing all PTF Field ID's and positons to a
-        numpy .npy save file.
+def cache_all_fields(txt_filename="PTF_AllFields_ID.txt", 
+                     npy_filename="all_fields.npy",
+                     path="data/cache", overwrite=False):
+    """ Convert the text file containing all PTF Field ID's and 
+        positons to a numpy .npy save file.
 
         It is much faster to load the .npy file than to generate an array on
         the fly from the text file. The text file can be found here:
             http://astro.caltech.edu/~eran/PTF_AllFields_ID.txt
     """
-    all_fields = np.genfromtxt(txt_filename, \
-                           skiprows=4, \
-                           usecols=[0,1,2,5,6,7], \
-                           dtype=[("id", int), ("ra", float), ("dec", float), ("gal_lon", float), ("gal_lat", float), ("Eb_v", float)]).\
-                           view(np.recarray)
+    txt_filename = os.path.join(project_root, path, txt_filename)
+    npy_filename = os.path.join(project_root, path, npy_filename)
 
-    np.save(npy_filename, all_fields)
+    if not os.path.exists(txt_filename):
+        url = "http://www.astro.caltech.edu/~eran/PTF_AllFields_ID.txt"
+        logger.error("Download the txt file from: {0} and save to {1}."
+                     .format(url, txt_filename))
 
-    return True
+    if os.path.exists(npy_filename) and overwrite:
+        os.remove(npy_filename)
+
+    if not os.path.exists(npy_filename):
+        all_fields = np.genfromtxt(txt_filename, \
+                                   skiprows=4, \
+                                   usecols=[0,1,2,5,6,7], \
+                                   dtype=[("id", int), \
+                                          ("ra", float), ("dec", float),\
+                                          ("gal_lon", float), ("gal_lat", float),\
+                                          ("Eb_v", float)]).view(np.recarray)
+
+        np.save(npy_filename, all_fields)
 
 def richards_qso(sdss_colors):
     if sdss_colors == None:

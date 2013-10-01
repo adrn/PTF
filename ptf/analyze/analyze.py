@@ -20,7 +20,8 @@ from .statistics import *
 from ..util import get_logger
 logger = get_logger(__name__)
 
-__all__ = ["fit_subtract_microlensing", "fit_microlensing_event", "fit_constant_line", "iscandidate"]
+__all__ = ["fit_subtract_microlensing", "fit_microlensing_event", 
+           "fit_constant_line", "iscandidate"]
 
 def _parameters_to_dict(parameters):
     """ Convert an lmfit Parameters object to a Python dictionary """
