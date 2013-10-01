@@ -69,7 +69,7 @@ PTF data are collected using the former Canada-France-Hawaii Telescope 12K$\time
 
 While a real-time image-differencing pipeline identifies transients of interest and passes these to a dedicated photometric follow-up telescope, a separate pipeline generates PTF light curves. Images are processed using standard reduction procedures including de-biasing, flat-fielding, and astrometric calibration (Laher et al., in prep). SExtractor is used for source identification \citep{bertin96}. The absolute photometric calibration of the images is good to a systematic limit of $\sim$2\% for photometric nights, as described in \cite{ofek2012}.  The final light curves are produced using relative photometric calibration, which refines the calibration to $<$1\% for photometric nights and improves the calibration for bad nights \citep[Levitan et al., in prep; for algorithm details see][]{levitan2011, ofek2012}. The resulting archive is an excellent resource for the study of periodic forms of variability \citep[e.g., stellar or asteroid rotation;][]{agueros11,polishook2012}. 
 
-As of 2012 Dec, the PTF footprint includes $\sim$15,224 (2766) deg$^2$ imaged $>$10 ($>$100) times in $R$-band and $\sim$5430 (290) deg$^2$ imaged that often in $g$-band (see Figure~\ref{fig:survey_footprint}). The PTF survey footprint is not uniformly sampled either spatially or temporally. Each field has a unique sampling pattern determined by which of the PTF sub-surveys it belongs to, what time of the year it is visible, and how high a priority it is given by the scheduler. The imaging cadences range from 1-5 days, but there is a higher-cadence campaign of a field in Orion to find transiting planets around young stars \citep{nick2009}. The result is that PTF light curves often contain gaps and regions of high-cadence observations and/or of low-cadence observations, so that the archive is a massive dataset of irregularly-sampled, time-domain photometry. Figure~\ref{fig:sampling} shows six randomly selected light curves and illustrates the varying cadences and coverage that different fields may have over the same one-year period. 
+As of 2012 Dec, the PTF footprint includes $\sim$15,224 (2766) deg$^2$ imaged $>$10 ($>$100) times in $R$-band and $\sim$5430 (290) deg$^2$ imaged that often in $g$-band (see Figure~\ref{fig:survey_footprint}). The PTF survey footprint is not uniformly sampled either spatially or temporally. Each field has a unique sampling pattern determined by which of the PTF sub-surveys it belongs to, what time of the year it is visible, and how high a priority it is given by the scheduler. The imaging cadences range from 1-5 days, but there is a higher-cadence campaign of a field in Orion to find transiting planets around young stars \citep{nick2009}. The result is that PTF light curves often contain gaps and regions of high-cadence observations and/or of low-cadence observations, so that the archive is a massive dataset of irregularly-sampled, time-domain photometry. Figure~\ref{fig:sampling} shows six randomly selected light curves and illustrates the varying cadences and coverage that different fields may have over the same one-year period. The PTF data is not publicly available, but ... TODO
 
 \begin{figure}[h]
 \begin{center}
@@ -91,7 +91,15 @@ As of 2012 Dec, the PTF footprint includes $\sim$15,224 (2766) deg$^2$ imaged $>
 
 In Figure~\ref{fig:num_obs}, we plot the number of $R$-band exposures for each field against the observational baseline (the number of days between the first and last exposure). Given the exposure distribution, which peaks at 30-40 but includes a long tail to larger numbers, we restrict our sample to the light curves with $>$10 \textit{R}-band observations.  
 
-What would a microlensing event look like in a typical PTF light curve? If the source is an unblended point source and the lens is a foreground, dim object, a microlensing event is fully described by three parameters: the angular impact parameter $u_0$, the peak time of the event $t_0$, and the timescale of the event (Einstein crossing time) $t_E$. In terms of a dimensionless projected distance between the source and lens, $u$, the amplification factor $A$ and flux $F$ as a function of time can be defined as: 
+\section{Microlensing event recovery} \label{sec:event_recovery}
+Microlensing surveys typically use difference image analysis \citep{alard1998} to identify transient events in raw imaging data. The light curves of transient sources are then analyzed and vetted using a variety of selection methods to search for microlensing event candidates and distinguish them from, e.g., variable stars, outbursting systems, and novae. Surveys have approached this process differently (as described in \citealt{ogle_optical_depth, con_idx, alcock2000, macho_detection_efficiency, udalski03,  hamadache2009, wyrzykowski2009, sumi2011}), but the general idea is to require that: 
+\begin{enumerate}
+	\item any selected light curve has some number of consecutive data points brighter than some threshold,
+	\item compared to flat or linear light-curve models, a microlensing model best describe the data, as determined by using a $\Delta\chi^2$ test, and
+	\item the microlensing model event parameters have physically reasonable values.
+\end{enumerate}
+
+What would a microlensing event look like in a typical PTF light curve? If the source is an unblended point source and the lens is a foreground, dim object, a microlensing event is fully described by three parameters: the angular impact parameter $u_0$, the peak time of the event $t_0$, and the timescale of the event (Einstein crossing time) $t_E$. In terms of a dimensionless projected distance between the source and lens (in units of Einstein radius), $u$, the amplification factor $A$ and flux $F$ as a function of time can be defined as: 
 \begin{align}
 	u(t) &= \sqrt{u_0^2 + 2\Big(\frac{t-t_0}{t_E}\Big)},\\
 	A(t) &= \frac{u^2 + 2}{u\sqrt{u^2 + 4}},\\
@@ -103,18 +111,9 @@ What would a microlensing event look like in a typical PTF light curve? If the s
 \end{align}
 where $m_0(t)$ is the unperturbed, but possibly time-variable, magnitude of the source.
 
-
 Even in cases of high amplification ($u_0<<1$), a survey may miss or poorly sample an event if $t_E$ is short ($t_E \lesssim\mathrm{days}$), while if $t_E$ is long ($t_E \gtrsim 1~\mathrm{year}$) the event may be confused with other forms of long-duration variability. Figure~\ref{fig:microlensing_sim} illustrates the effect of simulated microlensing events with a fixed $t_E=20~\mathrm{days}$, but different angular impact parameter, $u_0$, on a random well-sampled PTF light curve. 
 
-\section{Microlensing event recovery} \label{sec:event_recovery}
-Microlensing surveys typically use difference image analysis \citep{alard1998} to identify transient events in raw imaging data. The light curves of transient sources are then analyzed and vetted using a variety of selection methods to search for microlensing event candidates and distinguish them from, e.g., variable stars, outbursting systems, and novae. Surveys have approached this process differently (as described in \citealt{ogle_optical_depth, con_idx, alcock2000, macho_detection_efficiency, udalski03,  hamadache2009, wyrzykowski2009, sumi2011}), but the general idea is to require that: 
-\begin{enumerate}
-	\item any selected light curve has some number of consecutive data points brighter than some threshold,
-	\item compared to flat or linear light-curve models, a microlensing model best describe the data, as determined by using a $\Delta\chi^2$ test, and
-	\item the microlensing model event parameters have physically reasonable values.
-\end{enumerate}
-
-Applying this prescription to the PTF data presents obvious challenges. For example, microlensing surveys have relatively uniform time sampling of their survey footprint over an observing season, justifying the first requirement. But it is harder to motivate such a cut on data with significant and irregular gaps. In order to develop the most successful procedure for PTF data, we therefore examine the relative performance of a set of variability indices and of the traditional prescription in selecting simulated microlensing events.
+Applying the above prescription to the PTF data presents obvious challenges. For example, microlensing surveys have relatively uniform time sampling of their survey footprint over an observing season, justifying the first requirement. But it is harder to motivate such a cut on data with significant and irregular gaps. In order to develop the most successful procedure for PTF data, we therefore examine the relative performance of a set of variability indices and of the traditional prescription in selecting simulated microlensing events.
 
 \begin{figure}[h]
 \centering\includegraphics[width=.48\textwidth, trim=130 85 90 65, clip]{fig5.eps}
