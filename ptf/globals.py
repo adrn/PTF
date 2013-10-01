@@ -24,7 +24,7 @@ with open(os.path.join(_base_path, "config"), "r") as f:
         except ValueError:
             config[key] = val
 
-all_fields = np.load(os.path.join(os.path.split(_base_path)[0], "data", "all_fields.npy"))
+all_fields = np.load(os.path.join(os.path.split(_base_path)[0], "data", "cache", "all_fields.npy"))
 data_path = os.path.join(os.path.split(_base_path)[0], "data")
 plots_path = os.path.join(os.path.split(_base_path)[0], "plots")
 
