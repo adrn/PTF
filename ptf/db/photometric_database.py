@@ -28,6 +28,8 @@ try:
 except ImportError:
     logger.warning("galacticutils not found! SDSS search functionality won't work.")
 
+#all_fields = np.load(os.path.join(ptf_params.config["PROJECTPATH"], "data", "all_fields.npy"))
+all_fields = np.load(os.path.join(os.path.split(globals._base_path)[0], "data", "all_fields.npy"))
 match_path = "/scr4/dlevitan/matches"
 pytable_base_string = os.path.join(match_path, "match_{filter.id:02d}_{field.id:06d}_{ccd.id:02d}.pytable")
 filter_map = {"R" : 2, "g" : 1}
@@ -345,7 +347,7 @@ class CCD(object):
                 ra, dec = data[0]["ra"], data[0]["dec"]
             except IndexError:
                 ra, dec = None, None
-        
+
         if barebones:
             return PDBLightCurve(mjd=mjd, mag=mag, error=mag_err, field_id=self.field.id, ccd_id=self.id, source_id=source_id, ra=ra, dec=dec)
         else:
