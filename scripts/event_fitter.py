@@ -121,6 +121,8 @@ def ln_p_t0(t0, mjd, mag, t0_sigma=25.):
 
 def ln_p_tE(tE, tE_sigma=1.3):
     """ Prior on duration of event tE """
+    if tE < 0:
+        return -np.inf
     return -0.5 * (np.log(2.*np.pi*tE_sigma) + (np.log(tE) - np.log(30.))**2 / tE_sigma**2) # Log-normal centered at 30 days
 
 def ln_p_m0(m0, median_mag, mag_rms):
@@ -179,6 +181,7 @@ def plot_priors(light_curve, ln=False):
     plt.savefig("plots/test.png")
 
 def ln_posterior(p, mag, mjd, sigma):
+    #print p, ln_prior(p, mag, mjd), ln_likelihood(p, mag, mjd, sigma)
     return ln_prior(p, mag, mjd) + ln_likelihood(p, mag, mjd, sigma)
 
 def test_ln_prior():
@@ -203,7 +206,7 @@ def test_ln_prior():
     print "Bad tE:", ln_prior([15, 0.3, 50., 0.2], light_curve.mag, light_curve.mjd)
     print "Bad tE:", ln_prior([15, 0.3, 50., 2000.], light_curve.mag, light_curve.mjd)
 
-def fit_model_to_light_curve(light_curve, nwalkers=200, nburn_in=100, nsamples=250):
+def fit_model_to_light_curve(light_curve, nwalkers=200, nburn_in=100, nsamples=250, seed=None):
     """ Fit a microlensing model to a given light curve using Emcee
 
     """
@@ -221,7 +224,7 @@ def fit_model_to_light_curve(light_curve, nwalkers=200, nburn_in=100, nsamples=2
     sampler = emcee.EnsembleSampler(nwalkers, ndim, ln_posterior,
                                     args=[light_curve.mag, light_curve.mjd, light_curve.error],
                                     threads=4)
-    pos, prob, state = sampler.run_mcmc(p0, nburn_in)
+    pos, prob, state = sampler.run_mcmc(p0, nburn_in, rstate0=seed)
 
     sampler.reset()
     pos, prob, state = sampler.run_mcmc(pos, nsamples)
@@ -233,7 +236,7 @@ def fit_model_to_light_curve(light_curve, nwalkers=200, nburn_in=100, nsamples=2
 def make_chain_distribution_figure(light_curve, sampler, title="", filename=None):
     chain = sampler.flatchain
 
-    fig, axes = plt.subplots(2, 2, figsize=(10,14))
+    fig, axes = plt.subplots(2, 2, figsize=(10,12))
     param_to_label = {"m0" : r"$M_0$", "u0" : r"$u_0$", "t0" : r"$t_0$", "tE" : r"$t_E$"}
     params = ["m0", "u0", "t0", "tE"]
 
@@ -298,7 +301,7 @@ def make_chain_distribution_figure(light_curve, sampler, title="", filename=None
 def make_light_curve_figure(light_curve, sampler, filename=None, title="", x_axis_labels=True, y_axis_labels=True, chains=True):
     chain = sampler.flatchain
 
-    fig = plt.figure(figsize=(12,12))
+    fig = plt.figure(figsize=(10,12))
     fig.suptitle(title, fontsize=23)
     gs = gridspec.GridSpec(2, 1, height_ratios=[1,2])
     ax = plt.subplot(gs[1])
@@ -342,6 +345,11 @@ def make_light_curve_figure(light_curve, sampler, filename=None, title="", x_axi
     mean_m0, mean_u0, mean_t0, mean_tE = np.median(chain,axis=0)
     std_m0, std_u0, std_t0, std_tE = np.std(chain,axis=0)
     
+    print("m0 = ", mean_m0, std_m0)
+    print("u0 = ", mean_u0, std_u0)
+    print("tE = ", mean_tE, std_tE)
+    print("t0 = ", mean_t0, std_t0)
+    
     light_curve.mjd -= mean_t0
     zoomed_light_curve = light_curve.slice_mjd(-3.*mean_tE, 3.*mean_tE)
     if len(zoomed_light_curve) == 0:
@@ -355,7 +363,9 @@ def make_light_curve_figure(light_curve, sampler, filename=None, title="", x_axi
     light_curve.plot(ax2)
     ax.set_xlim(-3.*mean_tE, 3.*mean_tE)
     #ax.text(-2.5*mean_tE, np.min(s_light_curve.mag), r"$u_0=${u0:.3f}$\pm${std:.3f}".format(u0=u0, std=std_u0) + "\n" + r"$t_E=${tE:.1f}$\pm${std:.1f} days".format(tE=mean_tE, std=std_tE), fontsize=19)
-    fig.text(0.15, 0.48,
+    
+    if chains:
+        fig.text(0.15, 0.48,
              r"$u_0=${u0:.3f}$\pm${std:.3f}".format(u0=mean_u0, std=std_u0) + 
              "\n" + r"$t_E=${tE:.1f}$\pm${std:.1f} days".format(tE=mean_tE, std=std_tE), fontsize=19)
     
@@ -365,9 +375,10 @@ def make_light_curve_figure(light_curve, sampler, filename=None, title="", x_axi
         ax.set_xlabel(r"time-$t_0$ [days]", fontsize=24)
 
     # Now plot the "best fit" line in red
-    s_light_curve = SimulatedLightCurve(mjd=mjd, error=np.zeros_like(mjd), mag=best_m0)
-    s_light_curve.add_microlensing_event(t0=best_t0, u0=best_u0, tE=best_tE)
-    ax.plot(s_light_curve.mjd-best_t0, s_light_curve.mag, "r-", alpha=0.6, linewidth=2)
+    if chains:
+        s_light_curve = SimulatedLightCurve(mjd=mjd, error=np.zeros_like(mjd), mag=best_m0)
+        s_light_curve.add_microlensing_event(t0=best_t0, u0=best_u0, tE=best_tE)
+        ax.plot(s_light_curve.mjd-best_t0, s_light_curve.mag, "r-", alpha=0.6, linewidth=2)
 
     if y_axis_labels:
         ax2.set_ylabel(r"$R$ (mag)", fontsize=24)
@@ -377,7 +388,9 @@ def make_light_curve_figure(light_curve, sampler, filename=None, title="", x_axi
     #ax_inset.set_xlim(-0.3*tE, 0.3*tE)
     #ax_inset.set_xticklabels([])
     #ax_inset.set_yticklabels([])
-
+    
+    fig.subplots_adjust(hspace=0.1, left=0.12)
+    
     if filename == None:
         return fig, axes
     else:
