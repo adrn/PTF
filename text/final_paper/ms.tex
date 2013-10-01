@@ -129,7 +129,7 @@ where N is the total number of observations.
 
 We modify the definition of $Con$ to be the number of clusters of three or more consecutive observations that are more than $3\sigma$ brighter than the reference magnitude of the source (e.g., for a single microlensing event in an otherwise flat light curve, $Con=1$). This change allows us to use the performance of $Con$ as a proxy for the consecutive-point requirement described above. 
 
-$\eta$, the von Neumann ratio \citep{von_neumann1941}, is the mean square successive difference divided by the sample variance:
+$\eta$, the von Neumann ratio \citep[][also known as the Durbin-Watson statistic]{von_neumann1941}, is the mean square successive difference divided by the sample variance:
 \begin{align}
 	\eta = \frac{\delta^2}{\sigma^2} = \frac{\sum^{N-1}_i(x_{i+1} - x_i)^2/(N-1)}{\sigma^2}.
 \end{align}
