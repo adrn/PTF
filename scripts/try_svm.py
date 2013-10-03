@@ -17,6 +17,7 @@ import astropy.units as u
 
 # Project
 from ptf.globals import all_fields
+from ptf.lightcurve import SimulatedLightCurve
 
 # Create logger
 logger = logging.getLogger(__name__)
@@ -29,8 +30,8 @@ np.random.seed(42)
 
 Ntrials = 100
 Nsources = 100
-features = ['con', 'vonNeumannRatio', 'stetsonJ', 'stetsonK']
-Nfeatures = len(features)
+feature_map = dict(con='con', eta='vonNeumannRatio', j='stetsonJ', k='stetsonK')
+Nfeatures = len(feature_map)
 
 filterID = 2
 fieldID = 110001
@@ -50,10 +51,15 @@ random_sourceIDs = sourceIDs[np.random.randint(len(sourceIDs), size=Nsources)]
 training_data = np.zeros((Ntrials*Nsources,Nfeatures))
 for sourceID in random_sourceIDs:
     d = sourceData.readWhere("matchedSourceID == {0}".format(sourceID))
-    
+    mjd = d['mjd']
+    mag = d['mag']
+    err = d['magErr']
+
     for trial in range(Ntrials):
-        
-        print(d.dtype.names)
+        lc = SimulatedLightCurve(mjd=mjd, mag=mag, error=err)
+        lc.add_microlensing_event()
+        stats = compute_variability_indices(lc, indices=feature_map.keys())
+        print(stats)
         break
     break
 
