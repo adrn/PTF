@@ -18,6 +18,9 @@ import astropy.units as u
 # Project
 from ptf.globals import all_fields
 from ptf.lightcurve import SimulatedLightCurve
+from ptf.analyze import compute_variability_indices
+from ptf.util import pdb_index_name
+pdb_index_name['con'] = 'con'
 
 # Create logger
 logger = logging.getLogger(__name__)
@@ -30,8 +33,8 @@ np.random.seed(42)
 
 Ntrials = 100
 Nsources = 100
-feature_map = dict(con='con', eta='vonNeumannRatio', j='stetsonJ', k='stetsonK')
-Nfeatures = len(feature_map)
+features = ['con', 'eta', 'j', 'k', 'sigma_mu']
+Nfeatures = len(features)
 
 filterID = 2
 fieldID = 110001
@@ -45,11 +48,24 @@ sourceData = chip.getNode('/filter{:02d}/field{:06d}/chip{:02d}/sourcedata'\
 sources = chip.getNode('/filter{:02d}/field{:06d}/chip{:02d}/sources'\
                        .format(filterID, fieldID, chipID))
 
-sourceIDs = sources.readWhere("ngoodobs > 10")["matchedSourceID"]
+goodSources = sources.readWhere("ngoodobs > 10")
+sourceIDs = goodSources["matchedSourceID"]
+all_data = np.zeros((len(sourceIDs),Nfeatures))
+
+for ii,f in enumerate(features):
+    if f == "sigma_mu":
+        pdb_f1,pdb_f2 = pdb_index_name[f]
+        all_data[:,ii] = goodSources[pdb_f1] / goodSources[pdb_f2]
+    else:
+        pdb_f = pdb_index_name[f]
+        all_data[:,ii] = goodSources[pdb_f]
+
+np.save("/home/aprice-whelan/tmp/all_data.npy", all_data)
+
 random_sourceIDs = sourceIDs[np.random.randint(len(sourceIDs), size=Nsources)]
 
-training_data = np.zeros((Ntrials*Nsources,Nfeatures))
-for sourceID in random_sourceIDs:
+training_data = np.zeros((Nsources,Ntrials,Nfeatures))
+for ii,sourceID in enumerate(random_sourceIDs):
     d = sourceData.readWhere("matchedSourceID == {0}".format(sourceID))
     mjd = d['mjd']
     mag = d['mag']
@@ -58,9 +74,9 @@ for sourceID in random_sourceIDs:
     for trial in range(Ntrials):
         lc = SimulatedLightCurve(mjd=mjd, mag=mag, error=err)
         lc.add_microlensing_event()
-        stats = compute_variability_indices(lc, indices=feature_map.keys())
-        print(stats)
-        break
-    break
+        stats = compute_variability_indices(lc, indices=features)
+        training_data[ii, trial, :] = np.array([stats[x] for x in features])
+
+np.save("/home/aprice-whelan/tmp/training_data.npy", training_data)
 
 chip.close()
