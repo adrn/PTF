@@ -16,6 +16,7 @@ config = dict()
 _base_path = os.path.split(__file__)[0]
 
 # Need this for mongodb config
+'''
 with open(os.path.join(_base_path, "config"), "r") as f:
     for line in f.readlines():
         key,val = line.split()
@@ -23,6 +24,7 @@ with open(os.path.join(_base_path, "config"), "r") as f:
             config[key] = int(val)
         except ValueError:
             config[key] = val
+'''
 
 all_fields = np.load(os.path.join(os.path.split(_base_path)[0], "data", "cache", "all_fields.npy"))
 data_path = os.path.join(os.path.split(_base_path)[0], "data")
