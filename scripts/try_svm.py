@@ -25,19 +25,36 @@ lcBaseDir = '/scr2/ptf/variable/matches/'
 indexFile = os.path.join(lcBaseDir, 'index.npy')
 index = np.load(indexFile)
 
-np.random.seed(142)
-idx = np.random.randint(len(all_fields))
+np.random.seed(42)
 
-sys.exit(0)
+Ntrials = 100
+Nsources = 100
+features = ['con', 'vonNeumannRatio', 'stetsonJ', 'stetsonK']
+Nfeatures = len(features)
+
 filterID = 2
-fieldID = all_fields[idx][0]
+fieldID = 110001
 chipID = 1
 
 matchFile = os.path.join(lcBaseDir, 'match_{:02d}_{:06d}_{:02d}.pytable'\
                           .format(filterID, fieldID, chipID))
 chip = tables.openFile(matchFile)
+sourceData = chip.getNode('/filter{:02d}/field{:06d}/chip{:02d}/sourcedata'\
+                         .format(filterID, fieldID, chipID))
+sources = chip.getNode('/filter{:02d}/field{:06d}/chip{:02d}/sources'\
+                       .format(filterID, fieldID, chipID))
 
-sourceTable = chip.getNode('/filter{:02d}/field{:06d}/chip{:02d}/sources'\
-                           .format(filterID, fieldID, chipID))
+sourceIDs = sources.readWhere("ngoodobs > 10")["matchedSourceID"]
+random_sourceIDs = sourceIDs[np.random.randint(len(sourceIDs), size=Nsources)]
 
-print(len(sourceTable))
+training_data = np.zeros((Ntrials*Nsources,Nfeatures))
+for sourceID in random_sourceIDs:
+    d = sourceData.readWhere("matchedSourceID == {0}".format(sourceID))
+    
+    for trial in range(Ntrials):
+        
+        print(d.dtype.names)
+        break
+    break
+
+chip.close()
