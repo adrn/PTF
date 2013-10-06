@@ -31,13 +31,6 @@ except ImportError:
     logger.warning("galacticutils not found! SDSS search functionality "
                    "won't work.")
 
-# Path to npy file containing all field IDs
-#_all_fields = os.path.join(ptf_params.config["PROJECTPATH"], 
-#                           "data", "all_fields.npy")
-_all_fields = os.path.join(os.path.split(_base_path)[0], 
-                           "data", "all_fields.npy")
-all_fields = np.load(_all_fields)
-
 match_path = "/scr4/dlevitan/matches"
 pytable_base_string = os.path.join(match_path, "match_{filter.id:02d}"
                                    "_{field.id:06d}_{ccd.id:02d}.pytable")
