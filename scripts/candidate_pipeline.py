@@ -219,7 +219,8 @@ if __name__ == "__main__":
         field = pdb.Field(field_id, "R")
         logger.info("Field: {}".format(field.id))
 
-        # There is some strangeness to getting the coordinates for a Field -- this just makes it stupidproof
+        # There is some strangeness to getting the coordinates for a Field 
+        # -- this just makes it stupidproof
         try:
             if field.ra == None or field.dec == None:
                 raise AttributeError()
@@ -240,7 +241,8 @@ if __name__ == "__main__":
                     continue
 
         if args.overwrite_lcs:
-            field_collection.update({"_id" : field.id}, {"$set" : {"already_searched" : False}})
+            field_collection.update({"_id" : field.id}, 
+                                    {"$set" : {"already_searched" : False}})
             #light_curve_collection.remove({"field_id" : field.id})
 
             # Only remove light curves that haven't been looked at
@@ -264,7 +266,9 @@ if __name__ == "__main__":
             continue
 
         # Check to see if the selection criteria for this field is already loaded into the database
-        selection_criteria = field_collection.find_one({"_id" : field.id}, fields=["selection_criteria"])["selection_criteria"]
+        selection_criteria = field_collection.find_one({"_id" : field.id}, 
+                                                       fields=["selection_criteria"])
+        selection_criteria = selection_criteria["selection_criteria"]
 
         if args.overwrite or selection_criteria == None:
             logger.info("Selection criteria not available for field.")
@@ -295,8 +299,11 @@ if __name__ == "__main__":
             field_collection.update({"_id" : field.id}, {"$set" : {"selection_criteria" : selection_criteria_document}})
 
         logger.debug("Selection criteria loaded")
-        selection_criteria_document = field_collection.find_one({"_id" : field.id}, fields=["selection_criteria"])["selection_criteria"]["eta"]
-
+        selection_criteria_document = field_collection.find_one({"_id" : field.id}, 
+                                                                fields=["selection_criteria"])
+        selection_criteria_document = selection_criteria_document["selection_criteria"]["eta"]
+        
+        # APW: ok so what is select_candidates doing?
         selected_light_curves = select_candidates(field, selection_criteria_document)
         logger.info("Selected {} light curves.".format(len(selected_light_curves)))
 
