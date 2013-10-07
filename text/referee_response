@@ -11,38 +11,64 @@ Abstract
 "...simple predictions for the microlensing event rate in the PTF footprint over the survey's three years of operations."
 Provide some insight to what simple means.
 
-Response:
+++ Response:
 We have added a clarifying statement referencing the work that this estimate was based on.
 
-Text changes:
+++ Text changes:
 "While these candidates cannot be confirmed, as we lack simultaneous, multi-color photometry of the events, this number is consistent with predictions for the microlensing event rate in the PTF footprint over the survey's three years of operations, as estimated from the model proposed in \citet{han2008}."
 
 1. Introduction
 
 A review of the methodologies in discovering microlensing is missing. The authors need to provide a review of other methods. The treatment on page 4 is not adequate. I would also recommend mentioning event detection algorithms.
 
+++ Response: TODO
+
+++ Text changes:
+
 Otherwise very well written. I would like to see references to a few concepts:
 
 a) "but thanks to advances in CCD technology and the development of dedicated microlensing surveys, a few thousand events are now observed each year"
 Provide a reference or URL
 
+++ Response:
+A URL has been added.
+
 b) "By contrast, high-Galactic-latitude events probe lenses with distances 1 kpc; the Einstein radii, therefore, tend to be larger (&#x223C;milliarcseconds) and may cause detectable astrometric signatures."
 Provide reference
 
+++ Response:
+A reference has been added.
+
 Also I recommend removing the comment about future work from the introduction.
 
+++ Response:
+This comment has been removed.
 
 2. PTF
 
 Are the PTF data publicly available? If not, this has to be stated. Also can the author provide a small dataset. Other authors may want to compare their methodology to this one.  I would personally like to test the proposed method.
 
+++ Response: TODO
+
 The material starting with "What would a microlensing event look like ..." and beyond do not belong in this section and I think should be moved into section 3.
+
+++ Response:
+This block has been moved to section 3.
+
 u_0 is in units of Einstein radius and it is dimensionless.
+
+++ Response:
+Added a clarification of the units.
+
+++ Text changes:
+"In terms of a dimensionless projected distance between the source and lens (in units of Einstein radius)..."
 
 
 3 MICROLENSING EVENT RECOVERY
 
 [Scientific Editor comment: The von Neumann ratio in sec 3.1 is more commonly known as the Durbin-Watson statistic and is extensively used in econometrics. The paper should make this link, and summarize its mathematical properties (cf. Wikipedia and volumes such as `Analysis of Financial Time Series', 3rd ed, R. S. Tsay, 2010). Most relevant, the statistic has known mean and variance under certain assumptions (e.g. evenly spaced data, normal errors), and can thus be used for probabilistic statements.]
+
+++ Response: TODO
 
 "Compared to flat or linear light-curve models, a microlensing model best describe the data, as determined by using a &#x2206;&#x03C7;2 test, and.."
 It is not obvious what a Delta_chi^2 test is at this point.
@@ -52,11 +78,31 @@ Does this mean fitting a Gaussian shape to a microlensing? How is this done? Is 
 
 [Scientific Editor comment:  The astronomers' common use of delta chi^2 for model selection in nonlinear regression is nonstandard in statistics.  I assume it is meant to be a simplified likelihood ratio test, but this too is inadequate when the two models under consideration have different numbers of parameters.  The AIC or BIC (Bayesian Information Criterion) in maximum likelihood estimation is preferred (see Wikipedia).  In particular: What is in the denominator of the chi^2-like statistic?  If it is measurement errors, then the errors must account for the full variance about the model, and the errors must be normally distributed (I see outliers in Fig 5).]
 
+++ Response:
+In response to the above point from the referee, and the related point from the editor, we have added some more detail about the exact procedure. 
+
+++ Text changes:
+"We add one more index, $\Delta \chi^2$, the difference in $\chi^2$ between fitting a Gaussian model and fitting a linear model to a light curve. In detail, we use a Levenberg-Marquardt optimizer to perform a least-squares fit with each of these models to the light curves and then compute $\Delta\chi^2=\chi_{linear} - \chi_{gaussian}$. Out tests with $\Delta \chi^2$ below compare the distribution of values over light curves on the same chip --- because of this, we neglect including an AIC or BIC correction to make this a proper likelihood test as the number of data points and number of model parameters are constant. For the Gaussian fit, the optimizer is initialized with a standard-deviation of 10 days, centered on the brightest data point. This is a standard statistical test used by microlensing surveys, and allows us to compare the relative performance of the (slightly modified) \cite{shin2009} indices and of this approach."
+
 I do not understand figure 5. First the y axes need labels.  Second the parameters do not have time dependency. How do they depend on time? Are you introducing a window? If so, this should be explained.
+
+++ Response:
+We have updated the figure to include y axes labels. The panels in this figure are light curves (magnitude vs. time) selected from a specific PTF field which have maximum or minimum values for each statistic. The idea is to demonstrate the type of variability that each index is most sensitive to. We have also updated the figure caption to make this more clear.
+
+++ Text changes:
+"Light curves selected from PTF field 100101 with maximally outlying values for each variability index. For $\eta$ and $K$, this corresponds to the light curve with the \emph{minimum} value of the index over the entire field. For the other indices, these are the light curves with the \emph{maximum} value of the relevant index over the field. These light curves represent the type of variability that each index is most sensitive to."
 
 I would have prefered a multidimensional classification using all the parameters and optimize False Positives and efficiency. Many off-the-shelf methods like Support Vector Machines and Random Forests can be used very easily. I suggest the authors try one of those approaches. It is very simple to use. Software such as RapidMiner can be set and run within minutes.
 
+++ Response: TODO
+
 Figure 7-9. What is the "normalized" input distribution?
+
+++ Response:
+These are simply the distributions for _all_ simulated light curves that are fed in to the detection algorithm. We have clarified this in the figure caption.
+
+++ Text changes:
+"{\it Top:} A randomly selected light curve from PTF field 4327. Note the sampling pattern. {\it Bottom:} Detection efficiency $\varepsilon$ for $\eta$, $\Delta\chi^2$, and $J$, as a function of the simulated microlensing event parameters $t_E$, $u_0$, and $m_0$ (the event timescale, impact parameter, and `quiescent' source magnitude, respectively). Black (dashed) lines show the distributions for all light curves (normalized, so scale of y-axis is arbitrary), red (solid) lines show the recovered distributions."
 
 
 4. SEARCHING FOR EVENTS ...
@@ -65,9 +111,16 @@ What is the number of light-curves selected after step#2? Is it consistent with 
 
 After step#5, the method identifies 2377 candidates which is 0.0002%. If we assume most of them are FPs as it is shown in the following section, then it seems most of the light-curves are rejected at step#3. I suspect that the number of light-curves with N>10 is much smaller than 10^9.   This needs to be explained better: please provide the number of light-curves at each step.
 
-4.1 and 4.2 are well written and clear.
+++ Response:
+We have added the percentage of light curves remaining after each step, and fixed a mistake in the order of filtering operations. The percentage refers to the number remaining after each successive step, so it's 0.1%, then 10% of 0.1%, and etc.
 
+++ Text changes:
+(see bulleted list)
+
+4.1 and 4.2 are well written and clear.
 
 5. CONCLUSIONS
 
 My only concern is that the authors claim they have characterize the detection efficiency. In my opinion they have only characterize the detection efficiency of only a part of the process. I would like to see an addition that describes the detection efficiency of all steps.
+
+++ Response: TODO
