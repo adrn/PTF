@@ -196,7 +196,7 @@ def maximum_outlier_indices_plot(field_id):
     pdb_indices = ["bestVonNeumannRatio", "bestChiSQ", "bestStetsonJ", "bestStetsonK", ["bestMagRMS", "bestMedianMag"], "bestCon"]
     field = pdb.Field(field_id, "R")
 
-    fig, axes = plt.subplots(len(indices), 1, sharex=True, figsize=(18,24))
+    fig, axes = plt.subplots(len(indices), 1, sharex=True, figsize=(15,20))
 
     for ii, (index, pdb_index) in enumerate(zip(indices, pdb_indices)):
         all_outlier_sources = []
@@ -262,18 +262,24 @@ def maximum_outlier_indices_plot(field_id):
         axes[ii].set_title(pu.index_to_label(index), fontsize=28)
         #axes[ii].set_xlim(best_outlier_lightcurve.mjd.min()-2, best_outlier_lightcurve.mjd.max()+2)
         #axes[ii, 1].set_xlim(55350, 55600)
-        axes[ii].set_ylabel("$R$ [mag]")
+        axes[ii].set_ylabel("$R$ [mag]", fontsize=26)
+        axes[ii].set_yticks(axes[ii].get_yticks()[1:-1])
+        for ticklabel in axes[ii].get_yticklabels():
+            ticklabel.set_fontsize(22)
 
     for ax in fig.axes[:-1]:
         ax.xaxis.set_visible(False)
         #ax.yaxis.set_visible(False)
 
     #fig.axes[-1].yaxis.set_visible(False)
+    ticklbls = []
     for ticklabel in fig.axes[-1].get_xticklabels():
         ticklabel.set_fontsize(22)
+        ticklbls.append(int(ticklabel.get_text()))
+    fig.axes[-1].set_xticklabels([str(x-min(ticklbls)) for x in ticklbls])
 
-    axes[-1].set_xlabel("MJD", fontsize=26)
-    fig.subplots_adjust(hspace=0.2, top=0.95, bottom=0.08)
+    axes[-1].set_xlabel("time [days]", fontsize=26)
+    fig.subplots_adjust(hspace=0.0, top=0.95, bottom=0.08)
     fig.savefig(os.path.join(pg.plots_path, "paper_figures", "max_outlier_light_curves.pdf".format(field_id)))#, bbox_inches="tight")
 
 def intersect_light_curves(light_curve1, light_curve2):
