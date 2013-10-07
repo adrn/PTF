@@ -236,14 +236,15 @@ To identify candidate microlensing events in the $1.1\times10^9$ light curves wi
 %We apply the 1\% FPR cut to the 2097 PTF fields ($\sim$15,224 deg$^2$) with $>$10 $R$-band observations using the variability index $\eta$. Our procedure is as follows:
 \begin{enumerate}
 	\item select a field from the 2097 fields with $>$10 good $R$-band observations and run Monte Carlo simulations to compute the 1\% FPR limiting values for $\eta$, $\Delta \chi^2$, and $J$ for that field;
-	\item compute $\eta$ for all the light curves in the field, and select the light curves that pass the quality cut described in Section~\ref{sec:detection_eff} and the FPR cut determined from the Monte Carlo simulations;
+	\item compute $\eta$ for all the light curves in the field, and select the light curves that pass the quality cut described in Section~\ref{sec:detection_eff} ($\sim$10\%) and the FPR cut determined from the Monte Carlo simulations ($\sim$0.1-0.5\%);
+	\item for fields with SDSS coverage, we use Data Release 9 photometry \citep{dr9paper} to remove sources typed as Galaxy or QSO (using \texttt{objc\_type}\footnote{http://www.sdss3.org/dr9/algorithms/classify.php}) and flag candidate quasars \citep[using the cuts described in][]{richards02} ($\sim$10\%);
 	\item fit a microlensing event model and subtract the model, then recompute $\eta$ for all the selected light curves;
-	\item reject the light curves for which the new value of $\eta$ still passes the cut\footnote{These are probably periodic variables.};
+	\item reject the light curves for which the new value of $\eta$ still passes the cut\footnote{These are probably periodic variables.} ($\sim$5-10\%);
 	\item retain any remaining light curves for further inspection.
 \end{enumerate}
 % Turn this into a table, with number of objects left over after each cut?
 
-This procedure identifies 2377 candidates from among the initial sample of $1.1\times10^9$ light curves. We search SIMBAD\footnote{This research has made use of the SIMBAD database, operated at CDS, Strasbourg, France.} and remove any candidate among these with a known extragalactic counterpart within 10\asec. For those in the SDSS footprint, we use Data Release 7 photometry \citep{DR7paper} to identify candidate quasars \citep[using the cuts described in][]{richards02} and examine the SDSS images \citep{sdss_images} to remove extended objects. Removing extragalactic objects in this manner from our candidate list reduces contamination by, e.g., supernovae. 
+This procedure identifies 2377 candidates from among the initial sample of $1.1\times10^9$ light curves. We search SIMBAD\footnote{This research has made use of the SIMBAD database, operated at CDS, Strasbourg, France.} and remove any candidate among these with a known extragalactic counterpart within 10\asec. For those in the SDSS footprint, we examine the SDSS images \citep{sdss_images} to remove extended objects. Removing extragalactic objects in this manner from our candidate list reduces contamination by, e.g., supernovae. 
 
 \begin{figure*}[htb]
 \centering
@@ -435,21 +436,23 @@ This research made use of Astropy (\url{http://www.astropy.org}), a community-de
 
 %\bigskip
 %\setlength{\baselineskip}{0.6\baselineskip}
-%\bibliography{references_5}
 %\bibliography{references_3}
 %\setlength{\baselineskip}{1.667\baselineskip}
 
 \begin{thebibliography}{53}
 \expandafter\ifx\csname natexlab\endcsname\relax\def\natexlab#1{#1}\fi
 
-\bibitem[{{Abazajian} {et~al.}(2009)}]{DR7paper}
-{Abazajian}, K.~N., {et~al.} 2009, \apjs, 182, 543
-
 \bibitem[{{Ag{\"u}eros} {et~al.}(2011){Ag{\"u}eros}, {Covey}, {Lemonias},
   {Law}, {Kraus}, {Batalha}, {Bloom}, {Cenko}, {Kasliwal}, {Kulkarni},
   {Nugent}, {Ofek}, {Poznanski}, \& {Quimby}}]{agueros11}
 {Ag{\"u}eros}, M.~A., {Covey}, K.~R., {Lemonias}, J.~J., {et~al.} 2011, \apj,
   740, 110
+  
+\bibitem[{{Ahn} {et~al.}(2012){Ahn}, {Alexandroff}, {Allende Prieto},
+  {Anderson}, {Anderton}, {Andrews}, {Aubourg}, {Bailey}, {Balbinot}, {Barnes},
+  \& et~al.}]{dr9paper}
+{Ahn}, C.~P., {Alexandroff}, R., {Allende Prieto}, C., {et~al.} 2012, \apjs,
+  203, 21
 
 \bibitem[{{Alard} \& {Lupton}(1998)}]{alard1998}
 {Alard}, C., \& {Lupton}, R.~H. 1998, \apj, 503, 325
