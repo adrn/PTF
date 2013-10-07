@@ -262,12 +262,13 @@ def maximum_outlier_indices_plot(field_id):
         axes[ii].set_title(pu.index_to_label(index), fontsize=28)
         #axes[ii].set_xlim(best_outlier_lightcurve.mjd.min()-2, best_outlier_lightcurve.mjd.max()+2)
         #axes[ii, 1].set_xlim(55350, 55600)
+        axes[ii].set_ylabel("$R$ [mag]")
 
     for ax in fig.axes[:-1]:
         ax.xaxis.set_visible(False)
-        ax.yaxis.set_visible(False)
+        #ax.yaxis.set_visible(False)
 
-    fig.axes[-1].yaxis.set_visible(False)
+    #fig.axes[-1].yaxis.set_visible(False)
     for ticklabel in fig.axes[-1].get_xticklabels():
         ticklabel.set_fontsize(22)
 
