@@ -181,27 +181,28 @@ if __name__ == "__main__":
     from argparse import ArgumentParser
 
     parser = ArgumentParser(description="")
-    parser.add_argument("-v", "--verbose", action="store_true", dest="verbose", default=False,
-                    help="Be chatty! (default = False)")
-    parser.add_argument("-q", "--quiet", action="store_true", dest="quiet", default=False,
-                    help="Be quiet! (default = False)")
-
-    parser.add_argument("-o", "--overwrite", action="store_true", dest="overwrite", default=False,
-                    help="Overwrite any existing / cached files")
-    parser.add_argument("--overwrite-light-curves", action="store_true", dest="overwrite_lcs", default=False,
-                    help="Keep the selection criteria, just redo the search.")
-
-    parser.add_argument("-a", "--all", dest="all", default=False, action="store_true",
-                    help="Run on all fields.")
-    parser.add_argument("-f", "--field-id", dest="field_id", default=[], nargs="+", type=int,
-                    help="The PTF field IDs to run on")
+    parser.add_argument("-v","--verbose", action="store_true", dest="verbose",
+                        default=False, help="Be chatty! (default = False)")
+    parser.add_argument("-q", "--quiet", action="store_true", dest="quiet", 
+                        default=False, help="Be quiet! (default = False)")
+    parser.add_argument("-o", "--overwrite", action="store_true", 
+                        dest="overwrite", default=False, 
+                        help="Overwrite any existing / cached files")
+    parser.add_argument("--overwrite-light-curves", action="store_true", 
+                        dest="overwrite_lcs", default=False,
+                        help="Keep the selection criteria, just redo the search.")
+    parser.add_argument("-a", "--all", dest="all", default=False, 
+                        action="store_true", help="Run on all fields.")
+    parser.add_argument("-f", "--field-id", dest="field_id", default=[], 
+                        nargs="+",type=int,help="The PTF field IDs to run on")
     parser.add_argument("-r", "--field-range", dest="field_range", default=[],
-                    help="A range of PTF field IDs to run on")
-
-    parser.add_argument("--num-light-curves", dest="num_light_curves", default=100, type=int,
-                    help="Number of light curves to select from each CCD.")
-    parser.add_argument("--num-simulations", dest="num_simulations", default=100, type=int,
-                    help="Number of simulations per light curve.")
+                        help="A range of PTF field IDs to run on")
+    parser.add_argument("--num-light-curves", dest="num_light_curves", 
+                        default=100, type=int, help="Number of light curves" 
+                        "to select from each CCD.")
+    parser.add_argument("--num-simulations", dest="num_simulations", 
+                        default=100, type=int,
+                        help="Number of simulations per light curve.")
 
     args = parser.parse_args()
 
@@ -224,15 +225,20 @@ if __name__ == "__main__":
 
     if args.all:
         all_fields = np.load("data/survey_coverage/fields_observations_R.npy")
-        field_ids = all_fields[all_fields["num_exposures"] > min_number_of_good_observations]["field"]
-        logger.info("Chose to run on all fields with >{} observations = {} fields.".format(min_number_of_good_observations, len(field_ids)))
+        field_ids = all_fields[all_fields["num_exposures"] > \
+                        min_number_of_good_observations]["field"]
+        logger.info("Chose to run on all fields with >{} observations "
+                    "= {} fields.".format(min_number_of_good_observations, 
+                                          len(field_ids)))
 
     if args.field_range:
         min_field_id, max_field_id = map(int, args.field_range.split("-"))
 
         all_fields = np.load("data/survey_coverage/fields_observations_R.npy")
-        field_ids = all_fields[all_fields["num_exposures"] > min_number_of_good_observations]["field"]
-        field_ids = field_ids[(field_ids >= min_field_id) & (field_ids < max_field_id)]
+        field_ids = all_fields[all_fields["num_exposures"] > \
+                        min_number_of_good_observations]["field"]
+        field_ids = field_ids[(field_ids >= min_field_id) & \
+                        (field_ids < max_field_id)]
 
     for field_id in sorted(field_ids):
         # Skip field 101001 because the data hasn't been reduced by the PTF pipeline?
@@ -326,8 +332,11 @@ if __name__ == "__main__":
         selection_criteria_document = selection_criteria_document["selection_criteria"]["eta"]
         
         # APW: ok so what is select_candidates doing?
-        selected_light_curves = select_candidates(field, selection_criteria_document)
-        logger.info("Selected {} light curves.".format(len(selected_light_curves)))
+        selected_light_curves = select_candidates(field,
+                                                  selection_criteria_document)
+        logger.info("Selected {} light curves."\
+                     .format(len(selected_light_curves)))
 
-        save_candidates_to_mongodb(selected_light_curves, light_curve_collection)
+        save_candidates_to_mongodb(selected_light_curves, 
+                                   light_curve_collection)
         field_collection.update({"_id" : field.id}, {"$set" : {"already_searched" : True}})
