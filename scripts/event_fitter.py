@@ -37,7 +37,6 @@ ch.setFormatter(formatter)
 logger.addHandler(ch)
 
 # Third-party
-from apwlib.globals import greenText, yellowText, redText
 import numpy as np
 np.seterr(invalid="ignore")
 import emcee
