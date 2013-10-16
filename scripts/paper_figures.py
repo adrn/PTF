@@ -250,11 +250,11 @@ def maximum_outlier_indices_plot(field_id):
                 best_outlier_source = all_outlier_sources[idx_vals.argmax()]
                 best_outlier_lightcurve = all_ccds[idx_vals.argmax()].light_curve(best_outlier_source["matchedSourceID"], clean=clean, barebones=True)
 
-            sig,mn = np.std(best_outlier_lightcurve.mag), np.median(best_outlier_lightcurve.mag)
+            sig,md = np.std(best_outlier_lightcurve.mag), np.median(best_outlier_lightcurve.mag)
             ix = (best_outlier_lightcurve.mag < (md+8*sig)) & (best_outlier_lightcurve.mag > (md-8*sig))
-            best_outlier_lightcurve = PTFLightCurve(best_outlier_lightcurve.mjd, 
-                                                    best_outlier_lightcurve.mag,
-                                                    best_outlier_lightcurve.error)
+            best_outlier_lightcurve = PTFLightCurve(best_outlier_lightcurve.mjd[ix], 
+                                                    best_outlier_lightcurve.mag[ix],
+                                                    best_outlier_lightcurve.error[ix])
             try:
                 best_outlier_lightcurve.plot(axes[ii], ms=4)
                 break
@@ -272,7 +272,10 @@ def maximum_outlier_indices_plot(field_id):
         for ticklabel in axes[ii].get_yticklabels():
             ticklabel.set_fontsize(22)
         
-        axes[ii].text(55900, yticks[0], "{0}({1})".format(min_max[index], pu.index_to_label(index)), fontsize=30)
+        bbox_props = dict(boxstyle="round,pad=0.3", fc="white", ec="k", lw=1)
+        axes[ii].text(55975, yticks[2], "{0}({1})".format(min_max[index], pu.index_to_label(index)), 
+                      fontsize=30,
+                      bbox=bbox_props)
 
     for ax in fig.axes[:-1]:
         ax.xaxis.set_visible(False)
@@ -287,7 +290,7 @@ def maximum_outlier_indices_plot(field_id):
 
     axes[-1].set_xlabel("time [days]", fontsize=26)
     fig.subplots_adjust(hspace=0.0, top=0.95, bottom=0.08)
-    fig.savefig(os.path.join(pg.plots_path, "paper_figures", "max_outlier_light_curves.pdf".format(field_id)))#, bbox_inches="tight")
+    fig.savefig(os.path.join(pg.plots_path, "paper_figures", "max_outlier_light_curves{0}.pdf".format(field_id)))#, bbox_inches="tight")
 
 def intersect_light_curves(light_curve1, light_curve2):
     """ Returns two light curves that have the same time measurements """
@@ -1048,7 +1051,7 @@ if __name__ == "__main__":
 
     #make_survey_sampling_figure(10)
     #microlensing_event_sim()
-    maximum_outlier_indices_plot(100101)
+    maximum_outlier_indices_plot(3756)
     #variability_indices_distributions()
     #num_observations_distribution()
     #num_observations_distribution_90deg()
