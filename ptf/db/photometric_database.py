@@ -31,7 +31,7 @@ except ImportError:
     logger.warning("galacticutils not found! SDSS search functionality "
                    "won't work.")
 
-match_path = "/scr4/dlevitan/matches"
+match_path = "/scr2/ptf/variable/matches/"
 pytable_base_string = os.path.join(match_path, "match_{filter.id:02d}"
                                    "_{field.id:06d}_{ccd.id:02d}.pytable")
 filter_map = {"R" : 2, "g" : 1}
@@ -89,7 +89,6 @@ def quality_cut(sourcedata, source_id=None):
     y_cut1, y_cut2 = ccd_edge_cutoff, ccd_size[1] - ccd_edge_cutoff
 
     # TODO: Do a robust test to figure out what is faster: many constraints in 'where', or doing it with numpy
-
     if source_id == None:
         where_string = ""
     else:
@@ -105,9 +104,10 @@ def quality_cut(sourcedata, source_id=None):
 
     # Saturation limit, 14.3, based on email conversation with David Levitan
     # UPDATE: I NO LONGER CUT ON SATURATION LIMIT (data["mag"] > 14.3) &
-    cut_data = data[(data["x_image"] > 15) & (data["x_image"] < 2033) & \
-                    (data["y_image"] > 15) & (data["y_image"] < 4081) & \
-                    (data["relPhotFlags"] < 4) & \
+    #(data["x_image"] > 15) & (data["x_image"] < 2033) & \
+    #(data["y_image"] > 15) & (data["y_image"] < 4081) & \
+                    
+    cut_data = data[(data["relPhotFlags"] < 4) & \
                     (data["mag"] < 21) & \
                     ((data["sextractorFlags"] & 251) == 0) & \
                     ((data["ipacFlags"] & 6077) == 0) & \
