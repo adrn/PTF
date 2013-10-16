@@ -21,9 +21,8 @@ We have added a clarifying statement referencing the work that this estimate was
 
 A review of the methodologies in discovering microlensing is missing. The authors need to provide a review of other methods. The treatment on page 4 is not adequate. I would also recommend mentioning event detection algorithms.
 
-++ Response: TODO
-
-++ Text changes:
+++ Response: 
+A brief discussion of other methodology is included in the beginning of section 3, with references to many of the survey papers. Unfortunately, they do not include much detail about the individual methods. We have heard through contacting individuals that the methods typically apply a variety of filters to the data to eliminate variable sources, then use some algorithm to fit a point-source, point-lens model to the remaining light curves. The details after this step are only vaguely described in the papers cited on page 4. 
 
 Otherwise very well written. I would like to see references to a few concepts:
 
@@ -48,7 +47,8 @@ This comment has been removed.
 
 Are the PTF data publicly available? If not, this has to be stated. Also can the author provide a small dataset. Other authors may want to compare their methodology to this one.  I would personally like to test the proposed method.
 
-++ Response: TODO
+++ Response: 
+The PTF data is not presently publicly available, and we have added a ... TODO
 
 The material starting with "What would a microlensing event look like ..." and beyond do not belong in this section and I think should be moved into section 3.
 
@@ -68,7 +68,8 @@ Added a clarification of the units.
 
 [Scientific Editor comment: The von Neumann ratio in sec 3.1 is more commonly known as the Durbin-Watson statistic and is extensively used in econometrics. The paper should make this link, and summarize its mathematical properties (cf. Wikipedia and volumes such as `Analysis of Financial Time Series', 3rd ed, R. S. Tsay, 2010). Most relevant, the statistic has known mean and variance under certain assumptions (e.g. evenly spaced data, normal errors), and can thus be used for probabilistic statements.]
 
-++ Response: TODO
+++ Response: 
+We have added a note relating the von Neumann ratio to the Durbin-Watson statistic and added a reference to the paper by Durbin and Watson. 
 
 "Compared to flat or linear light-curve models, a microlensing model best describe the data, as determined by using a &#x2206;&#x03C7;2 test, and.."
 It is not obvious what a Delta_chi^2 test is at this point.
@@ -94,7 +95,8 @@ We have updated the figure to include y axes labels. The panels in this figure a
 
 I would have prefered a multidimensional classification using all the parameters and optimize False Positives and efficiency. Many off-the-shelf methods like Support Vector Machines and Random Forests can be used very easily. I suggest the authors try one of those approaches. It is very simple to use. Software such as RapidMiner can be set and run within minutes.
 
-++ Response: TODO
+++ Response:
+We agree that this would be a worthwile and extremely valuable project, however is outside of the scope of this study. Josh Bloom et al. are working on classifying all PTF light curves using a highly tuned random forest classification network, ... TODO
 
 Figure 7-9. What is the "normalized" input distribution?
 
@@ -123,4 +125,5 @@ We have added the percentage of light curves remaining after each step, and fixe
 
 My only concern is that the authors claim they have characterize the detection efficiency. In my opinion they have only characterize the detection efficiency of only a part of the process. I would like to see an addition that describes the detection efficiency of all steps.
 
-++ Response: TODO
+++ Response: 
+TODO
