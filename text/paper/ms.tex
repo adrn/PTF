@@ -129,7 +129,7 @@ where N is the total number of observations.
 
 We modify the definition of $Con$ to be the number of clusters of three or more consecutive observations that are more than $3\sigma$ brighter than the reference magnitude of the source (e.g., for a single microlensing event in an otherwise flat light curve, $Con=1$). This change allows us to use the performance of $Con$ as a proxy for the consecutive-point requirement described above. 
 
-$\eta$, the von Neumann ratio \citep[][also known as the Durbin-Watson statistic]{von_neumann1941}, is the mean square successive difference divided by the sample variance:
+$\eta$, the von Neumann ratio \citep[][also known as the Durbin-Watson statistic]{von_neumann1941, durbin50}, is the mean square successive difference divided by the sample variance:
 \begin{align}
 	\eta = \frac{\delta^2}{\sigma^2} = \frac{\sum^{N-1}_i(x_{i+1} - x_i)^2/(N-1)}{\sigma^2}.
 \end{align}
@@ -439,7 +439,7 @@ This research made use of Astropy (\url{http://www.astropy.org}), a community-de
 %\bibliography{references_3}
 %\setlength{\baselineskip}{1.667\baselineskip}
 
-\begin{thebibliography}{53}
+\begin{thebibliography}{54}
 \expandafter\ifx\csname natexlab\endcsname\relax\def\natexlab#1{#1}\fi
 
 \bibitem[{{Ag{\"u}eros} {et~al.}(2011){Ag{\"u}eros}, {Covey}, {Lemonias},
@@ -524,6 +524,11 @@ This research made use of Astropy (\url{http://www.astropy.org}), a community-de
 
 \bibitem[{{Di Stefano}(2008)}]{mesolensing}
 {Di Stefano}, R. 2008, \apj, 684, 46
+
+\bibitem[Durbin \& Watson(1950)]{durbin50}
+J.~Durbin and G.~S. Watson.
+\newblock Testing for serial correlation in least squares regression: I.
+\newblock {\em Biometrika}, 37(3/4):pp. 409--428, 1950.
 
 \bibitem[{{Foreman-Mackey} {et~al.}(2012){Foreman-Mackey}, {Hogg}, {Lang}, \&
   {Goodman}}]{dfm}
