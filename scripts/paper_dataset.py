@@ -9,13 +9,14 @@ __author__ = "adrn <adrn@astro.columbia.edu>"
 import os, sys
 import logging
 import random
+import cPickle as pickle
 
 # Third-party
 import numpy as np
 
 # Project
 import ptf.db.photometric_database as pdb
-from ptf.globals import all_fields
+from ptf.globals import all_fields, data_path
 
 np.random.seed(42)
 Nfields = len(all_fields)
@@ -29,27 +30,25 @@ field_ccd = dict()
 while Nselected < Nlightcurves:
     field_row = all_fields[np.random.randint(Nfields)]
     field_id = field_row['id']
-    ccd_id = random.choice(ccd_ids)
-
-    print(field_id, ccd_id)
-
-    try:
-        ccd = pdb.CCD(ccd_id, field_id, 'R')
-    except ValueError:
+    
+    field = pdb.Field(field_id, 'R')
+    if len(field.ccds) == 0:
         continue
 
-    try:
-        field_ccd[field_id]
-    except KeyError:
-        field_ccd[field_id] = dict()
-
-    field = field_ccd[field_id]
+    ccd = random.choice(field.ccds.values())
 
     try:
-        field[ccd_id]
+        field_ccd[field.id]
     except KeyError:
-        field[ccd_id] = 0
+        field_ccd[field.id] = dict()
 
-    field_ccd[field_id][ccd_id] += 1
-    Nlightcurves += 1
-    sys.exit(0)    
+    try:
+        field_ccd[field_id][ccd.id]
+    except KeyError:
+        field_ccd[field_id][ccd.id] = 0
+
+    field_ccd[field.id][ccd.id] += 1
+    Nselected += 1
+
+with open(os.path.join(data_path, "publish_field_ccds.pickle"), 'w') as f:
+    pickle.dump(field_ccd, f)
