@@ -250,6 +250,11 @@ def maximum_outlier_indices_plot(field_id):
                 best_outlier_source = all_outlier_sources[idx_vals.argmax()]
                 best_outlier_lightcurve = all_ccds[idx_vals.argmax()].light_curve(best_outlier_source["matchedSourceID"], clean=clean, barebones=True)
 
+            sig,mn = np.std(best_outlier_lightcurve.mag), np.median(best_outlier_lightcurve.mag)
+            ix = (best_outlier_lightcurve.mag < (md+8*sig)) & (best_outlier_lightcurve.mag > (md-8*sig))
+            best_outlier_lightcurve = PTFLightCurve(best_outlier_lightcurve.mjd, 
+                                                    best_outlier_lightcurve.mag,
+                                                    best_outlier_lightcurve.error)
             try:
                 best_outlier_lightcurve.plot(axes[ii], ms=4)
                 break
