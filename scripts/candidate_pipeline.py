@@ -23,12 +23,6 @@ warnings.simplefilter("ignore")
 # Third-party
 import numpy as np
 import scipy.optimize as so
-try:
-    from apwlib.globals import greenText, yellowText, redText
-except ImportError:
-    raise ImportError("apwlib not found! \nDo: 'git clone "
-        "git@github.com:adrn/apwlib.git' and run 'python setup.py "
-        "install' to install.")
 
 # Project
 import ptf.db.photometric_database as pdb
@@ -52,9 +46,14 @@ def select_candidates(field, selection_criteria, num_fit_attempts=10):
 
     light_curves = []
     for ccd in field.ccds.values():
-        logger.info(greenText("Starting with CCD {}".format(ccd.id)))
+        logger.info("Starting with CCD {}".format(ccd.id))
         chip = ccd.read()
-
+        ####### APW @ MDM
+        #print("Total:", len(chip.sources.read(field="matchedSourceID")))
+        #cdtn = "(ngoodobs > 10) " #& ((ngoodobs/nobs) > 0.5)"
+        #print("Condition:", len(chip.sources.readWhere(cdtn, field="matchedSourceID")))
+        #continue
+        ########################
         cdtn = ("(ngoodobs > {}) & (vonNeumannRatio > 0.0) & "
                 "(vonNeumannRatio < {}) & ((ngoodobs/nobs) > 0.5)")
         cdtn = cdtn.format(min_number_of_good_observations, eta_cut)
@@ -62,7 +61,6 @@ def select_candidates(field, selection_criteria, num_fit_attempts=10):
 
         logger.info("\tSelected {} pre-candidates from PDB"\
                     .format(len(source_ids)))
-
         for source_id in source_ids:
             # APW: TODO -- this is still the biggest time hog!!! It turns 
             #   out it's still faster than reading the whole thing into 
@@ -72,7 +70,8 @@ def select_candidates(field, selection_criteria, num_fit_attempts=10):
 
             # If light curve doesn't have enough clean observations, skip it
             if light_curve != None and \
-                len(light_curve) < min_number_of_good_observations: continue
+                len(light_curve) < min_number_of_good_observations: 
+                continue
 
             # Compute the variability indices for the cleaned light curve
             try:
@@ -99,7 +98,7 @@ def select_candidates(field, selection_criteria, num_fit_attempts=10):
             qso_status = richards_qso(sdss_colors)
             if sdss_colors != None and qso_status:
                 light_curve.tags.append("qso")
-
+            
             candidate_status = pa.iscandidate(light_curve, 
                                               lower_eta_cut=eta_cut)
 
@@ -291,7 +290,7 @@ if __name__ == "__main__":
         field_doc = field_collection.find_one({"_id" : field.id}, fields=["already_searched"])
         if field_doc["already_searched"]:
             logger.info("Field already searched and candidates added to candidate database!")
-            continue
+            # APW: continue
 
         # Check to see if the selection criteria for this field is already loaded into the database
         selection_criteria = field_collection.find_one({"_id" : field.id}, 
@@ -322,9 +321,8 @@ if __name__ == "__main__":
                 selection_criteria_document[index] = dict()
                 selection_criteria_document[index] = selection_criteria[index]
 
-            #selection_criteria_document["upper"] = selection_criteria["eta"]["upper"]
-            #selection_criteria_document["lower"] = selection_criteria["eta"]["lower"]
-            field_collection.update({"_id" : field.id}, {"$set" : {"selection_criteria" : selection_criteria_document}})
+            field_collection.update({"_id" : field.id}, 
+                                    {"$set" : {"selection_criteria" : selection_criteria_document}})
 
         logger.debug("Selection criteria loaded")
         selection_criteria_document = field_collection.find_one({"_id" : field.id}, 
