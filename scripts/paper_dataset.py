@@ -22,9 +22,8 @@ from ptf.globals import all_fields, data_path
 np.random.seed(42)
 dict_file = os.path.join(data_path, "publish_field_ccds.pickle")
 
-def make_lookup_dict(Nlightcurves=100000):
+def make_lookup_dict(Nlightcurves=10000):
     Nfields = len(all_fields)
-    Nlightcurves = 100000
     Nselected = 0
 
     ccd_ids = range(13)
@@ -71,6 +70,8 @@ def random_light_curves(ccd, N):
         if len(lcs) >= N:
             return lcs
 
+    return []
+
 def store_light_curves():
     field_ccd = fnunpickle(dict_file)
 
@@ -102,7 +103,7 @@ def store_light_curves():
                 if data is None:
                     data = np.array([f, c, s, lc.mjd, lc.mag, lc.error])
                 else:
-                    data = np.hstack((data, np.array([f, c, s, lc.mjd, lc.mag, lc.error]))
+                    data = np.hstack((data, np.array([f, c, s, lc.mjd, lc.mag, lc.error])))
 
             print(data.shape)
             sys.exit(0)
@@ -112,6 +113,6 @@ def store_light_curves():
 
 if __name__ == "__main__":
     if not os.path.exists(dict_file):
-        make_lookup_dict(Nlightcurves=100000)
+        make_lookup_dict(Nlightcurves=10000)
 
     store_light_curves()
