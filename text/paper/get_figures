@@ -1,0 +1,23 @@
+curl http://www.astro.caltech.edu/~aprice-whelan/ptf/plots/survey_coverage/R_coverage.pdf > figures/R_coverage.pdf
+curl http://www.astro.caltech.edu/~aprice-whelan/ptf/plots/sampling_figure.pdf > figures/sampling_figure.pdf
+curl http://www.astro.caltech.edu/~aprice-whelan/ptf/plots/max_outlier_light_curves.pdf > figures/max_outlier_light_curves.pdf
+curl http://www.astro.caltech.edu/~aprice-whelan/ptf/plots/new_detection_efficiency/example_light_curve_f100152_ccd2.pdf > figures/example_light_curve_f100152_ccd2.pdf
+curl http://www.astro.caltech.edu/~aprice-whelan/ptf/plots/new_detection_efficiency/example_light_curve_f4327_ccd2.pdf > figures/example_light_curve_f4327_ccd2.pdf
+curl http://www.astro.caltech.edu/~aprice-whelan/ptf/plots/new_detection_efficiency/example_light_curve_f4588_ccd2.pdf > figures/example_light_curve_f4588_ccd2.pdf
+curl http://www.astro.caltech.edu/~aprice-whelan/ptf/plots/new_detection_efficiency/field004588_Nperccd1000_Nevents100.pdf > figures/field004588_Nperccd1000_Nevents100.pdf
+curl http://www.astro.caltech.edu/~aprice-whelan/ptf/plots/new_detection_efficiency/field100152_Nperccd1000_Nevents100.pdf > figures/field100152_Nperccd1000_Nevents100.pdf
+curl http://www.astro.caltech.edu/~aprice-whelan/ptf/plots/new_detection_efficiency/field004327_Nperccd1000_Nevents100.pdf > figures/field004327_Nperccd1000_Nevents100.pdf
+
+curl http://www.astro.caltech.edu/~aprice-whelan/ptf/plots/var_indices/delta_chi_squared_vs_j.pdf > figures/delta_chi_squared_vs_j.pdf
+curl http://www.astro.caltech.edu/~aprice-whelan/ptf/plots/var_indices/eta_vs_j.pdf > figures/eta_vs_j.pdf
+curl http://www.astro.caltech.edu/~aprice-whelan/ptf/plots/var_indices/eta_vs_delta_chi_squared.pdf > figures/eta_vs_delta_chi_squared.pdf
+
+curl http://www.astro.caltech.edu/~aprice-whelan/ptf/plots/event_fitter/field4721_ccd8_source3208.pdf > figures/field4721_ccd8_source3208.pdf
+curl http://www.astro.caltech.edu/~aprice-whelan/ptf/plots/event_fitter/field4789_ccd6_source11457.pdf > figures/field4789_ccd6_source11457.pdf
+curl http://www.astro.caltech.edu/~aprice-whelan/ptf/plots/event_fitter/field100003_ccd6_source10741.pdf > figures/field100003_ccd6_source10741.pdf
+curl http://www.astro.caltech.edu/~aprice-whelan/ptf/plots/event_fitter/field100400_ccd1_source49501.pdf > figures/field100400_ccd1_source49501.pdf
+
+curl http://www.astro.caltech.edu/~aprice-whelan/ptf/plots/event_fitter/field4721_ccd8_source3208_posterior.pdf > figures/field4721_ccd8_source3208_posterior.pdf
+curl http://www.astro.caltech.edu/~aprice-whelan/ptf/plots/event_fitter/field4789_ccd6_source11457_posterior.pdf > figures/field4789_ccd6_source11457_posterior.pdf
+curl http://www.astro.caltech.edu/~aprice-whelan/ptf/plots/event_fitter/field100003_ccd6_source10741_posterior.pdf > figures/field100003_ccd6_source10741_posterior.pdf
+curl http://www.astro.caltech.edu/~aprice-whelan/ptf/plots/event_fitter/field100400_ccd1_source49501_posterior.pdf > figures/field100400_ccd1_source49501_posterior.pdf
