@@ -743,7 +743,7 @@ def lightcurve_from_filename(filename):
 def fit_candidates(Nburn, Nsamples, Nwalkers, seed=None):
     final_candidates = ["PTFS1206i", "PTFS1216bt", "PTFS1217cv"]
     
-    fig1 = plt.figure(figsize=(32,12))
+    fig1 = plt.figure(figsize=(22,8))
     gs = gridspec.GridSpec(2, 3, height_ratios=[1,2])
     
     u0s,t0s,m0s,tEs = [],[],[],[]
