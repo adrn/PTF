@@ -234,11 +234,12 @@ For each of these fields we find that $\eta$ consistently performs better than t
 \end{figure}
 
 \section{Searching for events in the full PTF dataset}\label{sec:search}
-To identify candidate microlensing events in the $1.1\times10^9$ light curves with $>$10 $R$-band observations, we:
+To identify candidate microlensing events we: %in the $1.1\times10^9$ light curves with $>$10 $R$-band observations, we:
 %We apply the 1\% FPR cut to the 2097 PTF fields ($\sim$15,224 deg$^2$) with $>$10 $R$-band observations using the variability index $\eta$. Our procedure is as follows:
 \begin{enumerate}
-	\item select a field from the 2097 fields with $>$10 good $R$-band observations and run Monte Carlo simulations to compute the 1\% FPR limiting values for $\eta$, $\Delta \chi^2$, and $J$ for that field;
-	\item compute $\eta$ for all the light curves in the field. While $\sim$10\% of the light curves pass the quality cut described in Section~\ref{sec:detection_eff}, only $\sim$0.1-0.5\% of these pass the FPR cut determined from the Monte Carlo simulations;
+	\item select the light curves from one of the 2097 fields with $>$10 $R$-band observations;
+	\item identify those light curves with more than 50\% good data points and $>$10 good observations (see Section~\ref{sec:detection_eff}) and run Monte Carlo simulations to compute the 1\% FPR limiting values for $\eta$, $\Delta \chi^2$, and $J$ for that field;
+	\item compute $\eta$ for all the light curves in the field. While $\sim$10\% of the light curves pass the quality cut described above, only $\sim$0.1-0.5\% of these survive the FPR cut determined from the Monte Carlo simulations;
 	\item for fields with SDSS coverage, we use Data Release 9 photometry \citep{dr9paper} to remove sources typed as Galaxy or QSO (using \texttt{objc\_type}\footnote{{\tt http://www.sdss3.org/dr9/algorithms/classify.php}}) and flag candidate quasars \citep[using the cuts described in][]{richards02}; this eliminates $\sim$90\% of the remaining light curves;
 	\item fit a microlensing event model and subtract the model, then recompute $\eta$ for all the selected light curves;
 	\item reject the light curves for which the new value of $\eta$ still passes the cut\footnote{These are probably periodic variables.} --- this step eliminates $\sim$90-95\% of the remaining light curves;
