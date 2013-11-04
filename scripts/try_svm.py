@@ -32,7 +32,7 @@ index = np.load(indexFile)
 np.random.seed(42)
 
 Ntrials = 100
-Nsources = 100
+Nsources = 1000
 features = ['con', 'eta', 'j', 'k', 'sigma_mu']
 Nfeatures = len(features)
 

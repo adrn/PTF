@@ -150,7 +150,7 @@ class PTFLightCurve(object):
         list of mag, magErr
         If no hits, returns None
         """
-        catFname = '/scr4/dlevitan/sdssdr9_extcat.pytable'
+        catFname = '/scr2/ptf/variable/catalogs/sdssdr9_extcat.pytable'
         matchRadius=2./3600.
         ra,dec = self.ra, self.dec
 

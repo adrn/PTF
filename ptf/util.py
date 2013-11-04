@@ -52,7 +52,7 @@ def index_to_label(index):
 # Create logger for this module
 logger = logging.getLogger("ptf")
 ch = logging.StreamHandler()
-formatter = logging.Formatter("%(name)s / %(levelname)s / %(message)s")
+formatter = logging.Formatter("%(name)s - %(pathname)s / %(levelname)s / %(message)s")
 ch.setFormatter(formatter)
 logger.addHandler(ch)
 
