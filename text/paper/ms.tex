@@ -38,7 +38,7 @@
 \altaffiltext{7}{Spitzer Science Center, California Institute of Technology, Mail Stop 314-6, Pasadena, CA 91125, USA}
 
 \begin{abstract}
-Many current photometric, time-domain surveys are driven by specific goals, such as searches for supernovae or transiting exoplanets, which set the cadence with which individual fields are re-imaged. In the case of the Palomar Transient Factory (PTF), several such sub-surveys are being conducted in parallel, leading to extremely non-uniform sampling over the survey's nearly $20,000~\mathrm{deg}^2$ footprint. While the median $7.26~\mathrm{deg}^2$ PTF field has been imaged $\sim$40 times in \textit{R}-band, $\sim$$2300~\mathrm{deg}^2$ have been observed more than 100 times. We use the existing PTF data to study the trade-off between searching for microlensing events in a survey whose footprint is much larger than that of typical microlensing searches, but that has far-from-optimal time sampling. To examine the probability that microlensing events can be recovered in these data, we test previous statistics used on uniformly sampled data to identify variables and transients. We find that one such statistic, the von Neumann ratio (also known as the Durbin-Watson statistic), performs best for identifying simulated microlensing events in our data. We develop a selection method using this statistic and apply it to data from all PTF fields with $>$10 $R$-band observations --- a total of $1.1\times10^9$ light curves --- to uncover three candidate sparse-field microlensing events. These candidates cannot be confirmed, as we lack simultaneous, multi-color photometry of the events. However, their number is consistent with predictions for the microlensing event rate in the PTF footprint over the survey's three years of operations, as estimated from near-field microlensing models. This work can help constrain all-sky event rate predictions and tests microlensing signal recovery in large data sets, both of which will be useful to future wide-field, time-domain surveys, such as that planned with the Large Synoptic Survey Telescope. 
+Many current photometric, time-domain surveys are driven by specific goals, such as searches for supernovae or transiting exoplanets, which set the cadence with which individual fields are re-imaged. In the case of the Palomar Transient Factory (PTF), several such sub-surveys are being conducted in parallel, leading to extremely non-uniform sampling over the survey's nearly $20,000~\mathrm{deg}^2$ footprint. While the median $7.26~\mathrm{deg}^2$ PTF field has been imaged $\sim$40 times in \textit{R}-band, $\sim$$2300~\mathrm{deg}^2$ have been observed more than 100 times. We use the existing PTF data to study the trade-off between searching for microlensing events in a survey whose footprint is much larger than that of typical microlensing searches, but that has far-from-optimal time sampling. To examine the probability that microlensing events can be recovered in these data, we test statistics previously used on uniformly sampled data to identify variables and transients. We find that one such statistic, the von Neumann ratio (also known as the Durbin-Watson statistic), performs best for identifying simulated microlensing events in our data. We develop a selection method using this statistic and apply it to data from all PTF fields with $>$10 $R$-band observations --- a total of $1.1\times10^9$ light curves --- to uncover three candidate sparse-field microlensing events. These candidates cannot be confirmed, as we lack simultaneous, multi-color photometry of the events. However, their number is consistent with predictions for the microlensing event rate in the PTF footprint over the survey's three years of operations, as estimated from near-field microlensing models. This work can help constrain all-sky event rate predictions and tests microlensing signal recovery in large data sets, both of which will be useful to future wide-field, time-domain surveys, such as that planned with the Large Synoptic Survey Telescope. 
 \end{abstract}
 
 \keywords{
@@ -59,7 +59,7 @@ Microlensing surveys typically focus on high-density stellar regions, such as th
 \caption{PTF $R$-band survey footprint, in equatorial coordinates. The fields are color-coded by the total number of observations. The field size corresponds to the actual area covered by a single PTF exposure.}\label{fig:survey_footprint}
 \end{figure*}	
 
-Only one event outside of a dense stellar field has been recorded to date: the Tago event \citep{fukui2007, gaudi2008}, a serendipitous detection of the microlensing of a bright source. \cite{gaudi2008} set probabilistic limits on the mass, distance, proper motion, and magnitude of this lens using existing observations near the event's location, and further observations may turn these limits into precise measurements. Such an analysis is usually not possible for events in high-density fields where the lenses are, on average, much farther away and blending makes photometry --- and, therefore, mass measurements --- challenging. By contrast, high-Galactic-latitude events probe lenses with distances $\lesssim$1~kpc; the Einstein radii, therefore, tend to be larger ($\sim$milliarcseconds) and may cause detectable astrometric signatures \citep[][]{han2008, mesolensing1, mesolensing2}. A measurement of the astrometric shift due to microlensing will break the distance-mass degeneracy in the lensing parameters and enable a direct measurement of the lens mass. Finding even a handful of nearby lenses that can be studied in the same kind of detail as the Tago event would, therefore, be very valuable. 
+Only one event outside of a dense stellar field has been recorded to date: the Tago event \citep{fukui2007, gaudi2008}, a serendipitous detection of the microlensing of a bright source. \cite{gaudi2008} set probabilistic limits on the mass, distance, proper motion, and magnitude of this lens using existing observations near the event's location, and further observations may turn these limits into precise measurements. Such an analysis is usually not possible for events in high-density fields where the lenses are, on average, much farther away and blending makes photometry --- and, therefore, mass measurements --- challenging. By contrast, high-Galactic-latitude events probe lenses with distances $\lesssim$1~kpc; the Einstein radii, therefore, tend to be larger ($\sim$milliarcseconds) and may cause detectable astrometric signatures \citep[][]{han2008, mesolensing2, mesolensing1}. A measurement of the astrometric shift due to microlensing will break the distance-mass degeneracy in the lensing parameters and enable a direct measurement of the lens mass. Finding even a handful of nearby lenses that can be studied in the same kind of detail as the Tago event would, therefore, be very valuable. 
 
 In this paper, we use the Palomar Transient Factory (PTF) survey, described in Section~\ref{sec:ptf}, as a test case for studying the frequency and detectability of microlensing events in all-sky, irregularly sampled, time-domain surveys. Although to date no microlensing event has been reported using PTF data, a simple extrapolation from previous all-sky rate estimates suggests $\sim$1--10 detectable microlensing events within the PTF footprint over the survey's three years of operation \citep{gaudi2008, han2008}. We examine the selection methods used by microlensing surveys to identify event signatures in light curves as well as an event identification procedure based on a set of variability statistics. We then present the detection efficiency for these methods as computed for a representative set of PTF fields (Section~\ref{sec:event_recovery}). In Section~\ref{sec:search}, we apply a set of criteria that use the results of these tests to all PTF light curves with $>$10 high-quality observations to identify candidate microlensing events. We discuss eight interesting transients and three candidate events identified in this manner before concluding in Section~\ref{sec:conc}. % A detailed investigation of the all-sky microlensing event rate,  generated from a model that includes realistic mass and velocity distributions, will be presented in Fournier et al. (in prep).
 
@@ -68,7 +68,7 @@ PTF data are collected using the former Canada-France-Hawaii Telescope 12K$\time
 
 While a real-time image-differencing pipeline identifies transients of interest and passes these to a dedicated photometric follow-up telescope, a separate pipeline generates PTF light curves. Images are processed using standard reduction procedures including de-biasing, flat-fielding, and astrometric calibration (Laher et al., in prep). SExtractor is used for source identification \citep{bertin96}. The absolute photometric calibration of the images is good to a systematic limit of $\sim$2\% for photometric nights, as described in \cite{ofek2012}.  The final light curves are produced using relative photometric calibration, which refines the calibration to $<$1\% for photometric nights and improves the calibration for bad nights \citep[Levitan et al., in prep; for algorithm details see][]{levitan2011, ofek2012}. The resulting archive is an excellent resource for the study of periodic forms of variability \citep[e.g., stellar or asteroid rotation;][]{agueros11,polishook2012}. 
 
-As of 2012 Dec, the PTF footprint includes $\sim$15,224 (2766) deg$^2$ imaged $>$10 ($>$100) times in $R$-band and $\sim$5430 (290) deg$^2$ imaged that often in $g$-band (see Figure~\ref{fig:survey_footprint}). The PTF survey footprint is not uniformly sampled either spatially or temporally. Each field has a unique sampling pattern determined by which of the PTF sub-surveys it belongs to, what time of the year it is visible, and how high a priority it is given by the scheduler. The imaging cadences range from 1-5 days, but there is a higher-cadence campaign of a field in Orion to find transiting planets around young stars \citep{nick2009}. The result is that PTF light curves often contain gaps and regions of high-cadence observations and/or of low-cadence observations, so that the archive is a massive dataset of irregularly-sampled, time-domain photometry. Figure~\ref{fig:sampling} shows six randomly selected light curves and illustrates the varying cadences and coverage that different fields may have over the same one-year period. While the PTF database is not yet public, we have made $10^5$ light curves available at {\tt }. These light curves meet the quality criteria described in Section~\ref{sec:detection_eff} and can be used to test the statistical methods described here (or others!).
+As of 2012 Dec, the PTF footprint includes $\sim$15,224 (2766) deg$^2$ imaged $>$10 ($>$100) times in $R$-band and $\sim$5430 (290) deg$^2$ imaged that often in $g$-band (see Figure~\ref{fig:survey_footprint}). The PTF survey footprint is not uniformly sampled either spatially or temporally. Each field has a unique sampling pattern determined by which of the PTF sub-surveys it belongs to, what time of the year it is visible, and how high a priority it is given by the scheduler. The imaging cadences range from 1-5 days, but other cadences are possible: for example, there was a higher-cadence campaign of a field in Orion to find transiting planets around young stars \citep{nick2009}. The result is that PTF light curves often contain gaps and regions of high-cadence observations and/or of low-cadence observations, so that the archive is a massive dataset of irregularly-sampled, time-domain photometry. Figure~\ref{fig:sampling} shows six randomly selected light curves and illustrates the varying cadences and coverage that different fields may have over the same one-year period. While the PTF database is not yet public, we have made $10^4$ randomly selected light curves available at \url{http:// TODO }. These light curves meet the quality criteria described in Section~\ref{sec:detection_eff} and can be used to test the statistical methods described here (or others!).
 
 \begin{figure}[h]
 \begin{center}
@@ -120,7 +120,7 @@ Applying the standard microlensing-search prescription to the PTF data presents 
 \end{figure}
 
 \subsection{The Variability Indices} 
-We choose five statistical measures of variability compiled by \cite{shin2009} that have been previously applied to the classification and discovery of periodic variables. These variability indices are $\sigma/\mu$, $Con$, $\eta$, $J$, and $K$.\footnote{We do not implement the sixth index described by \cite{shin2009}, $AoVM$, because it mainly helps identify periodic sources.} $\sigma/\mu$ is the ratio of the sample standard deviation ($\sigma$) to the sample mean, 
+We choose five statistical measures of variability compiled by \cite{shin2009} that have been previously applied to the classification and discovery of periodic variables. These variability indices are $\sigma/\mu$, $Con$, $\eta$, $J$, and $K$.\footnote{We do not implement the sixth index described by \cite{shin2009}, $AoVM$, because it mainly helps identify periodic sources.} $\sigma/\mu$ is the ratio of the sample standard deviation ($\sigma$) to the sample mean ($\mu$), 
 \begin{align}
 	\frac{\sigma}{\mu} = \frac{\sqrt{\sum^N_i (x_i - \mu)^2 / (N-1)}}{\sum^N_i x_i/N},
 \end{align}
@@ -140,13 +140,13 @@ $J$ and $K$ were suggested by \cite{stetson1996}:
 	J &= \sum^{N-1}_i sign(\delta_i \delta_{i+1})\sqrt{|\delta_i \delta_{i+1}|},\\
 	K &= \frac{1/N\sum^N_i |\delta_i|}{\sqrt{1/N\sum^N_i\delta_i^2}},
 \end{align}
-where $e_i$ is the photometric error of each data point, and the $sign$ function returns $\pm$1, depending on the sign of the argument. $J$ tends to 0 for non-variable stars, but is large when there are significant differences between successive data points in a light curve. $K$ is a measure of the kurtosis of the distribution of data points.
+where $e_i$ is the photometric error of each data point, and the $sign$ function returns $\pm$1, depending on the sign of the argument. $J$ tends to 0 for non-variable stars, but is large when there are significant differences between successive data points in a light curve. $K$ is a measure of the kurtosis of the distribution of data points. We add one more index, $\Delta \chi^2$, the difference in $\chi^2$ between fitting a Gaussian model and fitting a linear model to a light curve. 
 
-We add one more index, $\Delta \chi^2$, the difference in $\chi^2$ between fitting a Gaussian model and fitting a linear model to a light curve. Specifically, we use a Levenberg-Marquardt optimizer to perform a least-squares fit with each of these models to the light curves and then compute $\Delta\chi^2=\chi_{linear} - \chi_{gaussian}$. Our tests with $\Delta \chi^2$ below compare the distribution of values over light curves on the same chip. As a result, the number of data points and number of model parameters are constant, and we therefore do not include an Akaike or Bayesian information criterion term. 
+Specifically, we use a Levenberg-Marquardt optimizer to perform a least-squares fit with each of these models to the light curves and then compute $\Delta\chi^2=\chi_{linear} - \chi_{gaussian}$. Our tests with $\Delta \chi^2$ below compare the distribution of values over light curves on the same chip. As a result, the number of data points and number of model parameters are constant, and we therefore do not include an Akaike or Bayesian information criterion term. For the Gaussian fit, the optimizer is initialized with a $\sigma$ of 10 days, centered on the brightest data point. 
 
-For the Gaussian fit, the optimizer is initialized with a $\sigma$ of 10 days, centered on the brightest data point. This is a standard statistical test used by microlensing surveys, and allows us to compare the relative performance of the (slightly modified) \cite{shin2009} indices and of this approach. 
+This is a standard statistical test used by microlensing surveys, and allows us to compare the relative performance of the (slightly modified) \cite{shin2009} indices and of this approach. 
 
-Figure~\ref{fig:indices_examples} shows maximally outlying light curves for each variability statistic selected from $\sim$20,000 light curves for objects on a single CCD in PTF field 100101. %, centered at (J2000) 17:21:31.44 $+$61:07:46.6. 
+Figure~\ref{fig:indices_examples} shows maximally outlying light curves for each variability statistic selected from $\sim$20,000 light curves for objects on a single CCD in PTF field 3756. %, centered at (J2000) 17:21:31.44 $+$61:07:46.6. 
 Clearly, the indices are sensitive to different aspects of variability in the data. We expect $\sigma/\mu$ to be most useful for discerning periodic or semi-periodic variability where the variance is large; the expectations are not as clear for other indices. 
 
 \begin{figure}[h]
@@ -215,7 +215,7 @@ For each of these fields we find that $\eta$ consistently performs better than t
 	   \includegraphics[width=.46\textwidth, trim=8 8 5 5, clip] {fig8_b.eps}
 	   \label{fig:subfig2}
 	 }
-\caption{Same as \figurename~\ref{fig:detection_efficiency_4327}, for PTF field 4588.}\label{fig:detection_efficiency_4588}
+\caption{Same as Figure~\ref{fig:detection_efficiency_4327}, for PTF field 4588.}\label{fig:detection_efficiency_4588}
 \end{figure}
 
 \begin{figure}
@@ -229,7 +229,7 @@ For each of these fields we find that $\eta$ consistently performs better than t
 	   \includegraphics[width=.46\textwidth, trim=8 8 5 5, clip] {fig9_b.eps}
 	   \label{fig:subfig2}
 	 }
-\caption{Same as \figurename~\ref{fig:detection_efficiency_4327}, for PTF field 100152.}\label{fig:detection_efficiency_100152}
+\caption{Same as Figure~\ref{fig:detection_efficiency_4327}, for PTF field 100152.}\label{fig:detection_efficiency_100152}
 \end{figure}
 
 \section{Searching for events in the full PTF dataset}\label{sec:search}
@@ -237,7 +237,7 @@ To identify candidate microlensing events we: %in the $1.1\times10^9$ light curv
 %We apply the 1\% FPR cut to the 2097 PTF fields ($\sim$15,224 deg$^2$) with $>$10 $R$-band observations using the variability index $\eta$. Our procedure is as follows:
 \begin{enumerate}
 	\item select the light curves from one of the 2097 fields with $>$10 $R$-band observations;
-	\item identify those light curves with more than 50\% good data points and $>$10 good observations (see Section~\ref{sec:detection_eff}) and run Monte Carlo simulations to compute the 1\% FPR limiting values for $\eta$, $\Delta \chi^2$, and $J$ for that field;
+	\item identify those light curves with more than 50\% good data points and $>$10 good observations and run Monte Carlo simulations to compute the 1\% FPR limiting values for $\eta$, $\Delta \chi^2$, and $J$ for that field;
 	\item compute $\eta$ for all the light curves in the field. While $\sim$10\% of the light curves pass the quality cut described above, only $\sim$0.1-0.5\% of these survive the FPR cut determined from the Monte Carlo simulations;
 	\item for fields with SDSS coverage, we use Data Release 9 photometry \citep{dr9paper} to remove sources typed as Galaxy or QSO (using \texttt{objc\_type}\footnote{\url{http://www.sdss3.org/dr9/algorithms/classify.php}}) and flag candidate quasars \citep[using the cuts described in][]{richards02}; this eliminates $\sim$90\% of the remaining light curves;
 	\item fit a microlensing event model and subtract the model, then recompute $\eta$ for all the selected light curves;
@@ -288,7 +288,7 @@ We visually inspect each of the remaining $\sim$2000 light curves. We identify a
 
 We are left with $\sim$300 unclassified transients. Through visual inspection of these light curves, we classify the bulk of these as novae, supernovae, flares, or outbursting systems, and identify 11 microlensing event candidates. We then search the literature for additional photometric data for these 11 objects. Most have a counterpart in WISE \citep{WISE}, while a few have a counterpart in 2MASS \citep{cutri03}; see Table~\ref{table:photometry} for a summary. We also obtained spectroscopy for several of these candidates. Below we detail what can be learned from these data. Generally, additional deeper optical/infrared imaging and/or optical spectroscopy is required to draw firm conclusions about the nature of the object.
 
-To summarize what follows: we rule out five of the 11 candidates as being likely extragalactic transients based on photometry and/or imaging from WISE, 2MASS, and/or PTF. Three of the candidates are not detected in WISE and/or 2MASS; follow-up imaging or spectroscopy is needed to draw any conclusions about these objects. The remaining three objects (PTF1J061800.25$+$203142.5, J161502.39$+$540053.8, and J172826.08$+$692501.1) are likely stars and, given the observed PTF variability, plausible microlensing events. We emphasize, however, that lacking simultaneous, multi-color photometry during the events, we cannot claim these as microlensing events with any confidence. These three candidates are shown in Figure~\ref{fig:candidates}, and PTF cutouts of the associated sources at quiescence and near peak brightness are shown in Figure~\ref{fig:postage_stamps}. Light curves for the other eight events are shown in Figure~\ref{fig:not_candidates}.
+To summarize what follows: we rule out five of the 11 candidates as being likely extragalactic transients based on photometry and/or imaging from WISE, 2MASS, and/or PTF. Three of the candidates are not detected in WISE and/or 2MASS; follow-up imaging or spectroscopy is needed to draw any conclusions about these objects. The remaining three objects (PTF1J061800.25$+$203142.5, J161502.39$+$540053.8, and J172826.08$+$692501.1) are likely stars and, given the observed PTF variability, plausible microlensing events. We emphasize, however, that lacking simultaneous, multi-color photometry during the events, we cannot claim these as microlensing events with any confidence. These three candidates are shown in Figure~\ref{fig:candidates}, and PTF cutouts of the associated sources at quiescence and near peak brightness are shown in Figure~\ref{fig:postage_stamps} (light curves for the other eight events are shown in Figure~\ref{fig:not_candidates}).
 
 For these three plausible events, we use a Markov-chain Monte-Carlo algorithm \citep{goodman, dfm} to derive posterior probability distributions over each parameter in the point-source, point-lens microlensing model (Eq.~\ref{eq:ml_model}). Overplotted on Figure~\ref{fig:candidates} are samples from these posterior distributions along with the maximum {\it a posteriori} (MAP) model; the corresponding MAP event parameters are listed in Table~\ref{table:candidates1}. The event durations for PTF1J0618 and PTF1J1615 are reasonable, given that a ${\sim}0.1\ M_\odot$ lens at ${\sim}500~\mathrm{pc}$ in the thick disk ($v_{tan}\sim 50~\mathrm{km}~\mathrm{s}^{-1}$) has a typical event duration $t_E \sim 20~\mathrm{days}$, but the significantly longer duration of PTF1J1728 ($>$150 days) could be a sign of a greater mass lens or larger distance.
 
@@ -313,9 +313,9 @@ We lack a spectrum for PTF1J1615, so the distance estimate to this star is even 
 \colhead{PTF1} & \colhead{$u_0$}  & \colhead{$t_E$ [days]}   & \colhead{$t_0$ [MJD]}   & \colhead{$m_0$ [R]}     
 }
 \startdata
-J0618 & $0.178\pm0.019$ & $22.8\pm1.4$ & $55879.975\pm0.248$ & $20.226\pm0.026$\\
-J1615 & $0.388\pm0.015$ & $32.5\pm2.3$  & $55895.797\pm1.956$ & $20.016\pm0.005$\\
-J1728 & $1.338\pm0.001$ & $156.6\pm1.2$ & $55194.313\pm0.702$ & $16.259\pm0.001$ 
+J0618 & 0.178$\pm$0.011 & 23.7$\pm$1.6 & 55880.0$\pm$0.4 & 20.222$\pm$0.034 \\
+J1615 & 0.376$\pm$0.016 & 31.4$\pm$1.1 & 55895.5$\pm$2.1 & 20.019$\pm$0.004 \\
+J1728 & 1.338$\pm$0.002 & 161.1$\pm$4.9 & 55192.2$\pm$1.4 & 16.260$\pm$0.002 
 \enddata
 \end{deluxetable*}
 
@@ -439,317 +439,324 @@ This research made use of Astropy (\url{http://www.astropy.org}), a community-de
 
 %\bigskip
 \setlength{\baselineskip}{0.6\baselineskip}
-\bibliography{references_3}
+%\bibliography{references_3}
 \setlength{\baselineskip}{1.667\baselineskip}
 
-%\begin{thebibliography}{54}
-%\expandafter\ifx\csname natexlab\endcsname\relax\def\natexlab#1{#1}\fi
-%
-%\bibitem[{{Ag{\"u}eros} {et~al.}(2011){Ag{\"u}eros}, {Covey}, {Lemonias},
-%  {Law}, {Kraus}, {Batalha}, {Bloom}, {Cenko}, {Kasliwal}, {Kulkarni},
-%  {Nugent}, {Ofek}, {Poznanski}, \& {Quimby}}]{agueros11}
-%{Ag{\"u}eros}, M.~A., {Covey}, K.~R., {Lemonias}, J.~J., {et~al.} 2011, \apj,
-%  740, 110
-%  
-%\bibitem[{{Ahn} {et~al.}(2012){Ahn}, {Alexandroff}, {Allende Prieto},
-%  {Anderson}, {Anderton}, {Andrews}, {Aubourg}, {Bailey}, {Balbinot}, {Barnes},
-%  \& et~al.}]{dr9paper}
-%{Ahn}, C.~P., {Alexandroff}, R., {Allende Prieto}, C., {et~al.} 2012, \apjs,
-%  203, 21
-%
-%\bibitem[{{Alard} \& {Lupton}(1998)}]{alard1998}
-%{Alard}, C., \& {Lupton}, R.~H. 1998, \apj, 503, 325
-%
-%\bibitem[{{Alcock} {et~al.}(1993){Alcock}, {Allsman}, {Axelrod}, {Bennett},
-%  {Cook}, {Park}, {Marshall}, {Stubbs}, {Griest}, {Perlmutter}, {Sutherland},
-%  {Freeman}, {Peterson}, {Quinn}, \& {Rodgers}}]{original_macho}
-%{Alcock}, C., {Allsman}, R.~A., {Axelrod}, T.~S., {et~al.} 1993, in
-%  Astronomical Society of the Pacific Conference Series, Vol.~43, Sky Surveys.
-%  Protostars to Protogalaxies, ed. {B.~T.~Soifer}, 291
-%
-%\bibitem[{{Alcock} {et~al.}(2000){Alcock}, {Allsman}, {Alves}, {Axelrod},
-%  {Becker}, {Bennett}, {Cook}, {Drake}, {Freeman}, {Geha}, {Griest}, {Lehner},
-%  {Marshall}, {Minniti}, {Nelson}, {Peterson}, {Popowski}, {Pratt}, {Quinn},
-%  {Stubbs}, {Sutherland}, {Tomaney}, {Vandehei}, {Welch}, \& {MACHO
-%  Collaboration}}]{alcock2000}
-%{Alcock}, C., {Allsman}, R.~A., {Alves}, D.~R., {et~al.} 2000, \apj, 541, 734
-%
-%\bibitem[{{Alcock} {et~al.}(2001){Alcock}, {Allsman}, {Alves}, {Axelrod},
-%  {Becker}, {Bennett}, {Cook}, {Drake}, {Freeman}, {Geha}, {Griest}, {Lehner},
-%  {Marshall}, {Minniti}, {Nelson}, {Peterson}, {Popowski}, {Pratt}, {Quinn},
-%  {Stubbs}, {Sutherland}, {Tomaney}, {Vandehei}, \&
-%  {Welch}}]{macho_detection_efficiency}
-%{Alcock}, C., {Allsman}, R.~A., {Alves}, D., {et~al.} 2001, \apjs, 136, 439
-%
-%\bibitem[{{Aubourg} {et~al.}(1993){Aubourg}, {Bareyre}, {Brehin}, {Gros},
-%  {Lachieze-Rey}, {Laurent}, {Lesquoy}, {Magneville}, {Milsztajn}, {Moscoso},
-%  {Queinnec}, {Rich}, {Spiro}, {Vigroux}, {Zylberajch}, {Ansari}, {Cavalier},
-%  {Moniez}, {Beaulieu}, {Ferlet}, {Grison}, {Vidal-Madjar}, {Guibert},
-%  {Moreau}, {Tajahmady}, {Maurice}, {Prevot}, \& {Gry}}]{eros_original}
-%{Aubourg}, E., {Bareyre}, P., {Brehin}, S., {et~al.} 1993, The Messenger, 72,
-%  20
-%
-%\bibitem[{{Bertin} \& {Arnouts}(1996)}]{bertin96}
-%{Bertin}, E., \& {Arnouts}, S. 1996, \aaps, 117, 393
-%
-%\bibitem[{{Binney} {et~al.}(2000){Binney}, {Bissantz}, \&
-%  {Gerhard}}]{binney2000}
-%{Binney}, J., {Bissantz}, N., \& {Gerhard}, O. 2000, \apjl, 537, L99
-%
-%\bibitem[{{Bloom} {et~al.}(2012){Bloom}, {Richards}, {Nugent}, {Quimby},
-%  {Kasliwal}, {Starr}, {Poznanski}, {Ofek}, {Cenko}, {Butler}, {Kulkarni},
-%  {Gal-Yam}, \& {Law}}]{bloomPasp}
-%{Bloom}, J.~S., {Richards}, J.~W., {Nugent}, P.~E., {et~al.} 2012, \pasp, 124,
-%  1175
-%
-%\bibitem[{{Bochanski} {et~al.}(2010){Bochanski}, {Hawley}, {Covey}, {West},
-%  {Reid}, {Golimowski}, \& {Ivezi{\'c}}}]{Bochanski2010}
-%{Bochanski}, J.~J., {Hawley}, S.~L., {Covey}, K.~R., {et~al.} 2010, \aj, 139,
-%  2679
-%
-%\bibitem[{{Covey}(2006)}]{kev06}
-%{Covey}, K.~R. 2006, PhD thesis, University of Washington, Washington, USA
-%
-%\bibitem[{{Covey} {et~al.}(2007){Covey}, {Ivezi{\'c}}, {Schlegel},
-%  {Finkbeiner}, {Padmanabhan}, {Lupton}, {Ag{\"u}eros}, {Bochanski}, {Hawley},
-%  {West}, {Seth}, {Kimball}, {Gogarten}, {Claire}, {Haggard}, {Kaib},
-%  {Schneider}, \& {Sesar}}]{kev07}
-%{Covey}, K.~R., {Ivezi{\'c}}, {\v Z}., {Schlegel}, D., {et~al.} 2007, \aj, 134,
-%  2398
-%
-%\bibitem[{{Crotts} \& {Tomaney}(1996)}]{crotts1996}
-%{Crotts}, A.~P.~S., \& {Tomaney}, A.~B. 1996, \apjl, 473, L87
-%
-%\bibitem[{{Cutri} {et~al.}(2003)}]{cutri03}
-%{Cutri}, R.~M., {et~al.} 2003, {2MASS All Sky Catalog of point sources.} (The
-%  IRSA 2MASS All-Sky Point Source Catalog, NASA/IPAC Infrared Science
-%  Archive.~http://irsa.ipac.caltech.edu/applications/Gator/)
-%
-%\bibitem[{{Di Stefano}(2008)}]{mesolensing}
-%{Di Stefano}, R. 2008, \apj, 684, 46
-%
-%\bibitem[Durbin \& Watson(1950)]{durbin50}
-%J.~Durbin and G.~S. Watson.
-%\newblock Testing for serial correlation in least squares regression: I.
-%\newblock {\em Biometrika}, 37(3/4):pp. 409--428, 1950.
-%
-%\bibitem[{{Foreman-Mackey} {et~al.}(2012){Foreman-Mackey}, {Hogg}, {Lang}, \&
-%  {Goodman}}]{dfm}
-%{Foreman-Mackey}, D., {Hogg}, D.~W., {Lang}, D., \& {Goodman}, J. 2012, ArXiv
-%  e-prints
-%
-%\bibitem[{{Fukui} {et~al.}(2007){Fukui}, {Abe}, {Ayani}, {Fujii}, {Iizuka},
-%  {Itow}, {Kabumoto}, {Kamiya}, {Kawabata}, {Kawanomoto}, {Kinugasa}, {Koff},
-%  {Krajci}, {Naito}, {Nogami}, {Narusawa}, {Ohishi}, {Ohnishi}, {Sumi}, \&
-%  {Tsumuraya}}]{fukui2007}
-%{Fukui}, A., {Abe}, F., {Ayani}, K., {et~al.} 2007, \apj, 670, 423
-%
-%\bibitem[{{Gaudi}(2011)}]{gaudi2011}
-%{Gaudi}, B.~S. 2011, {Microlensing by Exoplanets}, ed. S.~{Piper}, 79--110
-%
-%\bibitem[{{Gaudi} {et~al.}(2008){Gaudi}, {Patterson}, {Spiegel}, {Krajci},
-%  {Koff}, {Pojma{\'n}ski}, {Dong}, {Gould}, {Prieto}, {Blake}, {Roming},
-%  {Bennett}, {Bloom}, {Boyd}, {Eyler}, {de Ponthi{\`e}re}, {Mirabal}, {Morgan},
-%  {Remillard}, {Vanmunster}, {Wagner}, \& {Watson}}]{gaudi2008}
-%{Gaudi}, B.~S., {Patterson}, J., {Spiegel}, D.~S., {et~al.} 2008, \apj, 677,
-%  1268
-%
-%\bibitem[{{Goodman} \& {Weare}(2010)}]{goodman}
-%{Goodman}, J., \& {Weare}, J. 2010, Comm. App. Math. Comp. Sci., 5
-%
-%\bibitem[{{Hamadache} {et~al.}(2006){Hamadache}, {Le Guillou}, {Tisserand},
-%  {Afonso}, {Albert}, {Andersen}, {Ansari}, {Aubourg}, {Bareyre}, {Beaulieu},
-%  {Charlot}, {Coutures}, {Ferlet}, {Fouqu{\'e}}, {Glicenstein}, {Goldman},
-%  {Gould}, {Graff}, {Gros}, {Haissinski}, {de Kat}, {Lesquoy}, {Loup},
-%  {Magneville}, {Marquette}, {Maurice}, {Maury}, {Milsztajn}, {Moniez},
-%  {Palanque-Delabrouille}, {Perdereau}, {Rahal}, {Rich}, {Spiro},
-%  {Vidal-Madjar}, {Vigroux}, \& {Zylberajch}}]{hamadache2009}
-%{Hamadache}, C., {Le Guillou}, L., {Tisserand}, P., {et~al.} 2006, \aap, 454,
-%  185
-%
-%\bibitem[{{Han}(2008)}]{han2008}
-%{Han}, C. 2008, \apj, 681, 806
-%
-%\bibitem[{{Kowalski} {et~al.}(2010){Kowalski}, {Hawley}, {Holtzman},
-%  {Wisniewski}, \& {Hilton}}]{kowal2010}
-%{Kowalski}, A.~F., {Hawley}, S.~L., {Holtzman}, J.~A., {Wisniewski}, J.~P., \&
-%  {Hilton}, E.~J. 2010, \apjl, 714, L98
-%
-%\bibitem[{{Law} {et~al.}(2009){Law}, {Kulkarni}, {Dekany}, {Ofek}, {Quimby},
-%  {Nugent}, {Surace}, {Grillmair}, {Bloom}, {Kasliwal}, {Bildsten}, {Brown},
-%  {Cenko}, {Ciardi}, {Croner}, {Djorgovski}, {van Eyken}, {Filippenko}, {Fox},
-%  {Gal-Yam}, {Hale}, {Hamam}, {Helou}, {Henning}, {Howell}, {Jacobsen},
-%  {Laher}, {Mattingly}, {McKenna}, {Pickles}, {Poznanski}, {Rahmer}, {Rau},
-%  {Rosing}, {Shara}, {Smith}, {Starr}, {Sullivan}, {Velur}, {Walters}, \&
-%  {Zolkower}}]{nick2009}
-%{Law}, N.~M., {Kulkarni}, S.~R., {Dekany}, R.~G., {et~al.} 2009, \pasp, 121,
-%  1395
-%
-%\bibitem[{{Law} {et~al.}(2010){Law}, {Dekany}, {Rahmer}, {Hale}, {Smith},
-%  {Quimby}, {Ofek}, {Kasliwal}, {Zolkower}, {Velur}, {Henning}, {Bui},
-%  {McKenna}, {Nugent}, {Jacobsen}, {Walters}, {Bloom}, {Surace}, {Grillmair},
-%  {Laher}, {Mattingly}, \& {Kulkarni}}]{nick2010}
-%{Law}, N.~M., {Dekany}, R.~G., {Rahmer}, G., {et~al.} 2010, in Society of
-%  Photo-Optical Instrumentation Engineers (SPIE) Conference Series, Vol. 7735
-%
-%\bibitem[{{Levitan} {et~al.}(2011){Levitan}, {Fulton}, {Groot}, {Kulkarni},
-%  {Ofek}, {Prince}, {Shporer}, {Bloom}, {Cenko}, {Kasliwal}, {Law}, {Nugent},
-%  {Poznanski}, {Quimby}, {Horesh}, {Sesar}, \& {Sternberg}}]{levitan2011}
-%{Levitan}, D., {Fulton}, B.~J., {Groot}, P.~J., {et~al.} 2011, \apj, 739, 68
-%
-%\bibitem[{{Nieto--Santisteban} {et~al.}(2004)}]{sdss_images}
-%{Nieto--Santisteban}, M.~A., {et~al.} 2004, in ASP Conf. Ser. 314: Astronomical
-%  Data Analysis Software and Systems (ADASS) XIII, ed. F.~{Ochsenbein}, M.~G.
-%  {Allen}, \& D.~{Egret}, 666--+
-%
-%\bibitem[{{Ofek} {et~al.}(2012){Ofek}, {Laher}, {Surace}, {Levitan}, {Sesar},
-%  {Horesh}, {Law}, {van Eyken}, {Kulkarni}, {Prince}, {Nugent}, {Sullivan},
-%  {Yaron}, {Pickles}, {Ag{\"u}eros}, {Arcavi}, {Bildsten}, {Bloom}, {Cenko},
-%  {Gal-Yam}, {Grillmair}, {Helou}, {Kasliwal}, {Poznanski}, \&
-%  {Quimby}}]{ofek2012}
-%{Ofek}, E.~O., {Laher}, R., {Surace}, J., {et~al.} 2012, \pasp, 124, 854
-%
-%\bibitem[{{Oke} \& {Gunn}(1982)}]{oke_gunn}
-%{Oke}, J.~B., \& {Gunn}, J.~E. 1982, \pasp, 94, 586
-%
-%\bibitem[{{Os{\l}owski} {et~al.}(2008){Os{\l}owski}, {Moderski}, {Bulik}, \&
-%  {Belczynski}}]{oslowski2008}
-%{Os{\l}owski}, S., {Moderski}, R., {Bulik}, T., \& {Belczynski}, K. 2008, \aap,
-%  478, 429
-%
-%\bibitem[{{Paczynski}(1986)}]{paczynski1986}
-%{Paczynski}, B. 1986, \apj, 304, 1
-%
-%\bibitem[{{Pickles}(1998)}]{Pickles1998}
-%{Pickles}, A.~J. 1998, \pasp, 110, 863
-%
-%\bibitem[{{Polishook} {et~al.}(2012){Polishook}, {Ofek}, {Waszczak},
-%  {Kulkarni}, {Gal-Yam}, {Aharonson}, {Laher}, {Surace}, {Klein}, {Bloom},
-%  {Brosch}, {Prialnik}, {Grillmair}, {Cenko}, {Kasliwal}, {Law}, {Levitan},
-%  {Nugent}, {Poznanski}, \& {Quimby}}]{polishook2012}
-%{Polishook}, D., {Ofek}, E.~O., {Waszczak}, A., {et~al.} 2012, \mnras, 421,
-%  2094
-%
-%\bibitem[{{Rahmer} {et~al.}(2008){Rahmer}, {Smith}, {Velur}, {Hale}, {Law},
-%  {Bui}, {Petrie}, \& {Dekany}}]{rahmer2008}
-%{Rahmer}, G., {Smith}, R., {Velur}, V., {et~al.} 2008, in Society of
-%  Photo-Optical Instrumentation Engineers (SPIE) Conference Series, Vol. 7014
-%
-%\bibitem[{{Rattenbury} {et~al.}(2005){Rattenbury}, {Abe}, {Bennett}, {Bond},
-%  {Calitz}, {Claret}, {Cook}, {Furuta}, {Gal-Yam}, {Glicenstein}, {Hearnshaw},
-%  {Hauschildt}, {Kilmartin}, {Kurata}, {Masuda}, {Maoz}, {Matsubara},
-%  {Meintjes}, {Moniez}, {Muraki}, {Noda}, {Ofek}, {Okajima}, {Philpott},
-%  {Rhie}, {Sako}, {Sullivan}, {Sumi}, {Terndrup}, {Tristram}, {Wood},
-%  {Yanagisawa}, \& {Yock}}]{rattenbury2005}
-%{Rattenbury}, N.~J., {Abe}, F., {Bennett}, D.~P., {et~al.} 2005, \aap, 439, 645
-%
-%\bibitem[{{Rau} {et~al.}(2009){Rau}, {Kulkarni}, {Law}, {Bloom}, {Ciardi},
-%  {Djorgovski}, {Fox}, {Gal-Yam}, {Grillmair}, {Kasliwal}, {Nugent}, {Ofek},
-%  {Quimby}, {Reach}, {Shara}, {Bildsten}, {Cenko}, {Drake}, {Filippenko},
-%  {Helfand}, {Helou}, {Howell}, {Poznanski}, \& {Sullivan}}]{rau2009}
-%{Rau}, A., {Kulkarni}, S.~R., {Law}, N.~M., {et~al.} 2009, \pasp, 121, 1334
-%
-%\bibitem[{{Richards} {et~al.}(2002)}]{richards02}
-%{Richards}, G.~T., {et~al.} 2002, \aj, 123, 2945
-%
-%\bibitem[{{Sartore} \& {Treves}(2010)}]{sartore2010}
-%{Sartore}, N., \& {Treves}, A. 2010, \aap, 523, A33
-%
-%\bibitem[{{Shin} {et~al.}(2009){Shin}, {Sekora}, \& {Byun}}]{shin2009}
-%{Shin}, M.-S., {Sekora}, M., \& {Byun}, Y.-I. 2009, \mnras, 400, 1897
-%
-%\bibitem[{{Stetson}(1996)}]{stetson1996}
-%{Stetson}, P.~B. 1996, \pasp, 108, 851
-%
-%\bibitem[{{Stoughton} {et~al.}(2002){Stoughton}, {Lupton}, {Bernardi},
-%  {Blanton}, {Burles}, {Castander}, {Connolly}, {Eisenstein}, {Frieman},
-%  {Hennessy}, {Hindsley}, {Ivezi{\'c}}, {Kent}, {Kunszt}, {Lee}, {Meiksin},
-%  {Munn}, {Newberg}, {Nichol}, {Nicinski}, {Pier}, {Richards}, {Richmond},
-%  {Schlegel}, {Smith}, {Strauss}, {SubbaRao}, {Szalay}, {Thakar}, {Tucker},
-%  {Vanden Berk}, {Yanny}, {Adelman}, {Anderson}, {Anderson}, {Annis},
-%  {Bahcall}, {Bakken}, {Bartelmann}, {Bastian}, {Bauer}, {Berman},
-%  {B{\"o}hringer}, {Boroski}, {Bracker}, {Briegel}, {Briggs}, {Brinkmann},
-%  {Brunner}, {Carey}, {Carr}, {Chen}, {Christian}, {Colestock}, {Crocker},
-%  {Csabai}, {Czarapata}, {Dalcanton}, {Davidsen}, {Davis}, {Dehnen},
-%  {Dodelson}, {Doi}, {Dombeck}, {Donahue}, {Ellman}, {Elms}, {Evans}, {Eyer},
-%  {Fan}, {Federwitz}, {Friedman}, {Fukugita}, {Gal}, {Gillespie}, {Glazebrook},
-%  {Gray}, {Grebel}, {Greenawalt}, {Greene}, {Gunn}, {de Haas}, {Haiman},
-%  {Haldeman}, {Hall}, {Hamabe}, {Hansen}, {Harris}, {Harris}, {Harvanek},
-%  {Hawley}, {Hayes}, {Heckman}, {Helmi}, {Henden}, {Hogan}, {Hogg}, {Holmgren},
-%  {Holtzman}, {Huang}, {Hull}, {Ichikawa}, {Ichikawa}, {Johnston}, {Kauffmann},
-%  {Kim}, {Kimball}, {Kinney}, {Klaene}, {Kleinman}, {Klypin}, {Knapp},
-%  {Korienek}, {Krolik}, {Kron}, {Krzesi{\'n}ski}, {Lamb}, {Leger},
-%  {Limmongkol}, {Lindenmeyer}, {Long}, {Loomis}, {Loveday}, {MacKinnon},
-%  {Mannery}, {Mantsch}, {Margon}, {McGehee}, {McKay}, {McLean}, {Menou},
-%  {Merelli}, {Mo}, {Monet}, {Nakamura}, {Narayanan}, {Nash}, {Neilsen},
-%  {Newman}, {Nitta}, {Odenkirchen}, {Okada}, {Okamura}, {Ostriker}, {Owen},
-%  {Pauls}, {Peoples}, {Peterson}, {Petravick}, {Pope}, {Pordes}, {Postman},
-%  {Prosapio}, {Quinn}, {Rechenmacher}, {Rivetta}, {Rix}, {Rockosi}, {Rosner},
-%  {Ruthmansdorfer}, {Sandford}, {Schneider}, {Scranton}, {Sekiguchi}, {Sergey},
-%  {Sheth}, {Shimasaku}, {Smee}, {Snedden}, {Stebbins}, {Stubbs}, {Szapudi},
-%  {Szkody}, {Szokoly}, {Tabachnik}, {Tsvetanov}, {Uomoto}, {Vogeley}, {Voges},
-%  {Waddell}, {Walterbos}, {Wang}, {Watanabe}, {Weinberg}, {White}, {White},
-%  {Wilhite}, {Wolfe}, {Yasuda}, {York}, {Zehavi}, \& {Zheng}}]{stoughton02}
-%{Stoughton}, C., {Lupton}, R.~H., {Bernardi}, M., {et~al.} 2002, \aj, 123, 485
-%
-%\bibitem[{{Sumi} {et~al.}(2011){Sumi}, {Kamiya}, {Bennett}, {Bond}, {Abe},
-%  {Botzler}, {Fukui}, {Furusawa}, {Hearnshaw}, {Itow}, {Kilmartin}, {Korpela},
-%  {Lin}, {Ling}, {Masuda}, {Matsubara}, {Miyake}, {Motomura}, {Muraki},
-%  {Nagaya}, {Nakamura}, {Ohnishi}, {Okumura}, {Perrott}, {Rattenbury}, {Saito},
-%  {Sako}, {Sullivan}, {Sweatman}, {Tristram}, {Udalski}, {Szyma{\'n}ski},
-%  {Kubiak}, {Pietrzy{\'n}ski}, {Poleski}, {Soszy{\'n}ski}, {Wyrzykowski},
-%  {Ulaczyk}, \& {Microlensing Observations in Astrophysics (MOA)
-%  Collaboration}}]{sumi2011}
-%{Sumi}, T., {Kamiya}, K., {Bennett}, D.~P., {et~al.} 2011, \nat, 473, 349
-%
-%\bibitem[{{Tomov} {et~al.}(2013){Tomov}, {Tomova}, \& {Bisikalo}}]{tomov2013}
-%{Tomov}, N.~A., {Tomova}, M.~T., \& {Bisikalo}, D.~V. 2013, ArXiv e-prints
-%
-%\bibitem[{{Udalski}(2003)}]{udalski03}
-%{Udalski}, A. 2003, \actaa, 53, 291
-%
-%\bibitem[{{Udalski} {et~al.}(1992){Udalski}, {Szymanski}, {Kaluzny}, {Kubiak},
-%  \& {Mateo}}]{original_ogle}
-%{Udalski}, A., {Szymanski}, M., {Kaluzny}, J., {Kubiak}, M., \& {Mateo}, M.
-%  1992, \actaa, 42, 253
-%
-%\bibitem[{{Udalski} {et~al.}(1994){Udalski}, {Szymanski}, {Stanek}, {Kaluzny},
-%  {Kubiak}, {Mateo}, {Krzeminski}, {Paczynski}, \&
-%  {Venkat}}]{ogle_optical_depth}
-%{Udalski}, A., {Szymanski}, M., {Stanek}, K.~Z., {et~al.} 1994, \actaa, 44, 165
-%
-%\bibitem[{{von Neumann} {et~al.}(1941){von Neumann}, {Kent}, {Bellinson}, \&
-%  {Hart}}]{von_neumann1941}
-%{von Neumann}, J., {Kent}, R.~H., {Bellinson}, H.~R., \& {Hart}, B.~I. 1941,
-%  The Annals of Mathematical Statistics, 12, 153
-%
-%\bibitem[{{Wozniak}(2000)}]{con_idx}
-%{Wozniak}, P.~R. 2000, \actaa, 50, 421
-%
-%\bibitem[{{Wright} {et~al.}(2010){Wright}, {Eisenhardt}, {Mainzer}, {Ressler},
-%  {Cutri}, {Jarrett}, {Kirkpatrick}, {Padgett}, {McMillan}, {Skrutskie},
-%  {Stanford}, {Cohen}, {Walker}, {Mather}, {Leisawitz}, {Gautier}, {McLean},
-%  {Benford}, {Lonsdale}, {Blain}, {Mendez}, {Irace}, {Duval}, {Liu}, {Royer},
-%  {Heinrichsen}, {Howard}, {Shannon}, {Kendall}, {Walsh}, {Larsen}, {Cardon},
-%  {Schick}, {Schwalm}, {Abid}, {Fabinsky}, {Naes}, \& {Tsai}}]{WISE}
-%{Wright}, E.~L., {Eisenhardt}, P.~R.~M., {Mainzer}, A.~K., {et~al.} 2010, \aj,
-%  140, 1868
-%
-%\bibitem[{{Wyrzykowski} {et~al.}(2009){Wyrzykowski}, {Koz{\l}owski}, {Skowron},
-%  {Belokurov}, {Smith}, {Udalski}, {Szyma{\'n}ski}, {Kubiak},
-%  {Pietrzy{\'n}ski}, {Soszy{\'n}ski}, {Szewczyk}, \&
-%  {{\.Z}ebru{\'n}}}]{wyrzykowski2009}
-%{Wyrzykowski}, {\L}., {Koz{\l}owski}, S., {Skowron}, J., {et~al.} 2009, \mnras,
-%  397, 1228
-%
-%\bibitem[{Yan {et~al.}(2013)Yan, Donoso, Tsai, Stern, Assef, Eisenhardt, Blain,
-%  Cutri, Jarrett, Stanford, Wright, Bridge, \& Riechers}]{yan2013}
-%Yan, L., Donoso, E., Tsai, C.-W., {et~al.} 2013, \aj, 145, 55
-%
-%\bibitem[{{York} {et~al.}(2000)}]{york00}
-%{York}, D.~G., {et~al.} 2000, \aj, 120, 1579
-%
-%\end{thebibliography}
+\begin{thebibliography}{56}
+\expandafter\ifx\csname natexlab\endcsname\relax\def\natexlab#1{#1}\fi
 
+\bibitem[{{Ag{\"u}eros} {et~al.}(2011){Ag{\"u}eros}, {Covey}, {Lemonias},
+  {Law}, {Kraus}, {Batalha}, {Bloom}, {Cenko}, {Kasliwal}, {Kulkarni},
+  {Nugent}, {Ofek}, {Poznanski}, \& {Quimby}}]{agueros11}
+{Ag{\"u}eros}, M.~A., {Covey}, K.~R., {Lemonias}, J.~J., {et~al.} 2011, \apj,
+  740, 110
+
+\bibitem[{{Ahn} {et~al.}(2012){Ahn}, {Alexandroff}, {Allende Prieto},
+  {Anderson}, {Anderton}, {Andrews}, {Aubourg}, {Bailey}, {Balbinot}, {Barnes},
+  \& et~al.}]{dr9paper}
+{Ahn}, C.~P., {Alexandroff}, R., {Allende Prieto}, C., {et~al.} 2012, \apjs,
+  203, 21
+
+\bibitem[{{Alard} \& {Lupton}(1998)}]{alard1998}
+{Alard}, C., \& {Lupton}, R.~H. 1998, \apj, 503, 325
+
+\bibitem[{{Alcock} {et~al.}(1993){Alcock}, {Allsman}, {Axelrod}, {Bennett},
+  {Cook}, {Park}, {Marshall}, {Stubbs}, {Griest}, {Perlmutter}, {Sutherland},
+  {Freeman}, {Peterson}, {Quinn}, \& {Rodgers}}]{original_macho}
+{Alcock}, C., {Allsman}, R.~A., {Axelrod}, T.~S., {et~al.} 1993, in
+  Astronomical Society of the Pacific Conference Series, Vol.~43, Sky Surveys.
+  Protostars to Protogalaxies, ed. {B.~T.~Soifer}, 291
+
+\bibitem[{{Alcock} {et~al.}(2000){Alcock}, {Allsman}, {Alves}, {Axelrod},
+  {Becker}, {Bennett}, {Cook}, {Drake}, {Freeman}, {Geha}, {Griest}, {Lehner},
+  {Marshall}, {Minniti}, {Nelson}, {Peterson}, {Popowski}, {Pratt}, {Quinn},
+  {Stubbs}, {Sutherland}, {Tomaney}, {Vandehei}, {Welch}, \& {MACHO
+  Collaboration}}]{alcock2000}
+{Alcock}, C., {Allsman}, R.~A., {Alves}, D.~R., {et~al.} 2000, \apj, 541, 734
+
+\bibitem[{{Alcock} {et~al.}(2001){Alcock}, {Allsman}, {Alves}, {Axelrod},
+  {Becker}, {Bennett}, {Cook}, {Drake}, {Freeman}, {Geha}, {Griest}, {Lehner},
+  {Marshall}, {Minniti}, {Nelson}, {Peterson}, {Popowski}, {Pratt}, {Quinn},
+  {Stubbs}, {Sutherland}, {Tomaney}, {Vandehei}, \&
+  {Welch}}]{macho_detection_efficiency}
+{Alcock}, C., {Allsman}, R.~A., {Alves}, D., {et~al.} 2001, \apjs, 136, 439
+
+\bibitem[{{Aubourg} {et~al.}(1993){Aubourg}, {Bareyre}, {Brehin}, {Gros},
+  {Lachieze-Rey}, {Laurent}, {Lesquoy}, {Magneville}, {Milsztajn}, {Moscoso},
+  {Queinnec}, {Rich}, {Spiro}, {Vigroux}, {Zylberajch}, {Ansari}, {Cavalier},
+  {Moniez}, {Beaulieu}, {Ferlet}, {Grison}, {Vidal-Madjar}, {Guibert},
+  {Moreau}, {Tajahmady}, {Maurice}, {Prevot}, \& {Gry}}]{eros_original}
+{Aubourg}, E., {Bareyre}, P., {Brehin}, S., {et~al.} 1993, The Messenger, 72,
+  20
+
+\bibitem[{{Bertin} \& {Arnouts}(1996)}]{bertin96}
+{Bertin}, E., \& {Arnouts}, S. 1996, \aaps, 117, 393
+
+\bibitem[{{Binney} {et~al.}(2000){Binney}, {Bissantz}, \&
+  {Gerhard}}]{binney2000}
+{Binney}, J., {Bissantz}, N., \& {Gerhard}, O. 2000, \apjl, 537, L99
+
+\bibitem[{{Bloom} {et~al.}(2012){Bloom}, {Richards}, {Nugent}, {Quimby},
+  {Kasliwal}, {Starr}, {Poznanski}, {Ofek}, {Cenko}, {Butler}, {Kulkarni},
+  {Gal-Yam}, \& {Law}}]{bloomPasp}
+{Bloom}, J.~S., {Richards}, J.~W., {Nugent}, P.~E., {et~al.} 2012, \pasp, 124,
+  1175
+
+\bibitem[{{Bochanski} {et~al.}(2010){Bochanski}, {Hawley}, {Covey}, {West},
+  {Reid}, {Golimowski}, \& {Ivezi{\'c}}}]{Bochanski2010}
+{Bochanski}, J.~J., {Hawley}, S.~L., {Covey}, K.~R., {et~al.} 2010, \aj, 139,
+  2679
+
+\bibitem[{{Brink} {et~al.}(2013){Brink}, {Richards}, {Poznanski}, {Bloom},
+  {Rice}, {Negahban}, \& {Wainwright}}]{brink2013}
+{Brink}, H., {Richards}, J.~W., {Poznanski}, D., {et~al.} 2013, \mnras, 435,
+  1047
+
+\bibitem[{{Covey}(2006)}]{kev06}
+{Covey}, K.~R. 2006, PhD thesis, University of Washington, Washington, USA
+
+\bibitem[{{Covey} {et~al.}(2007){Covey}, {Ivezi{\'c}}, {Schlegel},
+  {Finkbeiner}, {Padmanabhan}, {Lupton}, {Ag{\"u}eros}, {Bochanski}, {Hawley},
+  {West}, {Seth}, {Kimball}, {Gogarten}, {Claire}, {Haggard}, {Kaib},
+  {Schneider}, \& {Sesar}}]{kev07}
+{Covey}, K.~R., {Ivezi{\'c}}, {\v Z}., {Schlegel}, D., {et~al.} 2007, \aj, 134,
+  2398
+
+\bibitem[{{Crotts} \& {Tomaney}(1996)}]{crotts1996}
+{Crotts}, A.~P.~S., \& {Tomaney}, A.~B. 1996, \apjl, 473, L87
+
+\bibitem[{{Cutri} {et~al.}(2003)}]{cutri03}
+{Cutri}, R.~M., {et~al.} 2003, {2MASS All Sky Catalog of point sources.} (The
+  IRSA 2MASS All-Sky Point Source Catalog, NASA/IPAC Infrared Science
+  Archive.~http://irsa.ipac.caltech.edu/applications/Gator/)
+
+\bibitem[{{Di Stefano}(2008{\natexlab{a}})}]{mesolensing2}
+{Di Stefano}, R. 2008{\natexlab{a}}, \apj, 684, 59
+
+\bibitem[{{Di Stefano}(2008{\natexlab{b}})}]{mesolensing1}
+---. 2008{\natexlab{b}}, \apj, 684, 46
+
+\bibitem[Durbin \& Watson(1950)]{durbin50}
+J.~Durbin and G.~S. Watson.
+\newblock Testing for serial correlation in least squares regression: I.
+\newblock {\em Biometrika}, 37(3/4):pp. 409--428, 1950.
+
+\bibitem[{{Foreman-Mackey} {et~al.}(2012){Foreman-Mackey}, {Hogg}, {Lang}, \&
+  {Goodman}}]{dfm}
+{Foreman-Mackey}, D., {Hogg}, D.~W., {Lang}, D., \& {Goodman}, J. 2012, ArXiv
+  e-prints
+
+\bibitem[{{Fukui} {et~al.}(2007){Fukui}, {Abe}, {Ayani}, {Fujii}, {Iizuka},
+  {Itow}, {Kabumoto}, {Kamiya}, {Kawabata}, {Kawanomoto}, {Kinugasa}, {Koff},
+  {Krajci}, {Naito}, {Nogami}, {Narusawa}, {Ohishi}, {Ohnishi}, {Sumi}, \&
+  {Tsumuraya}}]{fukui2007}
+{Fukui}, A., {Abe}, F., {Ayani}, K., {et~al.} 2007, \apj, 670, 423
+
+\bibitem[{{Gaudi}(2011)}]{gaudi2011}
+{Gaudi}, B.~S. 2011, {Microlensing by Exoplanets}, ed. S.~{Piper}, 79--110
+
+\bibitem[{{Gaudi} {et~al.}(2008){Gaudi}, {Patterson}, {Spiegel}, {Krajci},
+  {Koff}, {Pojma{\'n}ski}, {Dong}, {Gould}, {Prieto}, {Blake}, {Roming},
+  {Bennett}, {Bloom}, {Boyd}, {Eyler}, {de Ponthi{\`e}re}, {Mirabal}, {Morgan},
+  {Remillard}, {Vanmunster}, {Wagner}, \& {Watson}}]{gaudi2008}
+{Gaudi}, B.~S., {Patterson}, J., {Spiegel}, D.~S., {et~al.} 2008, \apj, 677,
+  1268
+
+\bibitem[{{Goodman} \& {Weare}(2010)}]{goodman}
+{Goodman}, J., \& {Weare}, J. 2010, Comm. App. Math. Comp. Sci., 5
+
+\bibitem[{{Hamadache} {et~al.}(2006){Hamadache}, {Le Guillou}, {Tisserand},
+  {Afonso}, {Albert}, {Andersen}, {Ansari}, {Aubourg}, {Bareyre}, {Beaulieu},
+  {Charlot}, {Coutures}, {Ferlet}, {Fouqu{\'e}}, {Glicenstein}, {Goldman},
+  {Gould}, {Graff}, {Gros}, {Haissinski}, {de Kat}, {Lesquoy}, {Loup},
+  {Magneville}, {Marquette}, {Maurice}, {Maury}, {Milsztajn}, {Moniez},
+  {Palanque-Delabrouille}, {Perdereau}, {Rahal}, {Rich}, {Spiro},
+  {Vidal-Madjar}, {Vigroux}, \& {Zylberajch}}]{hamadache2009}
+{Hamadache}, C., {Le Guillou}, L., {Tisserand}, P., {et~al.} 2006, \aap, 454,
+  185
+
+\bibitem[{{Han}(2008)}]{han2008}
+{Han}, C. 2008, \apj, 681, 806
+
+\bibitem[{{Kowalski} {et~al.}(2010){Kowalski}, {Hawley}, {Holtzman},
+  {Wisniewski}, \& {Hilton}}]{kowal2010}
+{Kowalski}, A.~F., {Hawley}, S.~L., {Holtzman}, J.~A., {Wisniewski}, J.~P., \&
+  {Hilton}, E.~J. 2010, \apjl, 714, L98
+
+\bibitem[{{Law} {et~al.}(2009){Law}, {Kulkarni}, {Dekany}, {Ofek}, {Quimby},
+  {Nugent}, {Surace}, {Grillmair}, {Bloom}, {Kasliwal}, {Bildsten}, {Brown},
+  {Cenko}, {Ciardi}, {Croner}, {Djorgovski}, {van Eyken}, {Filippenko}, {Fox},
+  {Gal-Yam}, {Hale}, {Hamam}, {Helou}, {Henning}, {Howell}, {Jacobsen},
+  {Laher}, {Mattingly}, {McKenna}, {Pickles}, {Poznanski}, {Rahmer}, {Rau},
+  {Rosing}, {Shara}, {Smith}, {Starr}, {Sullivan}, {Velur}, {Walters}, \&
+  {Zolkower}}]{nick2009}
+{Law}, N.~M., {Kulkarni}, S.~R., {Dekany}, R.~G., {et~al.} 2009, \pasp, 121,
+  1395
+
+\bibitem[{{Law} {et~al.}(2010){Law}, {Dekany}, {Rahmer}, {Hale}, {Smith},
+  {Quimby}, {Ofek}, {Kasliwal}, {Zolkower}, {Velur}, {Henning}, {Bui},
+  {McKenna}, {Nugent}, {Jacobsen}, {Walters}, {Bloom}, {Surace}, {Grillmair},
+  {Laher}, {Mattingly}, \& {Kulkarni}}]{nick2010}
+{Law}, N.~M., {Dekany}, R.~G., {Rahmer}, G., {et~al.} 2010, in Society of
+  Photo-Optical Instrumentation Engineers (SPIE) Conference Series, Vol. 7735
+
+\bibitem[{{Levitan} {et~al.}(2011){Levitan}, {Fulton}, {Groot}, {Kulkarni},
+  {Ofek}, {Prince}, {Shporer}, {Bloom}, {Cenko}, {Kasliwal}, {Law}, {Nugent},
+  {Poznanski}, {Quimby}, {Horesh}, {Sesar}, \& {Sternberg}}]{levitan2011}
+{Levitan}, D., {Fulton}, B.~J., {Groot}, P.~J., {et~al.} 2011, \apj, 739, 68
+
+\bibitem[{{Nieto--Santisteban} {et~al.}(2004)}]{sdss_images}
+{Nieto--Santisteban}, M.~A., {et~al.} 2004, in ASP Conf. Ser. 314: Astronomical
+  Data Analysis Software and Systems (ADASS) XIII, ed. F.~{Ochsenbein}, M.~G.
+  {Allen}, \& D.~{Egret}, 666--+
+
+\bibitem[{{Ofek} {et~al.}(2012){Ofek}, {Laher}, {Surace}, {Levitan}, {Sesar},
+  {Horesh}, {Law}, {van Eyken}, {Kulkarni}, {Prince}, {Nugent}, {Sullivan},
+  {Yaron}, {Pickles}, {Ag{\"u}eros}, {Arcavi}, {Bildsten}, {Bloom}, {Cenko},
+  {Gal-Yam}, {Grillmair}, {Helou}, {Kasliwal}, {Poznanski}, \&
+  {Quimby}}]{ofek2012}
+{Ofek}, E.~O., {Laher}, R., {Surace}, J., {et~al.} 2012, \pasp, 124, 854
+
+\bibitem[{{Oke} \& {Gunn}(1982)}]{oke_gunn}
+{Oke}, J.~B., \& {Gunn}, J.~E. 1982, \pasp, 94, 586
+
+\bibitem[{{Os{\l}owski} {et~al.}(2008){Os{\l}owski}, {Moderski}, {Bulik}, \&
+  {Belczynski}}]{oslowski2008}
+{Os{\l}owski}, S., {Moderski}, R., {Bulik}, T., \& {Belczynski}, K. 2008, \aap,
+  478, 429
+
+\bibitem[{{Paczynski}(1986)}]{paczynski1986}
+{Paczynski}, B. 1986, \apj, 304, 1
+
+\bibitem[{{Pickles}(1998)}]{Pickles1998}
+{Pickles}, A.~J. 1998, \pasp, 110, 863
+
+\bibitem[{{Polishook} {et~al.}(2012){Polishook}, {Ofek}, {Waszczak},
+  {Kulkarni}, {Gal-Yam}, {Aharonson}, {Laher}, {Surace}, {Klein}, {Bloom},
+  {Brosch}, {Prialnik}, {Grillmair}, {Cenko}, {Kasliwal}, {Law}, {Levitan},
+  {Nugent}, {Poznanski}, \& {Quimby}}]{polishook2012}
+{Polishook}, D., {Ofek}, E.~O., {Waszczak}, A., {et~al.} 2012, \mnras, 421,
+  2094
+
+\bibitem[{{Rahmer} {et~al.}(2008){Rahmer}, {Smith}, {Velur}, {Hale}, {Law},
+  {Bui}, {Petrie}, \& {Dekany}}]{rahmer2008}
+{Rahmer}, G., {Smith}, R., {Velur}, V., {et~al.} 2008, in Society of
+  Photo-Optical Instrumentation Engineers (SPIE) Conference Series, Vol. 7014
+
+\bibitem[{{Rattenbury} {et~al.}(2005){Rattenbury}, {Abe}, {Bennett}, {Bond},
+  {Calitz}, {Claret}, {Cook}, {Furuta}, {Gal-Yam}, {Glicenstein}, {Hearnshaw},
+  {Hauschildt}, {Kilmartin}, {Kurata}, {Masuda}, {Maoz}, {Matsubara},
+  {Meintjes}, {Moniez}, {Muraki}, {Noda}, {Ofek}, {Okajima}, {Philpott},
+  {Rhie}, {Sako}, {Sullivan}, {Sumi}, {Terndrup}, {Tristram}, {Wood},
+  {Yanagisawa}, \& {Yock}}]{rattenbury2005}
+{Rattenbury}, N.~J., {Abe}, F., {Bennett}, D.~P., {et~al.} 2005, \aap, 439, 645
+
+\bibitem[{{Rau} {et~al.}(2009){Rau}, {Kulkarni}, {Law}, {Bloom}, {Ciardi},
+  {Djorgovski}, {Fox}, {Gal-Yam}, {Grillmair}, {Kasliwal}, {Nugent}, {Ofek},
+  {Quimby}, {Reach}, {Shara}, {Bildsten}, {Cenko}, {Drake}, {Filippenko},
+  {Helfand}, {Helou}, {Howell}, {Poznanski}, \& {Sullivan}}]{rau2009}
+{Rau}, A., {Kulkarni}, S.~R., {Law}, N.~M., {et~al.} 2009, \pasp, 121, 1334
+
+\bibitem[{{Richards} {et~al.}(2002)}]{richards02}
+{Richards}, G.~T., {et~al.} 2002, \aj, 123, 2945
+
+\bibitem[{{Sartore} \& {Treves}(2010)}]{sartore2010}
+{Sartore}, N., \& {Treves}, A. 2010, \aap, 523, A33
+
+\bibitem[{{Shin} {et~al.}(2009){Shin}, {Sekora}, \& {Byun}}]{shin2009}
+{Shin}, M.-S., {Sekora}, M., \& {Byun}, Y.-I. 2009, \mnras, 400, 1897
+
+\bibitem[{{Stetson}(1996)}]{stetson1996}
+{Stetson}, P.~B. 1996, \pasp, 108, 851
+
+\bibitem[{{Stoughton} {et~al.}(2002){Stoughton}, {Lupton}, {Bernardi},
+  {Blanton}, {Burles}, {Castander}, {Connolly}, {Eisenstein}, {Frieman},
+  {Hennessy}, {Hindsley}, {Ivezi{\'c}}, {Kent}, {Kunszt}, {Lee}, {Meiksin},
+  {Munn}, {Newberg}, {Nichol}, {Nicinski}, {Pier}, {Richards}, {Richmond},
+  {Schlegel}, {Smith}, {Strauss}, {SubbaRao}, {Szalay}, {Thakar}, {Tucker},
+  {Vanden Berk}, {Yanny}, {Adelman}, {Anderson}, {Anderson}, {Annis},
+  {Bahcall}, {Bakken}, {Bartelmann}, {Bastian}, {Bauer}, {Berman},
+  {B{\"o}hringer}, {Boroski}, {Bracker}, {Briegel}, {Briggs}, {Brinkmann},
+  {Brunner}, {Carey}, {Carr}, {Chen}, {Christian}, {Colestock}, {Crocker},
+  {Csabai}, {Czarapata}, {Dalcanton}, {Davidsen}, {Davis}, {Dehnen},
+  {Dodelson}, {Doi}, {Dombeck}, {Donahue}, {Ellman}, {Elms}, {Evans}, {Eyer},
+  {Fan}, {Federwitz}, {Friedman}, {Fukugita}, {Gal}, {Gillespie}, {Glazebrook},
+  {Gray}, {Grebel}, {Greenawalt}, {Greene}, {Gunn}, {de Haas}, {Haiman},
+  {Haldeman}, {Hall}, {Hamabe}, {Hansen}, {Harris}, {Harris}, {Harvanek},
+  {Hawley}, {Hayes}, {Heckman}, {Helmi}, {Henden}, {Hogan}, {Hogg}, {Holmgren},
+  {Holtzman}, {Huang}, {Hull}, {Ichikawa}, {Ichikawa}, {Johnston}, {Kauffmann},
+  {Kim}, {Kimball}, {Kinney}, {Klaene}, {Kleinman}, {Klypin}, {Knapp},
+  {Korienek}, {Krolik}, {Kron}, {Krzesi{\'n}ski}, {Lamb}, {Leger},
+  {Limmongkol}, {Lindenmeyer}, {Long}, {Loomis}, {Loveday}, {MacKinnon},
+  {Mannery}, {Mantsch}, {Margon}, {McGehee}, {McKay}, {McLean}, {Menou},
+  {Merelli}, {Mo}, {Monet}, {Nakamura}, {Narayanan}, {Nash}, {Neilsen},
+  {Newman}, {Nitta}, {Odenkirchen}, {Okada}, {Okamura}, {Ostriker}, {Owen},
+  {Pauls}, {Peoples}, {Peterson}, {Petravick}, {Pope}, {Pordes}, {Postman},
+  {Prosapio}, {Quinn}, {Rechenmacher}, {Rivetta}, {Rix}, {Rockosi}, {Rosner},
+  {Ruthmansdorfer}, {Sandford}, {Schneider}, {Scranton}, {Sekiguchi}, {Sergey},
+  {Sheth}, {Shimasaku}, {Smee}, {Snedden}, {Stebbins}, {Stubbs}, {Szapudi},
+  {Szkody}, {Szokoly}, {Tabachnik}, {Tsvetanov}, {Uomoto}, {Vogeley}, {Voges},
+  {Waddell}, {Walterbos}, {Wang}, {Watanabe}, {Weinberg}, {White}, {White},
+  {Wilhite}, {Wolfe}, {Yasuda}, {York}, {Zehavi}, \& {Zheng}}]{stoughton02}
+{Stoughton}, C., {Lupton}, R.~H., {Bernardi}, M., {et~al.} 2002, \aj, 123, 485
+
+\bibitem[{{Sumi} {et~al.}(2011){Sumi}, {Kamiya}, {Bennett}, {Bond}, {Abe},
+  {Botzler}, {Fukui}, {Furusawa}, {Hearnshaw}, {Itow}, {Kilmartin}, {Korpela},
+  {Lin}, {Ling}, {Masuda}, {Matsubara}, {Miyake}, {Motomura}, {Muraki},
+  {Nagaya}, {Nakamura}, {Ohnishi}, {Okumura}, {Perrott}, {Rattenbury}, {Saito},
+  {Sako}, {Sullivan}, {Sweatman}, {Tristram}, {Udalski}, {Szyma{\'n}ski},
+  {Kubiak}, {Pietrzy{\'n}ski}, {Poleski}, {Soszy{\'n}ski}, {Wyrzykowski},
+  {Ulaczyk}, \& {Microlensing Observations in Astrophysics (MOA)
+  Collaboration}}]{sumi2011}
+{Sumi}, T., {Kamiya}, K., {Bennett}, D.~P., {et~al.} 2011, \nat, 473, 349
+
+\bibitem[{{Tomov} {et~al.}(2013){Tomov}, {Tomova}, \& {Bisikalo}}]{tomov2013}
+{Tomov}, N.~A., {Tomova}, M.~T., \& {Bisikalo}, D.~V. 2013, ArXiv e-prints
+
+\bibitem[{{Udalski}(2003)}]{udalski03}
+{Udalski}, A. 2003, \actaa, 53, 291
+
+\bibitem[{{Udalski} {et~al.}(1992){Udalski}, {Szymanski}, {Kaluzny}, {Kubiak},
+  \& {Mateo}}]{original_ogle}
+{Udalski}, A., {Szymanski}, M., {Kaluzny}, J., {Kubiak}, M., \& {Mateo}, M.
+  1992, \actaa, 42, 253
+
+\bibitem[{{Udalski} {et~al.}(1994){Udalski}, {Szymanski}, {Stanek}, {Kaluzny},
+  {Kubiak}, {Mateo}, {Krzeminski}, {Paczynski}, \&
+  {Venkat}}]{ogle_optical_depth}
+{Udalski}, A., {Szymanski}, M., {Stanek}, K.~Z., {et~al.} 1994, \actaa, 44, 165
+
+\bibitem[{{von Neumann} {et~al.}(1941){von Neumann}, {Kent}, {Bellinson}, \&
+  {Hart}}]{von_neumann1941}
+{von Neumann}, J., {Kent}, R.~H., {Bellinson}, H.~R., \& {Hart}, B.~I. 1941,
+  The Annals of Mathematical Statistics, 12, 153
+
+\bibitem[{{Wozniak}(2000)}]{con_idx}
+{Wozniak}, P.~R. 2000, \actaa, 50, 421
+
+\bibitem[{{Wright} {et~al.}(2010){Wright}, {Eisenhardt}, {Mainzer}, {Ressler},
+  {Cutri}, {Jarrett}, {Kirkpatrick}, {Padgett}, {McMillan}, {Skrutskie},
+  {Stanford}, {Cohen}, {Walker}, {Mather}, {Leisawitz}, {Gautier}, {McLean},
+  {Benford}, {Lonsdale}, {Blain}, {Mendez}, {Irace}, {Duval}, {Liu}, {Royer},
+  {Heinrichsen}, {Howard}, {Shannon}, {Kendall}, {Walsh}, {Larsen}, {Cardon},
+  {Schick}, {Schwalm}, {Abid}, {Fabinsky}, {Naes}, \& {Tsai}}]{WISE}
+{Wright}, E.~L., {Eisenhardt}, P.~R.~M., {Mainzer}, A.~K., {et~al.} 2010, \aj,
+  140, 1868
+
+\bibitem[{{Wyrzykowski} {et~al.}(2009){Wyrzykowski}, {Koz{\l}owski}, {Skowron},
+  {Belokurov}, {Smith}, {Udalski}, {Szyma{\'n}ski}, {Kubiak},
+  {Pietrzy{\'n}ski}, {Soszy{\'n}ski}, {Szewczyk}, \&
+  {{\.Z}ebru{\'n}}}]{wyrzykowski2009}
+{Wyrzykowski}, {\L}., {Koz{\l}owski}, S., {Skowron}, J., {et~al.} 2009, \mnras,
+  397, 1228
+
+\bibitem[{Yan {et~al.}(2013)Yan, Donoso, Tsai, Stern, Assef, Eisenhardt, Blain,
+  Cutri, Jarrett, Stanford, Wright, Bridge, \& Riechers}]{yan2013}
+Yan, L., Donoso, E., Tsai, C.-W., {et~al.} 2013, \aj, 145, 55
+
+\bibitem[{{York} {et~al.}(2000)}]{york00}
+{York}, D.~G., {et~al.} 2000, \aj, 120, 1579
+
+\end{thebibliography}
 
 \end{document}  
