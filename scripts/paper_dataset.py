@@ -21,43 +21,34 @@ from astropy.io import fits
 import ptf.db.photometric_database as pdb
 from ptf.globals import all_fields, data_path
 
-np.random.seed(42)
+def get_lcs(field, N_per_field=5, seed=42):
+    np.random.random(seed)
 
-cache = defaultdict(dict)
-def get_lcs(Nlightcurves=1000, seed=42):
-    Nfields = len(all_fields)
-
-    ccd_ids = range(13)
-    ccd_ids.pop(3)
-
-    np.random.seed(seed)
+    cache = dict()
     lcs = []
-    while len(lcs) < Nlightcurves:
-        field_row = all_fields[np.random.randint(Nfields)]
-        field_id = field_row['id']
+    for ii in range(N_per_field):
+        ccd = random.choice(field.ccds.values)
 
-        field = pdb.Field(field_id, 'R')
-
-        if len(field.ccds) == 0:
-            continue
-
-        ccd = random.choice(field.ccds.values())
-        if not cache[field_id].has_key(ccd.id):
+        if not cache.has_key(ccd.id):
             chip = ccd.read()
             sources = chip.sources.readWhere("ngoodobs > 10")
-            cache[field_id][ccd.id] = sources
+            cache[ccd.id] = sources
 
-        np.random.shuffle(cache[field_id][ccd.id])
+        sources = cache[ccd.id]
+        np.random.shuffle(sources)
 
-        for source in cache[field_id][ccd.id]:
-            lc = ccd.light_curve(source["matchedSourceID"], clean=True, barebones=True)
+        for source in sources:
+            lc = ccd.light_curve(source["matchedSourceID"], clean=True,
+                                 barebones=True)
             if len(lc) > 10:
                 lcs.append(lc)
                 break
 
+    field.close()
+
     return lcs
 
-def store_light_curves(lcs):
+def lcsToArray(lcs):
     data = None
     for lc in lcs:
         n = len(lc.mjd)
@@ -69,22 +60,37 @@ def store_light_curves(lcs):
             data = np.array([f, c, s, lc.mjd, lc.mag, lc.error])
         else:
             data = np.hstack((data, np.array([f, c, s, lc.mjd, lc.mag, lc.error])))
-    
+
     dtype = [("field", int), ("ccd", int), ("id", int), \
              ("mjd", float), ("R_mag", float), ("mag_err", float)]
-    
+
     return np.array(data, dtype=dtype).view(np.recarray)
 
-if __name__ == "__main__":       
+if __name__ == "__main__":
+
+    all_fields = all_fields[all_fields["dec"] > -30.]
     path = "/home/aprice-whelan/new/ptf/data/paper_dataset"
 
-    for seed in range(10, 25):
-        fn = os.path.join(path, "lc_{0}.fits".format(seed))
-        if os.path.exists(fn): continue
-        lcs = get_lcs(100, seed=seed)
-        print(seed, len(lcs))
-        data = store_light_curves(lcs)
-        hdu = fits.BinTableHDU(data)
-        hdu.writeto(fn)
+    ii = 0
+    subdiv = 10
+    Nfields = len(all_fields)
+    field_subset = all_fields[ii*Nfields//subdiv:ii*Nfields//subdiv+Nfields//subdiv]
 
-        del data, lcs
+    for f in field_subset:
+        field = pdb.Field(f["id"], "R")
+        if len(field.ccds) == 0:
+            continue
+
+        lcs = get_lcs
+        arr = lcsToArray(lcs)
+
+        try:
+            np.hstack(data, arr)
+        except NameError:
+            data = arr
+
+        if len(data) >= 1000:
+            hdu = fits.BinTableHDU(data)
+            hdu.writeto(fn)
+            del data
+
