@@ -40,11 +40,14 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 # Project
-from ptf.simulation.simulatedlightcurve import SimulatedLightCurve
-import ptf.photometricdatabase as pdb
+from ptf.lightcurve import SimulatedLightCurve
+import ptf.db.photometric_database as pdb
 import ptf.analyze.analyze as analyze
-from ptf.globals import index_to_label
+#from ptf.globals import index_to_label
+import ptf.util as pu
 import ptf.variability_indices as vi
+
+index_to_label = pu.index_to_label
 
 best = False
 
@@ -103,6 +106,8 @@ def detection_efficiency_for_field(field, ccds=range(12), config=dict(), overwri
         os.remove(pickle_filename)
         logger.debug("Data file deleted...")
     
+    #print(pickle_filename, os.path.exists(pickle_filename))
+
     # If the cache pickle file doesn't exist, generate the data
     if not os.path.exists(pickle_filename):
         logger.info("Data file {} not found. Generating data...".format(pickle_filename))
@@ -299,7 +304,7 @@ def plot_distributions(selected_distributions, simulated_microlensing_statistics
             plt.setp(axes[jj,ii].get_yticklabels(), visible=False)
             
             if ii == 0:
-                axes[jj,ii].set_ylabel(index_to_label[index], fontsize=24, rotation=0)
+                axes[jj,ii].set_ylabel(index_to_label(index), fontsize=24, rotation=0)
             
             if ii == 0:
                 ylim = axes[jj,ii].get_ylim()
@@ -321,6 +326,8 @@ def plot_distributions(selected_distributions, simulated_microlensing_statistics
     fig.savefig(filename)
 
 def get_best_light_curve(field, ccd_id):
+    print(field.ccds)
+    sys.exit(0)
     ccd = field.ccds[ccd_id]
     chip = ccd.read()
     sources = chip.sources.readWhere("ngoodobs > 100")
@@ -341,7 +348,7 @@ def plot_best_light_curve(field_id, ccd_id):
     from pylab import ScalarFormatter
     ax.yaxis.set_major_formatter(ScalarFormatter(False))
     ax.set_xlabel("MJD", fontsize=20)
-    ax.set_ylabel("$R$ (mag)", fontsize=20)
+    ax.set_ylabel("$R$ [mag]", fontsize=20)
     fig.savefig("plots/new_detection_efficiency/example_light_curve_f{}_ccd{}.pdf".format(field.id, ccd_id), bbox_inches="tight")
 
 if __name__ == "__main__":
@@ -383,15 +390,15 @@ if __name__ == "__main__":
     config["number_of_microlensing_simulations_per_light_curve"] = args.N
     
     np.random.seed(42)
-    field = pdb.Field(args.field_id, filter="R")
+    if args.plot:
+        plot_best_light_curve(args.field_id, 2)
+
+    field = pdb.Field(int(args.field_id), filter="R")
     simulated_microlensing_statistics, selected_distributions = detection_efficiency_for_field(field, \
                                                                                                config=config, \
                                                                                                overwrite=args.overwrite, \
                                                                                                indices=indices,
                                                                                                plot=args.plot)
-    if args.plot:
-        plot_best_light_curve(args.field_id, 2)
-    
     
     sys.exit(0)
     fig, axes = plt.subplots(1, 1, sharex=True, figsize=(15,10))
