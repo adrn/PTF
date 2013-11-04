@@ -76,6 +76,8 @@ if __name__ == "__main__":
     Nfields = len(all_fields)
     field_subset = all_fields[ii*Nfields//subdiv:ii*Nfields//subdiv+Nfields//subdiv]
 
+    fn = os.path.join(path, "{0}.fits".format(ii))
+
     for f in field_subset:
         field = pdb.Field(f["id"], "R")
         if len(field.ccds) == 0:
