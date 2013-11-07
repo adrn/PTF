@@ -68,7 +68,7 @@ PTF data are collected using the former Canada-France-Hawaii Telescope 12K$\time
 
 While a real-time image-differencing pipeline identifies transients of interest and passes these to a dedicated photometric follow-up telescope, a separate pipeline generates PTF light curves. Images are processed using standard reduction procedures including de-biasing, flat-fielding, and astrometric calibration (Laher et al., in prep). SExtractor is used for source identification \citep{bertin96}. The absolute photometric calibration of the images is good to a systematic limit of $\sim$2\% for photometric nights, as described in \cite{ofek2012}.  The final light curves are produced using relative photometric calibration, which refines the calibration to $<$1\% for photometric nights and improves the calibration for bad nights \citep[Levitan et al., in prep; for algorithm details see][]{levitan2011, ofek2012}. The resulting archive is an excellent resource for the study of periodic forms of variability \citep[e.g., stellar or asteroid rotation;][]{agueros11,polishook2012}. 
 
-As of 2012 Dec, the PTF footprint includes $\sim$15,224 (2766) deg$^2$ imaged $>$10 ($>$100) times in $R$-band and $\sim$5430 (290) deg$^2$ imaged that often in $g$-band (see Figure~\ref{fig:survey_footprint}). The PTF survey footprint is not uniformly sampled either spatially or temporally. Each field has a unique sampling pattern determined by which of the PTF sub-surveys it belongs to, what time of the year it is visible, and how high a priority it is given by the scheduler. The imaging cadences range from 1-5 days, but other cadences are possible: for example, there was a higher-cadence campaign of a field in Orion to find transiting planets around young stars \citep{nick2009}. The result is that PTF light curves often contain gaps and regions of high-cadence observations and/or of low-cadence observations, so that the archive is a massive dataset of irregularly-sampled, time-domain photometry. Figure~\ref{fig:sampling} shows six randomly selected light curves and illustrates the varying cadences and coverage that different fields may have over the same one-year period. While the PTF database is not yet public, we have made $10^4$ randomly selected light curves available at \url{http:// TODO }. These light curves meet the quality criteria described in Section~\ref{sec:detection_eff} and can be used to test the statistical methods described here (or others!).
+As of 2012 Dec, the PTF footprint includes $\sim$15,224 (2766) deg$^2$ imaged $>$10 ($>$100) times in $R$-band and $\sim$5430 (290) deg$^2$ imaged that often in $g$-band (see Figure~\ref{fig:survey_footprint}). The PTF survey footprint is not uniformly sampled either spatially or temporally. Each field has a unique sampling pattern determined by which of the PTF sub-surveys it belongs to, what time of the year it is visible, and how high a priority it is given by the scheduler. The imaging cadences range from 1-5 days, but other cadences are possible: for example, there was a higher-cadence campaign of a field in Orion to find transiting planets around young stars \citep{vaneyken2011}. The result is that PTF light curves often contain gaps and regions of high-cadence observations and/or of low-cadence observations, so that the archive is a massive dataset of irregularly-sampled, time-domain photometry. Figure~\ref{fig:sampling} shows six randomly selected light curves and illustrates the varying cadences and coverage that different fields may have over the same one-year period. While the PTF database is not yet public, we have made $\sim$$10^4$ randomly selected light curves available at \url{http://adrian.pw/PTF/lightcurves.tar.gz}. These light curves meet the quality criteria described in Section~\ref{sec:detection_eff} and can be used to test the statistical methods described here (or others!).
 
 \begin{figure}[h]
 \begin{center}
@@ -140,11 +140,9 @@ $J$ and $K$ were suggested by \cite{stetson1996}:
 	J &= \sum^{N-1}_i sign(\delta_i \delta_{i+1})\sqrt{|\delta_i \delta_{i+1}|},\\
 	K &= \frac{1/N\sum^N_i |\delta_i|}{\sqrt{1/N\sum^N_i\delta_i^2}},
 \end{align}
-where $e_i$ is the photometric error of each data point, and the $sign$ function returns $\pm$1, depending on the sign of the argument. $J$ tends to 0 for non-variable stars, but is large when there are significant differences between successive data points in a light curve. $K$ is a measure of the kurtosis of the distribution of data points. We add one more index, $\Delta \chi^2$, the difference in $\chi^2$ between fitting a Gaussian model and fitting a linear model to a light curve. 
+where $e_i$ is the photometric error of each data point, and the $sign$ function returns $\pm$1, depending on the sign of the argument. $J$ tends to 0 for non-variable stars, but is large when there are significant differences between successive data points in a light curve. $K$ is a measure of the kurtosis of the distribution of data points. We add one more index, $\Delta \chi^2$, the difference in $\chi^2$ between fitting a Gaussian model and fitting a linear model to a light curve. This is a standard statistical test used by microlensing surveys, and allows us to compare the relative performance of the (slightly modified) \cite{shin2009} indices and of this approach.
 
-Specifically, we use a Levenberg-Marquardt optimizer to perform a least-squares fit with each of these models to the light curves and then compute $\Delta\chi^2=\chi_{linear} - \chi_{gaussian}$. Our tests with $\Delta \chi^2$ below compare the distribution of values over light curves on the same chip. As a result, the number of data points and number of model parameters are constant, and we therefore do not include an Akaike or Bayesian information criterion term. For the Gaussian fit, the optimizer is initialized with a $\sigma$ of 10 days, centered on the brightest data point. 
-
-This is a standard statistical test used by microlensing surveys, and allows us to compare the relative performance of the (slightly modified) \cite{shin2009} indices and of this approach. 
+Specifically, we use a Levenberg-Marquardt optimizer to perform a least-squares fit with each of these models to the light curves and then compute $\Delta\chi^2=\chi_{linear} - \chi_{gaussian}$. Our tests with $\Delta \chi^2$ below compare the distribution of values over light curves on the same chip. As a result, the number of data points and number of model parameters are constant, and we therefore do not include an Akaike or Bayesian information criterion (AIC or BIC) term. For the Gaussian fit, the optimizer is initialized with a $\sigma$ of 10 days, centered on the brightest data point.
 
 Figure~\ref{fig:indices_examples} shows maximally outlying light curves for each variability statistic selected from $\sim$20,000 light curves for objects on a single CCD in PTF field 3756. %, centered at (J2000) 17:21:31.44 $+$61:07:46.6. 
 Clearly, the indices are sensitive to different aspects of variability in the data. We expect $\sigma/\mu$ to be most useful for discerning periodic or semi-periodic variability where the variance is large; the expectations are not as clear for other indices. 
@@ -422,7 +420,7 @@ For these three plausible events, we use a Markov-chain Monte-Carlo algorithm to
 While this number of candidate events is consistent with simple predictions, microlensing event rate predictions away from the Galactic Plane are generally not well constrained. In a forthcoming paper, we will present a detailed investigation of the all-sky microlensing event rate,  generated from a model that includes realistic mass and velocity distributions
 (Fournier et al., in prep). 
 
-Our algorithm identified $\sim$2000 transient candidates from a database of over $10^9$ light curves, each of which we then visually inspected. Rigorously classifying and cataloging these sources was outside of the scope of this paper, but many  presented interesting forms of variability. Though it is not necessarily scalable for future surveys to look at all light curves selected by using our algorithm, these $\sim$2000 light curves, once carefully classified, could serve as a training set for a more sophisticated machine-learning approach \cite[e.g.,][]{bloomPasp,brink2013} to classify the light curves that survive our selection criteria. Approaches that combine statistical cuts such as those described in this paper and some type of machine learning will be essential to making the most of the future time-domain data such as that collected by the Large Synoptic Survey Telescope.
+Our algorithm identified $\sim$2000 transient candidates from a database of over $10^9$ light curves, each of which we then visually inspected. Rigorously classifying and cataloging these sources was outside of the scope of this paper, but many  presented interesting forms of variability. Though it is not necessarily scalable for future surveys to look at all light curves selected by using our algorithm, these $\sim$2000 light curves, once carefully classified, could serve as a training set for a more sophisticated machine-learning approach \cite[e.g.,][]{bloomPasp, brink2013} to classify the light curves that survive our selection criteria. Approaches that combine statistical cuts such as those described in this paper and some type of machine learning will be essential to making the most of the future time-domain data such as that collected by the Large Synoptic Survey Telescope.
 
 \acknowledgments
 We thank E.~Bowsher, S.~Douglas, and S.~Tang for their assistance in obtaining spectra for our candidates, and M.~Modjaz for help in interpreting several of these spectra. We are grateful to the anonymous referee and to our editor, E.~Feigelson, for comments that improved the paper.
@@ -438,11 +436,11 @@ This publication makes use of data products from the Wide-field Infrared Survey 
 This research made use of Astropy (\url{http://www.astropy.org}), a community-developed core Python package for astronomy.
 
 %\bigskip
-\setlength{\baselineskip}{0.6\baselineskip}
+%\setlength{\baselineskip}{0.6\baselineskip}
 %\bibliography{references_3}
-\setlength{\baselineskip}{1.667\baselineskip}
+%\setlength{\baselineskip}{1.667\baselineskip}
 
-\begin{thebibliography}{56}
+\begin{thebibliography}{57}
 \expandafter\ifx\csname natexlab\endcsname\relax\def\natexlab#1{#1}\fi
 
 \bibitem[{{Ag{\"u}eros} {et~al.}(2011){Ag{\"u}eros}, {Covey}, {Lemonias},
@@ -725,6 +723,14 @@ J.~Durbin and G.~S. Watson.
   {Kubiak}, {Mateo}, {Krzeminski}, {Paczynski}, \&
   {Venkat}}]{ogle_optical_depth}
 {Udalski}, A., {Szymanski}, M., {Stanek}, K.~Z., {et~al.} 1994, \actaa, 44, 165
+
+\bibitem[{{van Eyken} {et~al.}(2011){van Eyken}, {Ciardi}, {Rebull},
+  {Stauffer}, {Akeson}, {Beichman}, {Boden}, {von Braun}, {Gelino}, {Hoard},
+  {Howell}, {Kane}, {Plavchan}, {Ram{\'{\i}}rez}, {Bloom}, {Cenko}, {Kasliwal},
+  {Kulkarni}, {Law}, {Nugent}, {Ofek}, {Poznanski}, {Quimby}, {Grillmair},
+  {Laher}, {Levitan}, {Mattingly}, \& {Surace}}]{vaneyken2011}
+{van Eyken}, J.~C., {Ciardi}, D.~R., {Rebull}, L.~M., {et~al.} 2011, \aj, 142,
+  60
 
 \bibitem[{{von Neumann} {et~al.}(1941){von Neumann}, {Kent}, {Bellinson}, \&
   {Hart}}]{von_neumann1941}
